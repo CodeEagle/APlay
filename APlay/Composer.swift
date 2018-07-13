@@ -33,17 +33,17 @@ final class Composer {
 
     private unowned let _config: ConfigurationCompatible
     #if DEBUG
-    private static var count = 0
-    private let _id: Int
-    deinit {
-        debug_log("\(self) \(#function)")
-    }
+        private static var count = 0
+        private let _id: Int
+        deinit {
+            debug_log("\(self) \(#function)")
+        }
     #endif
 
     init(player: PlayerCompatible, config: ConfigurationCompatible) {
         #if DEBUG
-        _id = Composer.count
-        Composer.count = Composer.count &+ 1
+            _id = Composer.count
+            Composer.count = Composer.count &+ 1
         #endif
         _config = config
         _streamer = config.streamerBuilder(config)
@@ -78,7 +78,7 @@ final class Composer {
             case let .errorOccurred(error):
                 sself.eventPipeline.call(.error(error))
             case let .metadata(map):
-                sself.eventPipeline.call(.metadata(map))
+                sself.modifyMetadata(of: map)
             }
         }
 
@@ -102,7 +102,7 @@ final class Composer {
                         }
                     }
                 }
-                sself._ringBuffer.write(data: item.data, amount: item.count)
+                sself._ringBuffer.write(data: item.0, amount: item.1)
             case let .error(err):
                 sself.eventPipeline.call(.error(err))
                 if case APlay.Error.parser = err {
@@ -133,6 +133,23 @@ final class Composer {
             }
             eventPipeline.call(.error(e))
         }
+    }
+
+    private func modifyMetadata(of data: [MetadataParser.Item]) {
+        var ori = data
+        for (index, item) in data.enumerated() {
+            guard case let MetadataParser.Item.title(value) = item else { continue }
+            if value.isEmpty {
+                ori.remove(at: index)
+                break
+            } else {
+                eventPipeline.call(.metadata(ori))
+                return
+            }
+        }
+        let title = _streamer.info.fileName
+        ori.append(MetadataParser.Item.title(title))
+        eventPipeline.call(.metadata(ori))
     }
 }
 
@@ -178,7 +195,7 @@ extension Composer {
         if let value = info { _decoder.info.update(from: value) }
         _decoder.resume()
         _streamer.open(url: url, at: position)
-        _player?.setup(APlay.Configuration.canonical)
+        _player?.setup(Player.canonical)
         _player?.readClosure = { [weak self] size, pointer in
             guard let sself = self else { return (0, false) }
             let (readSize, isFirstData) = sself._ringBuffer.read(amount: size, into: pointer)
@@ -195,7 +212,7 @@ extension Composer {
         isRunning = true
         _config.startBackgroundTask(isToDownloadImage: false)
     }
-    
+
     func position(for time: inout TimeInterval) -> StreamProvider.Position {
         let d = duration
         guard d > 0 else { return 0 }
@@ -204,8 +221,7 @@ extension Composer {
         let percentage = Float(finalTime) / d
         // more accuracy using `_decoder.streamInfo.metadataSize` then `streamerinfo.dataOffset`, may id3v2 and id3v1 tag both exist.
         var dataOffset = percentage * Float(_streamer.contentLength - _decoder.info.metadataSize)
-        
-        
+
         let fileHint = streamInfo.fileHint
         if fileHint == .wave {
             let blockSize = Float(streamInfo.waveSubchunk1Size)
@@ -240,7 +256,7 @@ extension Composer {
         _decoder.destroy()
         _streamer.destroy()
     }
-    
+
     func seekable() -> Bool {
         return _decoder.seekable()
     }

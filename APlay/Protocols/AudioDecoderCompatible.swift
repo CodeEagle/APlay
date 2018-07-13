@@ -17,7 +17,7 @@ public protocol AudioDecoderCompatible: AnyObject {
     func resume()
     func destroy()
     func seekable() -> Bool
-    
+
     var info: AudioDecoder.Info { get }
     var outputStream: Delegated<AudioDecoder.Event, Void> { get }
     var inputStream: Delegated<AudioDecoder.AudioInput, Void> { get }
@@ -28,7 +28,6 @@ public protocol AudioDecoderCompatible: AnyObject {
 // MARK: - AudioDecoder
 
 public struct AudioDecoder {
-    
     /// AudioDecoder Event
     ///
     /// - error: error
@@ -51,22 +50,8 @@ public struct AudioDecoder {
 
     // MARK: - AudioOutput
 
-    /// AudioOutput for Decoder
-    public final class AudioOutput {
-        /// data
-        public let data: UnsafeMutableRawPointer
-        /// data count
-        public let count: UInt32
-
-        deinit { free(data) }
-
-        public init(data: UnsafeRawPointer, count: UInt32) {
-            let cnt = Int(count)
-            self.data = malloc(cnt)
-            memcpy(self.data, data, cnt)
-            self.count = count
-        }
-    }
+    /// (UnsafePointer<UInt8>, UInt32, Bool)
+    public typealias AudioOutput = (UnsafeRawPointer, UInt32)
 
     // MARK: - Decoder Info
 
@@ -74,7 +59,7 @@ public struct AudioDecoder {
     public final class Info {
         private static let maxBitrateSample = 50
         public lazy var srcFormat = AudioStreamBasicDescription()
-        public lazy var dstFormat = APlay.Configuration.canonical
+        public lazy var dstFormat = Player.canonical
         public lazy var audioDataByteCount: UInt = 0
         public lazy var dataOffset: UInt = 0
         public lazy var sampleRate: Float64 = 0
@@ -92,10 +77,8 @@ public struct AudioDecoder {
         private var isUpdatedOnce = false
 
         public init() {}
-        
-        func infoUpdated() {
-            isUpdatedOnce = true
-        }
+
+        func infoUpdated() { isUpdatedOnce = true }
 
         func reset() {
             srcFormat = AudioStreamBasicDescription()
@@ -146,7 +129,7 @@ public struct AudioDecoder {
             }
             return false
         }
-        
+
         func seekable() -> Bool {
             guard isUpdatedOnce else { return false }
             if fileHint == .flac {

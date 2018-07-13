@@ -54,8 +54,6 @@ public final class Uroboros {
     public var startAddress: UnsafeMutablePointer<Byte>? { return baseAddress?.advanced(by: Int(start)) }
     /// Queue for write action
     private let _writeQueue = DispatchQueue(label: "Uroboros.Write")
-    /// Queue for read action
-    private let _readQueue = DispatchQueue(label: "Uroboros.Read")
     /// Queue for properties I/O
     private let _propertiesQueue = DispatchQueue(label: "Uroboros.Properties")
     /// Semaphore for stop/continue write action
@@ -64,9 +62,9 @@ public final class Uroboros {
     private var _body: UroborosBody
 
     private var _name: String
-    
+
     private var _deliveryingFirstPacket = true
-    
+
     #if DEBUG
         deinit {
             debug_log("\(self)[\(_name)] \(#function)")
@@ -119,26 +117,23 @@ public final class Uroboros {
     /// - Returns: size for this time read
     @discardableResult public func read(amount: UInt32, into data: UnsafeMutableRawPointer, commitRead: Bool = true) -> (UInt32, Bool) {
         if amount == 0 || availableData == 0 { return (0, false) }
-
-        return _readQueue.sync {
-            let read = _propertiesQueue.sync {
-                return _availableData < amount ? _availableData : amount
-            }
-            let intCount = Int(read)
-            let targetLocation = Int(_start) + intCount
-            if targetLocation > capacity {
-                let secondPartLength = targetLocation - Int(capacity)
-                let firstPartLength = intCount - secondPartLength
-                memcpy(data, startAddress, firstPartLength)
-                memcpy(data.advanced(by: firstPartLength), baseAddress, secondPartLength)
-            } else {
-                memcpy(data, startAddress, intCount)
-            }
-            if commitRead { self.commitRead(count: read) }
-            let value = _deliveryingFirstPacket
-            _deliveryingFirstPacket = false
-            return (read, value)
+        let read = _propertiesQueue.sync {
+            return _availableData < amount ? _availableData : amount
         }
+        let intCount = Int(read)
+        let targetLocation = Int(_start) + intCount
+        if targetLocation > capacity {
+            let secondPartLength = targetLocation - Int(capacity)
+            let firstPartLength = intCount - secondPartLength
+            memcpy(data, startAddress, firstPartLength)
+            memcpy(data.advanced(by: firstPartLength), baseAddress, secondPartLength)
+        } else {
+            memcpy(data, startAddress, intCount)
+        }
+        if commitRead { self.commitRead(count: read) }
+        let value = _deliveryingFirstPacket
+        _deliveryingFirstPacket = false
+        return (read, value)
     }
 
     // MARK: - Private Functions
@@ -172,7 +167,7 @@ public final class Uroboros {
     public func clear() {
         let data = availableData
         guard data > 0 else { return }
-        _readQueue.sync { commitRead(count: data) }
+        commitRead(count: data)
     }
 }
 

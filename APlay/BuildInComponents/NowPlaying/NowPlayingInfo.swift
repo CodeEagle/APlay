@@ -41,9 +41,9 @@ extension APlay {
                 map[MPNowPlayingInfoPropertyPlaybackRate] = Double(playbackRate)
                 map[MPMediaItemPropertyPlaybackDuration] = duration
                 #if os(iOS)
-                if let image = artwork {
-                    map[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(image: image)
-                }
+                    if let image = artwork {
+                        map[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(image: image)
+                    }
                 #endif
                 return map
             })

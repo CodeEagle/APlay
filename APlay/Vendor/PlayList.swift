@@ -25,9 +25,9 @@ public final class PlayList {
 
     public init() {}
 
-    public func changeList(to value: [URL]) {
+    public func changeList(to value: [URL], at index: Int) {
         list = value
-        playingIndex = nil
+        playingIndex = index
         updateRandomList()
     }
 
@@ -109,6 +109,18 @@ public final class PlayList {
         } else {
             _randomList = []
         }
+    }
+
+    func play(at index: Int) -> URL? {
+        guard let url = list[ap_safe: index] else { return nil }
+        if loopPattern == .random {
+            if let idx = _randomList.firstIndex(of: url) {
+                playingIndex = idx
+                return url
+            }
+        }
+        playingIndex = index
+        return url
     }
 }
 

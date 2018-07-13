@@ -26,7 +26,6 @@ public typealias AudioStreamPacketDescription = CoreAudio.AudioStreamPacketDescr
 /// CoreAudio.AudioStreamBasicDescription
 public typealias AudioStreamBasicDescription = CoreAudio.AudioStreamBasicDescription
 
-
 /// AudioToolbox.AudioFileStreamParseFlags
 public typealias AudioFileStreamParseFlags = AudioToolbox.AudioFileStreamParseFlags
 
@@ -56,7 +55,6 @@ public let kAudioFormatFlagsNativeEndian = CoreAudio.kAudioFormatFlagsNativeEndi
 
 /// CoreAudio.kAudioFormatFlagIsPacked
 public let kAudioFormatFlagIsPacked = CoreAudio.kAudioFormatFlagIsPacked
-
 
 /// AudioDecoder.AudioFileType
 public typealias AudioFileType = AudioDecoder.AudioFileType

@@ -33,12 +33,12 @@ final class DefaultAudioDecoder {
     private unowned let _config: ConfigurationCompatible
     private lazy var __isRequestClose = false
     private lazy var _isFlacHeaderParsed = false
-    
+
     fileprivate var _isRequestClose: Bool {
         get { return _propertiesQueue.sync { __isRequestClose } }
         set { _propertiesQueue.async(flags: .barrier) { self.__isRequestClose = newValue } }
     }
-    
+
     #if DEBUG
         deinit {
             debug_log("\(self) \(#function)")
@@ -47,7 +47,7 @@ final class DefaultAudioDecoder {
 
     init(config: ConfigurationCompatible) {
         _config = config
-        _packetsManager = Uroboros(capacity: self._config.maxDecodedByteCount)
+        _packetsManager = Uroboros(capacity: _config.maxDecodedByteCount)
         _outputBuffer = Array(repeating: 0, count: Int(config.decodeBufferSize))
         _inputStream.delegate(to: self) { $0.inputAvailable($1) }
         initDecodeloop()
@@ -57,11 +57,10 @@ final class DefaultAudioDecoder {
 // MARK: - AudioDecoderCompatible
 
 extension DefaultAudioDecoder: AudioDecoderCompatible {
-    
     func seekable() -> Bool {
         return info.seekable()
     }
-    
+
     func destroy() {
         debug_log("DefaultAudioDecoder request destroy")
         _isRequestClose = true
@@ -117,7 +116,6 @@ private extension DefaultAudioDecoder {
 
     private func inputAvailable(_ data: AudioDecoder.AudioInput) {
         guard let stream = _audioFileStream else { return }
-//        let isFirstPacket = data.2
         let isWaveFormat = info.fileHint == .wave
         if isWaveFormat { _decodeTimer?.pause() }
         else { _decodeTimer?.resume() }
@@ -125,17 +123,17 @@ private extension DefaultAudioDecoder {
             parserWaveFile(data)
             return
         }
-        
+
         // flac seek support
         if info.fileHint == .flac, _isFlacHeaderParsed == false, let headerData = info.flacMetadata?.headerData {
             _isFlacHeaderParsed = true
             let count = UInt32(headerData.count)
-            let pointer: [UInt8] = headerData.compactMap({$0})
+            let pointer: [UInt8] = headerData.compactMap({ $0 })
             inputAvailable((UnsafePointer<UInt8>(pointer), count, true))
             inputAvailable(data)
             return
         }
-        
+
         let flag: AudioFileStreamParseFlags = isWaveFormat ? .continuity : info.parseFlags
         let result = AudioFileStreamParseBytes(stream, data.1, data.0, flag)
         guard result == noErr else {
@@ -250,11 +248,11 @@ private extension DefaultAudioDecoder {
                 i += increaseMent
             }
         }
-        
+
         func readyToProducePackets() {
             info.infoUpdated()
         }
-        
+
         switch propertyId {
         case kAudioFileStreamProperty_BitRate: bitrate()
         case kAudioFileStreamProperty_DataOffset: dataOffset()
@@ -353,7 +351,7 @@ private extension DefaultAudioDecoder {
 
 private extension DefaultAudioDecoder {
     private func initDecodeloop() {
-        _decodeTimer = GCDTimer(interval: .milliseconds(15), callback: { [weak self] _ in
+        _decodeTimer = GCDTimer(interval: .milliseconds(30), callback: { [weak self] _ in
             guard let sself = self else {
                 debug_log("Decodeloop return at -1")
                 return
@@ -397,43 +395,43 @@ private extension DefaultAudioDecoder {
         }
         let bytes = outputBufferList.mBuffers.mDataByteSize
         if let inInputData = outputBufferList.mBuffers.mData, bytes > 0 {
-            let out = AudioDecoder.AudioOutput(data: inInputData, count: bytes)
+            let out: AudioDecoder.AudioOutput = (UnsafeRawPointer(inInputData), bytes)
             outputStream.call(.output(out))
         } else {
             debug_log("wtf decode \(bytes) bytes")
         }
     }
 }
+
 // MARK: - Packet io
 
 private extension DefaultAudioDecoder {
-
     /*
      Packet Storage Struct
-     
+
      Total Size = 4 + 16 + N (including [Total Size] block)
-     
+
      +------------+------------------------------+---------+
      | Total Size | AudioStreamPacketDescription |  Data   |
      +------------+------------------------------+---------+
      | 4 Bytes    | 16 Bytes                     | N Bytes |
      +------------+------------------------------+---------+
      */
-    
+
     // MARK: handleAudioPackets
-    
+
     func handleAudioPackets(bytes: UInt32, packets: UInt32, data: UnsafeRawPointer, packetDescriptions: UnsafeMutablePointer<AudioStreamPacketDescription>?) {
         if info.srcFormat.isLinearPCM {
-            outputStream.call(.output(AudioDecoder.AudioOutput(data: data, count: bytes)))
+            outputStream.call(.output((data, bytes)))
             return
         }
         let total = Int(packets)
         for i in 0 ..< total {
             guard var desc = packetDescriptions?.advanced(by: i).pointee else { return }
-            
+
             let totalSize = asbdSize + desc.mDataByteSize + 4
             var totalSizeBytes = totalSize.asUInt8Array()
-            
+
             let offset = Int(desc.mStartOffset)
             // set to zero because decode packet singly, not in a list
             desc.mStartOffset = 0
@@ -447,7 +445,6 @@ private extension DefaultAudioDecoder {
     }
 
     func readPacket(into handler: inout [UInt8]) -> AudioStreamPacketDescription? {
-        
         var totalSizeBytes: [UInt8] = Array(repeating: 0, count: 4)
         let count = UInt32(totalSizeBytes.count)
         // availableData must larger than [Total Size] block
@@ -455,7 +452,7 @@ private extension DefaultAudioDecoder {
         // try to read next packet size without commit, if data not enough, skip and wait for next try.
         guard _packetsManager.read(amount: count, into: &totalSizeBytes, commitRead: false).0 == count else { return nil }
         let nextPacketSize = totalSizeBytes.unpack()
-        
+
         guard _packetsManager.availableData >= nextPacketSize, _isRequestClose == false else { return nil }
         // commit read bytes of the [Total Size] block
         _packetsManager.commitRead(count: count)
@@ -479,45 +476,44 @@ private extension DefaultAudioDecoder {
 extension DefaultAudioDecoder {
     func parserWaveFile(_ data: AudioDecoder.AudioInput) {
         guard info.sampleRate == 0, info.audioDataByteCount == 0, info.audioDataPacketCount == 0, info.dataOffset == 0 else {
-            outputStream.call(.output(AudioDecoder.AudioOutput(data: data.0, count: data.1)))
+            outputStream.call(.output((UnsafeRawPointer(data.0), data.1)))
             return
         }
         let raw = data.0
         let headerData = Data(bytes: raw, count: 4)
-        guard let header = String.init(data: headerData, encoding: .ascii), header == "RIFF" else {
+        guard let header = String(data: headerData, encoding: .ascii), header == "RIFF" else {
             outputStream.call(.error(.open("Not a validate wave format")))
             return
         }
-        
+
 //        let chunkSize: UInt32 = [4, 5, 6, 7].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
+
         let waveData = Data(bytes: raw.advanced(by: 8), count: 4)
-        guard let waveHeader = String.init(data: waveData, encoding: .ascii), waveHeader == "WAVE" else {
+        guard let waveHeader = String(data: waveData, encoding: .ascii), waveHeader == "WAVE" else {
             outputStream.call(.error(.open("Not a validate wave format")))
             return
         }
-        
+
         let formatData = Data(bytes: raw.advanced(by: 12), count: 4)
-        guard let formatHeader = String.init(data: formatData, encoding: .ascii), formatHeader == "fmt " else {
+        guard let formatHeader = String(data: formatData, encoding: .ascii), formatHeader == "fmt " else {
             outputStream.call(.error(.open("Not a validate wave format")))
             return
         }
-        
-        
-        let subchunk1Size = [16, 17, 18, 19].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
+
+        let subchunk1Size = [16, 17, 18, 19].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
+
 //        let audioFormat = [20, 21].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
-        let numChannels = [22, 23].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
-        let sampleRate = [24, 25, 26, 27].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
-        let byteRate = [28, 29, 30, 31].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
-        let blockAlign = [32, 33].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
-        let bitsPerSample = [34, 35].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
+
+        let numChannels = [22, 23].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
+
+        let sampleRate = [24, 25, 26, 27].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
+
+        let byteRate = [28, 29, 30, 31].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
+
+        let blockAlign = [32, 33].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
+
+        let bitsPerSample = [34, 35].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
+
         let totalSize: UInt32
         let dataData: Data
         // https://stackoverflow.com/questions/19991405/how-can-i-detect-whether-a-wav-file-has-a-44-or-46-byte-header
@@ -531,26 +527,26 @@ extension DefaultAudioDecoder {
             offset = 0
             dataData = Data(bytes: raw.advanced(by: 36), count: 4)
         }
-        guard let dataHeader = String.init(data: dataData, encoding: .ascii), dataHeader == "data" else {
+        guard let dataHeader = String(data: dataData, encoding: .ascii), dataHeader == "data" else {
             outputStream.call(.error(.open("Not a validate wave format")))
             return
         }
         let start = 40 + offset
-        let subchunk2Size = [start, start + 1, start + 2, start + 3].compactMap{ raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
-        
+        let subchunk2Size = [start, start + 1, start + 2, start + 3].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
+
         info.srcFormat.mSampleRate = Float64(sampleRate)
         info.srcFormat.mFormatID = kAudioFormatLinearPCM
-        info.srcFormat.mFramesPerPacket = 1 //For uncompressed audio, the value is 1. For variable bit-rate formats, the value is a larger fixed number, such as 1024 for AAC
+        info.srcFormat.mFramesPerPacket = 1 // For uncompressed audio, the value is 1. For variable bit-rate formats, the value is a larger fixed number, such as 1024 for AAC
         info.srcFormat.mChannelsPerFrame = numChannels
         info.srcFormat.mBytesPerFrame = info.srcFormat.mChannelsPerFrame * 2
         info.srcFormat.mBytesPerPacket = info.srcFormat.mFramesPerPacket * info.srcFormat.mBytesPerFrame
         // why??
         info.srcFormat.mBitsPerChannel = bitsPerSample
         info.srcFormat.mReserved = 0
-        info.srcFormat.mFormatFlags =  kAudioFormatFlagIsSignedInteger |
+        info.srcFormat.mFormatFlags = kAudioFormatFlagIsSignedInteger |
             kAudioFormatFlagsNativeEndian |
-        kLinearPCMFormatFlagIsPacked
-        
+            kLinearPCMFormatFlagIsPacked
+
         info.dstFormat = info.srcFormat
         info.waveSubchunk1Size = subchunk1Size
         info.dataOffset = UInt(totalSize)
@@ -565,9 +561,10 @@ extension DefaultAudioDecoder {
 //        let bitrate = UInt32(info.sampleRate) * info.srcFormat.mBitsPerChannel * info.srcFormat.mChannelsPerFrame / 1000
         info.bitrate = byteRate * 8 / 1000
         info.infoUpdated()
-        
+
         let left = data.1 - totalSize
-        let ret = AudioDecoder.AudioOutput(data: raw.advanced(by: Int(totalSize)), count: left)
+        let d = UnsafeRawPointer(raw.advanced(by: Int(totalSize)))
+        let ret = (d, left)
         outputStream.call(.output(ret))
         outputStream.call(.bitrate(info.bitrate))
     }
@@ -597,7 +594,7 @@ extension DefaultAudioDecoder {
         }
 
         static func callback() -> AudioConverterComplexInputDataProc {
-            let closure: AudioConverterComplexInputDataProc = { (converter, ioNumberDataPackets, ioData, outDataPacketDescription, inUserData) -> OSStatus in
+            let closure: AudioConverterComplexInputDataProc = { (_, ioNumberDataPackets, ioData, outDataPacketDescription, inUserData) -> OSStatus in
                 guard let info = inUserData else { return noErr }
                 let convertInfo = info.to(object: AudioBufferConverter.self)
                 return convertInfo.audioConverterCallback(packetsCount: ioNumberDataPackets, ioData: ioData, outDataPacketDescription: outDataPacketDescription)
@@ -619,4 +616,3 @@ extension UInt32 {
         return Array(bytePtr)
     }
 }
-

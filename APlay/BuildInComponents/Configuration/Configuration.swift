@@ -13,12 +13,10 @@ import AVFoundation
 #endif
 
 extension APlay {
-    
     /// Configuration for APlay
     public final class Configuration: ConfigurationCompatible {
-        
         /// 播放器歌曲默认图像
-        public let defaultCoverImage: UIImage?
+        public var defaultCoverImage: UIImage?
         /** 缓存目录 */
         public let cacheDirectory: String
         /// 网络 session
@@ -60,7 +58,7 @@ extension APlay {
         public let equalizerBandFrequencies: [Float]
         /// logger
         public let logger: LoggerCompatible
-        
+
         /// streamer factory
         public private(set) var streamerBuilder: StreamerBuilder = { Streamer(config: $0) }
 
@@ -69,7 +67,7 @@ extension APlay {
 
         /// metadata parser factory
         public private(set) var metadataParserBuilder: MetadataParserBuilder = {
-            (type, config) in
+            type, config in
             if type == .flac { return FlacParser(config: config) }
             else if type == .mp3 { return ID3Parser(config: config) }
             else { return nil }
@@ -84,7 +82,7 @@ extension APlay {
                 debug_log("\(self) \(#function)")
             }
         #endif
-        
+
         public init(defaultCoverImage: UIImage? = nil,
                     proxyPolicy: ProxyPolicy = .system,
                     logPolicy: Logger.Policy = Logger.Policy.defaultPolicy,
@@ -126,18 +124,18 @@ extension APlay {
             self.cacheDirectory = cacheDirectory
             self.networkPolicy = networkPolicy
             self.predefinedHttpHeaderValues = predefinedHttpHeaderValues
-            self.isEnabledAutomaticAudioSessionHandling = automaticAudioSessionHandlingEnabled
+            isEnabledAutomaticAudioSessionHandling = automaticAudioSessionHandlingEnabled
             self.maxRemoteStreamOpenRetry = maxRemoteStreamOpenRetry
             self.equalizerBandFrequencies = equalizerBandFrequencies
-            self.isEnabledVolumeMixer = enableVolumeMixer
+            isEnabledVolumeMixer = enableVolumeMixer
             self.autoFillID3InfoToNowPlayingCenter = autoFillID3InfoToNowPlayingCenter
-            
+
             logger = loggerBuilder?(logPolicy) ?? APlay.InternalLogger(policy: logPolicy)
-            
+
             if let builder = streamerBuilder { self.streamerBuilder = builder }
             if let builder = audioDecoderBuilder { self.audioDecoderBuilder = builder }
             if let builder = metadataParserBuilder { self.metadataParserBuilder = builder }
-            
+
             // config session
             if let builder = sessionBuilder {
                 session = builder(proxyPolicy)
@@ -187,7 +185,7 @@ extension APlay {
                     self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
                 })
             #elseif os(macOS)
-            print("tbd")
+                print("tbd")
 //            do {
 //                if #available(iOS 11.0, *) {
 //                    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longForm)
@@ -204,7 +202,6 @@ extension APlay {
             #endif
         }
 
-        
         /// Stop background task
         ///
         /// - Parameter isToDownloadImage: Bool
@@ -222,7 +219,6 @@ extension APlay {
 // MARK: - Models
 
 extension APlay.Configuration {
-    
     /// Default cache directory for player
     public static var defaultCachedDirectory: String {
         let base = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true).first!
@@ -232,28 +228,26 @@ extension APlay.Configuration {
         try? fs.createDirectory(atPath: target, withIntermediateDirectories: true, attributes: nil)
         return target
     }
-    
-    
+
     /// Default User-Agent for network streaming
     public static var defaultUA: String {
         var osStr = ""
         #if os(iOS)
-        let rversion = UIDevice.current.systemVersion
-        osStr = "iOS \(rversion)"
+            let rversion = UIDevice.current.systemVersion
+            osStr = "iOS \(rversion)"
         #elseif os(OSX)
-        // No need to be so concervative with the cache sizes
-        osStr = "macOS"
+            // No need to be so concervative with the cache sizes
+            osStr = "macOS"
         #endif
         return "APlay/\(APlay.version) \(osStr)"
     }
-    
+
     /// Default size for decoeded data
     public static var defaultMaxDecodedByteCount: UInt32 {
         let is64Bit = MemoryLayout<Int>.size == MemoryLayout<Int64>.size
         return (is64Bit ? 4 : 2) * 1_048_576
     }
 
-    
     /// Validate policy for remote file
     ///
     /// - notValidate: not validate
@@ -285,7 +279,7 @@ extension APlay.Configuration {
             case let .custom(block): return block(url)
             }
         }
-        
+
         /// A default implementation for custom((URL) -> String)
         public static var defaultPolicy: CacheFileNamingPolicy {
             return .custom({ (url) -> String in
@@ -299,7 +293,6 @@ extension APlay.Configuration {
         }
     }
 
-    
     /// Cache Plolicy
     ///
     /// - enable: enable with extra folders
@@ -322,7 +315,7 @@ extension APlay.Configuration {
             }
         }
     }
-    
+
     /// Network policy for accessing remote resources
     public enum NetworkPolicy {
         public typealias PermissionHandler = (URL, (@escaping (Bool) -> Void)) -> Void
@@ -336,7 +329,6 @@ extension APlay.Configuration {
         }
     }
 
-    
     /// Proxy Policy
     ///
     /// - system: using system proxy
@@ -345,7 +337,6 @@ extension APlay.Configuration {
         case system
         case custom(Info)
 
-        
         /// Custom proxy info
         public struct Info {
             /** 使用自定义代理 用户名 */
@@ -367,7 +358,7 @@ extension APlay.Configuration {
                 self.host = host
                 self.port = port
                 self.scheme = scheme
-                self.isProxyingHttps = proxyingHttps
+                isProxyingHttps = proxyingHttps
             }
 
             /// Authentication scheme
@@ -382,16 +373,6 @@ extension APlay.Configuration {
             }
         }
     }
-
-    static var canonical: AudioStreamBasicDescription = {
-        var bytesPerSample = UInt32(MemoryLayout<Int32>.size)
-        if #available(iOS 8.0, *) {
-            bytesPerSample = UInt32(MemoryLayout<Int16>.size)
-        }
-        let flags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked
-        let component = AudioStreamBasicDescription(mSampleRate: 44100, mFormatID: kAudioFormatLinearPCM, mFormatFlags: flags, mBytesPerPacket: bytesPerSample * 2, mFramesPerPacket: 1, mBytesPerFrame: bytesPerSample * 2, mChannelsPerFrame: 2, mBitsPerChannel: 8 * bytesPerSample, mReserved: 0)
-        return component
-    }()
 }
 
 // MARK: - SessionDelegate

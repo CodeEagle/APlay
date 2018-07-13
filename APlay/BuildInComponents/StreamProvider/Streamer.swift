@@ -37,7 +37,7 @@ final class Streamer: StreamProviderCompatible {
     private lazy var _canOutputData = false
     private lazy var _isFirstPacket = true
     private var _tagParser: MetadataParserCompatible?
-    
+
     private lazy var _isRequestClose = false
     private lazy var _isLooping = false
 
@@ -51,7 +51,7 @@ final class Streamer: StreamProviderCompatible {
 
     private func tagParser(for urlInfo: StreamProvider.URLInfo) -> MetadataParserCompatible? {
         var parser = _config.metadataParserBuilder(urlInfo.fileHint, _config)
-        if parser == nil  {
+        if parser == nil {
             if info.fileHint == .mp3 {
                 parser = ID3Parser(config: _config)
             } else if info.fileHint == .flac {
@@ -61,7 +61,7 @@ final class Streamer: StreamProviderCompatible {
                 return nil
             }
         }
-        
+
         parser?.outputStream.delegate(to: self, with: { sself, value in
             switch value {
             case let .metadata(data): sself.outputPipeline.call(.metadata(data))
@@ -162,7 +162,7 @@ extension Streamer {
         guard info.isRemote else { return }
         if resetTimer { _watchDogInfo.reset() }
     }
-    
+
     private func reset(url: URL) {
         _canOutputData = false
         close(resetTimer: true)
@@ -299,7 +299,11 @@ private extension Streamer {
         guard let stream = targetStream, _canOutputData else { return }
         let bufferSize = 8192 // balance cpu, slow streaming but low cpu usage
         let buffer = malloc(bufferSize)!.assumingMemoryBound(to: UInt8.self)
-        defer { free(buffer) }
+        // 50kb/s limit read speed
+//        let speed = 50 * 1024 / 1000
+//        defer { free(buffer) }
+//        var begin: CFAbsoluteTime = 0
+//        var end: CFAbsoluteTime = 0
         while CFReadStreamHasBytesAvailable(stream) {
             _isLooping = true
             if _isRequestClose == true {
@@ -313,6 +317,7 @@ private extension Streamer {
                 _isLooping = false
                 return
             }
+//            begin = CFAbsoluteTimeGetCurrent()
             // why it is not reading real data, sometime?
             let bytesRead = CFReadStreamRead(stream, buffer, CFIndex(bufferSize))
             // error, reading empty data back
@@ -357,9 +362,18 @@ private extension Streamer {
             if _icyCastInfo.isIcyStream == false, position.value == 0 {
                 _tagParser?.acceptInput(data: buffer, count: count)
             }
+
             let value = _isFirstPacket
             outputPipeline.call(.hasBytesAvailable(buffer, count, value))
             if _isFirstPacket { _isFirstPacket = false }
+
+//            end = CFAbsoluteTimeGetCurrent()
+//            let timeCost = end - begin
+//            let expectTimeCost = Int(bytesRead) / speed
+//            let deltaTime = expectTimeCost - Int(timeCost)
+//            if deltaTime > 0 {
+//                usleep(useconds_t(deltaTime * 1000))
+//            }
         }
     }
 

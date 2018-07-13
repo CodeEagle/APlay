@@ -25,10 +25,9 @@ extension LoggerCompatible {
 }
 
 public struct Logger {
-    
     /// Line seperator
     public static let lineSeperator = "\n\u{FEFF}\u{FEFF}"
-    
+
     /// Logger Policy
     ///
     /// - disable: disable
@@ -52,7 +51,7 @@ public struct Logger {
             default: return nil
             }
         }
-        
+
         /// Default policy for APlay
         public static var defaultPolicy: Policy {
             let cache = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true).first!

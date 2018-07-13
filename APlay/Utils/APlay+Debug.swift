@@ -13,7 +13,7 @@ import Foundation
 #endif
 
 func debug_log(_ msg: String) {
-    #if DEBUG || ((arch(i386) || arch(x86_64)) && os(iOS))
+    #if DEBUG && ((arch(i386) || arch(x86_64)) && os(iOS))
     var message = msg
     if message.contains("deinit") { message = "❌ \(msg)" }
     print("🐛 [Debug]", message)

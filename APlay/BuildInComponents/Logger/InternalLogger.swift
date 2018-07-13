@@ -44,7 +44,6 @@ extension APlay {
                 _lastRead = fileHandle.seekToEndOfFile()
             }
             _totalSize = _lastRead
-            reset()
         }
 
         private func dateTime() -> (String, String) {

@@ -10,8 +10,6 @@ import AudioUnit
 import Foundation
 
 final class AUPlayer: PlayerCompatible {
-    
-
     var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) = { _, _ in (0, false) }
 
     var eventPipeline: Delegated<Player.Event, Void> = Delegated<Player.Event, Void>()
@@ -22,7 +20,7 @@ final class AUPlayer: PlayerCompatible {
         }
     }
     private(set) lazy var asbd = AudioStreamBasicDescription()
-    
+
     private(set) var state: Player.State {
         get { return _stateQueue.sync { _state } }
         set {
@@ -58,7 +56,6 @@ final class AUPlayer: PlayerCompatible {
     private lazy var _outputUnit: AudioUnit? = nil
 
     private lazy var _audioConverterRef: AudioConverterRef? = nil
-    
 
     private lazy var _eqBandCount: UInt32 = 0
 
@@ -69,27 +66,25 @@ final class AUPlayer: PlayerCompatible {
         })
     }()
 
-    
-
     private lazy var _state: Player.State = .idle
     private unowned let _config: ConfigurationCompatible
 
     fileprivate lazy var _stateQueue = DispatchQueue(concurrentName: "AUPlayer.state")
 
-    fileprivate let _pcmBufferFrameSizeInBytes: UInt32 = AUPlayer.canonical.mBytesPerFrame
+    fileprivate let _pcmBufferFrameSizeInBytes: UInt32 = Player.canonical.mBytesPerFrame
 
     fileprivate lazy var _progress: Float = 0
 
     fileprivate lazy var _currentIndex = 0
-    fileprivate lazy var _pageSize = AUPlayer.maxReadPerSlice
+    fileprivate lazy var _pageSize = Player.maxReadPerSlice
     fileprivate func increaseBufferIndex() {
         _stateQueue.sync {
-            _currentIndex = (_currentIndex + 1) % Int(AUPlayer.minimumBufferCount)
+            _currentIndex = (_currentIndex + 1) % Int(Player.minimumBufferCount)
         }
     }
 
     fileprivate lazy var _buffers: UnsafeMutablePointer<UInt8> = {
-        let size = AUPlayer.minimumBufferSize
+        let size = Player.minimumBufferSize
         let b = malloc(size).assumingMemoryBound(to: UInt8.self)
         return b
     }()
@@ -116,12 +111,12 @@ final class AUPlayer: PlayerCompatible {
     func setup(_ asbd: AudioStreamBasicDescription) {
         updateAudioGraph(asbd: asbd)
     }
-    
+
     func destroy() {
         #if DEBUG
-        if runProfile {
-            _fakeConsumer.invalidate()
-        }
+            if runProfile {
+                _fakeConsumer.invalidate()
+            }
         #endif
         _playbackTimer.invalidate()
         pause()
@@ -188,7 +183,6 @@ extension AUPlayer {
     }
 
     func currentTime() -> Float {
-        guard state == .running else { return 0 }
         return _stateQueue.sync { _progress / Float(asbd.mSampleRate) + startTime }
     }
 
@@ -201,15 +195,15 @@ extension AUPlayer {
         set {
             _volume = newValue
             #if os(iOS)
-            if let unit = _mixerUnit {
-                AudioUnitSetParameter(unit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, _volume, 0)
-            }
+                if let unit = _mixerUnit {
+                    AudioUnitSetParameter(unit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, _volume, 0)
+                }
             #else
-            if let unit = _mixerUnit {
-                AudioUnitSetParameter(unit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, _volume, 0)
-            } else if let unit = _outputUnit {
-                AudioUnitSetParameter(unit, kHALOutputParam_Volume, kAudioUnitScope_Output, AUPlayer.Bus.output, _volume, 0)
-            }
+                if let unit = _mixerUnit {
+                    AudioUnitSetParameter(unit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, _volume, 0)
+                } else if let unit = _outputUnit {
+                    AudioUnitSetParameter(unit, kHALOutputParam_Volume, kAudioUnitScope_Output, AUPlayer.Bus.output, _volume, 0)
+                }
             #endif
         }
     }
@@ -308,15 +302,8 @@ private extension AUPlayer {
             try AUGraphAddNode(audioGraph, &AUPlayer.outputUnit, &_outputNode).throwCheck()
             try AUGraphNodeInfo(audioGraph, _outputNode, &AUPlayer.outputUnit, &_outputUnit).throwCheck()
             guard let unit = _outputUnit else { return }
-//            #if os(iOS)
-//                var flag: UInt32 = 1
-//                let size = UInt32(MemoryLayout.size(ofValue: flag))
-//                try AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, Player.Bus.output, &flag, size).throwCheck()
-//                flag = 0
-//                try AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, Player.Bus.input, &flag, size).throwCheck()
-//            #endif
-            let s = MemoryLayout.size(ofValue: AUPlayer.canonical)
-            try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, Player.Bus.output, &AUPlayer.canonical, UInt32(s)).throwCheck()
+            let s = MemoryLayout.size(ofValue: Player.canonical)
+            try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, Player.Bus.output, &Player.canonical, UInt32(s)).throwCheck()
         } catch let APlay.Error.player(err) {
             eventPipeline.call(.error(.player(err)))
         } catch {
@@ -475,16 +462,6 @@ private extension AUPlayer {
 // MARK: - Model
 
 extension AUPlayer {
-    
-
-  
-    static var ringBufferSize: UInt32 = 1024 * 1024 * 2
-
-    
-    static let maxReadPerSlice: Int = Int(Player.maxFramesPerSlice * canonical.mBytesPerPacket)
-    static let minimumBufferCount: Int = 8
-    static let minimumBufferSize: Int = maxReadPerSlice * minimumBufferCount
-
     static var outputUnit: AudioComponentDescription = {
         #if os(OSX)
             let subType = kAudioUnitSubType_DefaultOutput
@@ -495,10 +472,8 @@ extension AUPlayer {
         return component
     }()
 
-    static var canonical: AudioStreamBasicDescription = APlay.Configuration.canonical
-
     static var canonicalSize: UInt32 = {
-        UInt32(MemoryLayout.size(ofValue: canonical))
+        UInt32(MemoryLayout.size(ofValue: Player.canonical))
     }()
 
     static var convertUnit: AudioComponentDescription = {
@@ -515,8 +490,8 @@ extension AUPlayer {
         var component = AudioStreamBasicDescription()
         component.mFormatID = kAudioFormatMPEG4AAC
         component.mFormatFlags = AudioFormatFlags(MPEG4ObjectID.AAC_LC.rawValue)
-        component.mChannelsPerFrame = canonical.mChannelsPerFrame
-        component.mSampleRate = canonical.mSampleRate
+        component.mChannelsPerFrame = Player.canonical.mChannelsPerFrame
+        component.mSampleRate = Player.canonical.mSampleRate
         return component
     }
 

@@ -100,7 +100,7 @@ extension FlacParser {
                         _outputStream.call(.metadata(meta))
                     }
                     let size = value.totalSize()
-                    value.headerData = Data(_backupHeaderData[0..<Int(size)])
+                    value.headerData = Data(_backupHeaderData[0 ..< Int(size)])
                     _backupHeaderData = Data()
                     _outputStream.call(.flac(value))
                 }
@@ -139,7 +139,7 @@ public struct FlacMetadata {
         total += UInt32(headers.count * Header.size)
         return total
     }
-    
+
     func nearestOffset(for time: TimeInterval) -> (TimeInterval, UInt64)? {
         guard let table = seekTable, table.points.count > 0 else { return nil }
         var delta: TimeInterval = 999
@@ -439,7 +439,6 @@ public struct FlacMetadata {
     public struct SeekTable {
         public let header: Header
         public let points: [SeekPoint]
-        
 
         init(bytes: Data, header: Header) {
             self.header = header
@@ -455,14 +454,13 @@ public struct FlacMetadata {
             }
             points = pointTable.sorted(by: { $0.sampleNumber < $1.sampleNumber })
         }
-        
-        
+
         public struct SeekPoint: Hashable, CustomStringConvertible {
             private static let placeHolder: UInt64 = 0xFFFF_FFFF_FFFF_FFFF
             public let sampleNumber: UInt64
             public let streamOffset: UInt64
             public let frameSamples: UInt32
-            
+
             init(bytes: Data) {
                 let point0 = bytes.startIndex
                 let point8 = point0 + 8
@@ -472,7 +470,7 @@ public struct FlacMetadata {
                 streamOffset = bytes[point8 ..< point16].compactMap({ $0 }).unpackUInt64()
                 frameSamples = bytes[point16 ..< point18].compactMap({ $0 }).unpack()
             }
-            
+
             public var description: String {
                 let clz = "\(type(of: self))"
                 if sampleNumber == SeekPoint.placeHolder { return "\(clz).PlaceHolder" }

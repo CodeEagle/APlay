@@ -93,6 +93,12 @@ public struct StreamProvider {
             }
         }
 
+        public var fileName: String {
+            var coms = url.lastPathComponent.split(separator: ".")
+            coms.removeLast()
+            return coms.joined(separator: ".")
+        }
+
         public init(url: URL) {
             guard let scheme = url.scheme?.lowercased() else {
                 self = .unknown(url)
@@ -134,11 +140,14 @@ public struct StreamProvider {
             defer { free(buffer) }
             fseek(fd, 8, SEEK_SET)
             fread(buffer, 1, 4, fd)
-            if String(cString: buffer) == "WAVE" { return .wave }
+            var d = Data(bytes: buffer, count: 4)
+            var value = String(data: d, encoding: .utf8)
+            if value == "WAVE" { return .wave }
             fseek(fd, 0, SEEK_SET)
             fread(buffer, 1, 4, fd)
-            let value = String(cString: buffer)
-            if value.lowercased() == "flac" { return .flac }
+            d = Data(bytes: buffer, count: 4)
+            value = String(data: d, encoding: .utf8)
+            if value?.lowercased() == "flac" { return .flac }
             return .mp3
         }
 

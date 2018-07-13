@@ -8,10 +8,8 @@
 
 import Foundation
 
-
 /// Add Equatable support for AudioStreamBasicDescription
 extension AudioStreamBasicDescription: Equatable {
-    
     /// whether current mFormatID equal to kAudioFormatLinearPCM
     public var isLinearPCM: Bool {
         return mFormatID == kAudioFormatLinearPCM
@@ -100,16 +98,16 @@ extension OSStatus {
         guard self != noErr else { return nil }
         var result: String = ""
         var char = Int(bigEndian)
-        
-        for _ in 0..<4 {
-            guard isprint(Int32(char&255)) == 1 else {
+
+        for _ in 0 ..< 4 {
+            guard isprint(Int32(char & 255)) == 1 else {
                 result = "\(self)"
                 break
             }
-            //UnicodeScalar(char&255) will get optional
-            let raw = String(describing: UnicodeScalar(UInt8(char&255)))
+            // UnicodeScalar(char&255) will get optional
+            let raw = String(describing: UnicodeScalar(UInt8(char & 255)))
             result += raw
-            char = char/256
+            char = char / 256
         }
         let humanMsg = readableMessage(from: result)
         let msg = "\n{\n file: \(file):\(line),\n function: \(method),\n operation: \(operation),\n message: \(humanMsg)\n}"

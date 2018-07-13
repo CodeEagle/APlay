@@ -11,12 +11,11 @@ import Foundation
     import UIKit
 #endif
 
-
 /// A public class for control audio playback
 public final class APlay {
     /// Current framework version
-    public static var version: String = "0.0.1"
-    
+    public static var version: String = "0.0.3"
+
     /// Loop pattern for playback list
     public var loopPattern: PlayList.LoopPattern {
         get { return playlist.loopPattern }
@@ -32,7 +31,7 @@ public final class APlay {
     public private(set) lazy var metadatas: [MetadataParser.Item] = []
     /// Player Configuration
     public let config: ConfigurationCompatible
-    
+
     private let _player: PlayerCompatible
     private let _nowPlayingInfo: NowPlayingInfo
 
@@ -58,14 +57,14 @@ public final class APlay {
 
     public init(configuration: ConfigurationCompatible = Configuration()) {
         config = configuration
-        
+
         if #available(iOS 11.0, *) {
             _player = APlayer(config: config)
         } else {
             _player = AUPlayer(config: config)
         }
         _nowPlayingInfo = NowPlayingInfo(config: config)
-        
+
         _player.eventPipeline.delegate(to: self) { obj, event in
             switch event {
             case let .state(state):
@@ -109,36 +108,47 @@ public final class APlay {
 // MARK: - Public API
 
 public extension APlay {
-    
     /// play with a autoclosure
     ///
     /// - Parameter url: a autoclosure to produce URL
     func play(_ url: @autoclosure () -> URL) {
         let u = url()
         let urls = [u]
-        playlist.changeList(to: urls)
-        eventPipeline.call(.playlistChanged(urls))
+        playlist.changeList(to: urls, at: 0)
+        eventPipeline.call(.playlistChanged(urls, 0))
         _play(u)
     }
 
-    
     /// play whit variable parametric
     ///
     /// - Parameter urls: variable parametric URL input
     @inline(__always)
-    func play(_ urls: URL...) { play(urls) }
+    func play(_ urls: URL..., at index: Int = 0) { play(urls, at: index) }
 
     /// play whit URL array
     ///
     /// - Parameter urls: URL array
-    func play(_ urls: [URL]) {
-        playlist.changeList(to: urls)
-        eventPipeline.call(.playlistChanged(urls))
-        guard let url = playlist.nextURL() else { return }
+    func play(_ urls: [URL], at index: Int = 0) {
+        guard let url = urls[ap_safe: index] else {
+            let msg = "Can not found item at \(index) in list \(urls)"
+            eventPipeline.call(.error(.playItemNotFound(msg)))
+            return
+        }
+        playlist.changeList(to: urls, at: index)
+        eventPipeline.call(.playlistChanged(urls, index))
         _play(url)
     }
-    
-    
+
+    func play(at index: Int) {
+        guard let url = playlist.play(at: index) else {
+            let msg = "Can not found item at \(index) in list \(playlist.list)"
+            eventPipeline.call(.error(.playItemNotFound(msg)))
+            return
+        }
+        _play(url)
+        indexChanged()
+    }
+
     /// toggle play/pause for player
     func toggle() {
         _player.toggle()
@@ -148,21 +158,19 @@ public extension APlay {
         case .idle: _state = .idle
         }
     }
-    
-    
+
     /// resume playback
     func resume() {
         _player.resume()
-        _nowPlayingInfo.pause(elapsedPlayback: _player.currentTime())
+        _nowPlayingInfo.play(elapsedPlayback: _player.currentTime())
     }
 
     /// pause playback
     func pause() {
         _player.pause()
-        _nowPlayingInfo.play(elapsedPlayback: _player.currentTime())
+        _nowPlayingInfo.pause(elapsedPlayback: _player.currentTime())
     }
 
-    
     /// Seek to specific time
     ///
     /// - Parameter time: TimeInterval
@@ -180,17 +188,18 @@ public extension APlay {
         eventPipeline.call(.duration(_nowPlayingInfo.duration))
     }
 
-    
     /// play next song in list
     func next() {
         guard let url = playlist.nextURL() else { return }
         _play(url)
+        indexChanged()
     }
 
     /// play previous song in list
     func previous() {
         guard let url = playlist.previousURL() else { return }
         _play(url)
+        indexChanged()
     }
 
     /// destroy player
@@ -198,10 +207,18 @@ public extension APlay {
         _currentComposer?.destroy()
         _player.destroy()
     }
-    
+
     /// whether current song support seek
     func seekable() -> Bool {
         return _currentComposer?.seekable() ?? false
+    }
+
+    func metadataUpdate(title: String? = nil, album: String? = nil, artist: String? = nil, cover: UIImage? = nil) {
+        if let value = title { _nowPlayingInfo.name = value }
+        if let value = artist { _nowPlayingInfo.artist = value }
+        if let value = album { _nowPlayingInfo.album = value }
+        if let value = cover { _nowPlayingInfo.artwork = value }
+        _nowPlayingInfo.update()
     }
 }
 
@@ -270,10 +287,14 @@ private extension APlay {
             self._player.pause()
             self._currentComposer?.pause()
             self.eventPipeline.call(.playEnded)
-            self.resetFlag()
             self._isCalledDelayPaused = false
             self.next()
         }
+    }
+
+    func indexChanged() {
+        guard let index = playlist.playingIndex else { return }
+        eventPipeline.call(.playingIndexChanged(index))
     }
 
     // MARK: Composer
@@ -339,7 +360,7 @@ extension APlay {
         get { return _propertiesQueue.sync { _state } }
         set { _propertiesQueue.async(flags: .barrier) { self._state = newValue } }
     }
-    
+
     /// duration for current song
     public var duration: Int {
         return _nowPlayingInfo.duration
@@ -384,7 +405,6 @@ extension APlay {
 // MARK: - Enums
 
 public extension APlay {
-    
     /// Event for playback
     ///
     /// - state: player state
@@ -409,14 +429,14 @@ public extension APlay {
         case playback(Float)
         case duration(Int)
         case seekable(Bool)
-        case playlistChanged([URL])
+        case playingIndexChanged(Int)
+        case playlistChanged([URL], Int)
         case playModeChanged(PlayList.LoopPattern)
         case error(APlay.Error)
         case metadata([MetadataParser.Item])
         case flac(FlacMetadata)
     }
 
-    
     /// Player State
     ///
     /// - idle: init state
@@ -430,7 +450,7 @@ public extension APlay {
         case paused
         case error(APlay.Error)
         case unknown(Swift.Error)
-        
+
         public var isPlaying: Bool {
             switch self {
             case .playing: return true
@@ -439,7 +459,6 @@ public extension APlay {
         }
     }
 
-    
     /// Error for APlay
     ///
     /// - none: init state
@@ -453,6 +472,6 @@ public extension APlay {
     /// - parser: parser error with OSStatus
     /// - player: player error
     public enum Error: Swift.Error {
-        case none, open(String), openedAlready(String), streamParse(String), network(String), networkPermission(String),  reachMaxRetryTime, networkStatusCode(Int), parser(OSStatus), player(String)
+        case none, open(String), openedAlready(String), streamParse(String), network(String), networkPermission(String), reachMaxRetryTime, networkStatusCode(Int), parser(OSStatus), player(String), playItemNotFound(String)
     }
 }

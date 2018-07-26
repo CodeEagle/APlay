@@ -54,6 +54,7 @@ public final class Uroboros {
     public var startAddress: UnsafeMutablePointer<Byte>? { return baseAddress?.advanced(by: Int(start)) }
     /// Queue for write action
     private let _writeQueue = DispatchQueue(label: "Uroboros.Write")
+    private let _readQueue = DispatchQueue(label: "Uroboros.Read")
     /// Queue for properties I/O
     private let _propertiesQueue = DispatchQueue(label: "Uroboros.Properties")
     /// Semaphore for stop/continue write action
@@ -108,6 +109,19 @@ public final class Uroboros {
         }
     }
 
+    /// Get data form uroboros
+    ///
+    /// - Parameters:
+    ///   - amount: The number of bytes to retreive
+    ///   - data: The bytes to retreive buffer
+    ///   - commitRead: Can read data without commit
+    /// - Returns: size for this time read
+    @discardableResult public func readInQueue(amount: UInt32, into data: UnsafeMutableRawPointer, commitRead: Bool = true) -> (UInt32, Bool) {
+        return _readQueue.sync {
+            return self.read(amount: amount, into: data, commitRead: commitRead)
+        }
+    }
+    
     /// Get data form uroboros
     ///
     /// - Parameters:
@@ -178,17 +192,29 @@ extension Uroboros {
     private final class UroborosBody {
         let capacity: UInt32
 
+        /// Pointer to our allocated memory
+        private(set) var storagePointer: UnsafeMutableRawPointer!
+        
+        /// Base address of the storage, as mapped to UInt8
         private(set) var baseAddress: UnsafeMutablePointer<Byte>?
 
         init(capacity count: UInt32) {
             capacity = count
+            storagePointer = UnsafeMutableRawPointer.allocate(
+                byteCount: Int(capacity), alignment: MemoryLayout<Byte>.alignment
+            )
+            baseAddress = storagePointer.initializeMemory(as: UInt8.self, repeating: 0, count: Int(capacity))
+            
             baseAddress = malloc(Int(count))?.assumingMemoryBound(to: Byte.self)
             assert(baseAddress != nil, "UroborosBody cant not be nil")
         }
 
         deinit {
-            free(baseAddress)
-            baseAddress = nil
+            if let base = baseAddress {
+                base.deinitialize(count: Int(capacity))
+            }
+            storagePointer.deallocate()
+            _fixLifetime(self)
         }
     }
 }

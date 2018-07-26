@@ -22,7 +22,6 @@ final class APlayer: PlayerCompatible {
 
     fileprivate lazy var _progress: Float = 0
     private lazy var _volume: Float = 1
-    private lazy var _isConnected = false
 
     private(set) lazy var asbd = AudioStreamBasicDescription()
 
@@ -85,6 +84,12 @@ final class APlayer: PlayerCompatible {
     init(config: ConfigurationCompatible) {
         _config = config
         _engine.attach(_eq)
+        // Avoid requesting microphone permission, set rendering mode first before connect
+        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
+        _engine.stop()
+        try? _engine.enableManualRenderingMode(.realtime, format: format, maximumFrameCount: Player.maxFramesPerSlice)
+        _engine.connect(_engine.inputNode, to: _eq, format: nil)
+        _engine.connect(_eq, to: _engine.mainMixerNode, format: nil)
     }
 }
 
@@ -195,13 +200,6 @@ extension APlayer {
                 return withUnsafePointer(to: &sself.audioBufferList, { $0 })
             }
 
-            // Move connect here to avoid using microphone
-            if _isConnected == false {
-                _isConnected = true
-                _engine.connect(_engine.inputNode, to: _eq, format: nil)
-                _engine.connect(_eq, to: _engine.mainMixerNode, format: nil)
-            }
-
             _engine.prepare()
             try _engine.start()
         } catch {
@@ -215,5 +213,5 @@ private func renderCallback(userInfo: UnsafeMutableRawPointer, ioActionFlags: Un
     let sself = userInfo.to(object: APlayer.self)
     var status = noErr
     _ = sself._renderBlock?(inNumberFrames, ioData!, &status)
-    return noErr
+    return status
 }

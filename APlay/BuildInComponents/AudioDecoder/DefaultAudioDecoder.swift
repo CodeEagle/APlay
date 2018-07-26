@@ -17,6 +17,18 @@ final class DefaultAudioDecoder {
 
     private lazy var _propertiesQueue = DispatchQueue(concurrentName: "PacketIO")
 
+    private var __packetLinkList: Packet?
+    private weak var __packetLinkListTail: Packet?
+    
+    private var _packetLinkList: Packet? {
+        get { return _propertiesQueue.sync { __packetLinkList } }
+        set { _propertiesQueue.async(flags: .barrier) { self.__packetLinkList = newValue } }
+    }
+    private weak var _packetLinkListTail: Packet? {
+        get { return _propertiesQueue.sync { __packetLinkListTail } }
+        set { _propertiesQueue.async(flags: .barrier) { self.__packetLinkListTail = newValue } }
+    }
+    
     private lazy var _audioFileStream: AudioFileStreamID? = nil
     private lazy var __audioConverter: AudioConverterRef? = nil
     private var _audioConverter: AudioConverterRef? {
@@ -403,6 +415,53 @@ private extension DefaultAudioDecoder {
     }
 }
 
+// MARK: - Packet io v2
+
+private extension DefaultAudioDecoder {
+    final class Packet {
+        let desc: AudioStreamPacketDescription
+        let data: Data
+        var next: Packet?
+        init(desc: AudioStreamPacketDescription, value: UnsafeRawPointer, count: Int) {
+            self.desc = desc
+            data = Data.init(bytes: value, count: count)
+        }
+    }
+    
+    func handleAudioPacketsv2(bytes: UInt32, packets: UInt32, data: UnsafeRawPointer, packetDescriptions: UnsafeMutablePointer<AudioStreamPacketDescription>?) {
+        if info.srcFormat.isLinearPCM {
+            outputStream.call(.output((data, bytes)))
+            return
+        }
+        let total = Int(packets)
+        for i in 0 ..< total {
+            guard var desc = packetDescriptions?.advanced(by: i).pointee else { return }
+            let offset = Int(desc.mStartOffset)
+            // set to zero because decode packet singly, not in a list
+            desc.mStartOffset = 0
+            let packet = Packet(desc: desc, value: data.advanced(by: offset), count: Int(desc.mDataByteSize))
+            if _packetLinkList == nil {
+                _packetLinkList = packet
+                _packetLinkListTail = packet
+            } else {
+                _packetLinkListTail?.next = packet
+                _packetLinkListTail = packet
+            }
+            
+            if info.calculate(packet: desc) {
+                outputStream.call(.bitrate(info.bitrate))
+            }
+        }
+    }
+    
+    func readPacket() -> Packet? {
+        let value = _packetLinkList
+        _packetLinkList = _packetLinkList?.next
+        return value
+    }
+    
+}
+
 // MARK: - Packet io
 
 private extension DefaultAudioDecoder {
@@ -575,17 +634,38 @@ extension DefaultAudioDecoder {
 extension DefaultAudioDecoder {
     private final class AudioBufferConverter {
         private weak var _ring: DefaultAudioDecoder?
+        private var _buffer: [UInt8] = []
 
         init(ring: DefaultAudioDecoder) { _ring = ring }
 
         private func audioConverterCallback(packetsCount: UnsafeMutablePointer<UInt32>, ioData: UnsafeMutablePointer<AudioBufferList>, outDataPacketDescription: UnsafeMutablePointer<UnsafeMutablePointer<AudioStreamPacketDescription>?>?) -> OSStatus {
-            var buffer: [UInt8] = []
-            guard var desc = _ring?.readPacket(into: &buffer) else {
+            
+            
+//            guard let packet = _ring?.readPacket() else {
+//                packetsCount.pointee = 0
+//                outDataPacketDescription?.pointee = nil
+//                return OSStatus.empty
+//            }
+//            var desc = packet.desc
+//            var p: [UInt8] = packet.data.compactMap({$0})
+//            ioData.pointee.mNumberBuffers = 1
+//            ioData.pointee.mBuffers.mData =
+//                UnsafeMutableRawPointer(&p)
+//            ioData.pointee.mBuffers.mDataByteSize = packet.desc.mDataByteSize
+//
+//
+//            outDataPacketDescription?.pointee = UnsafeMutablePointer(&desc)
+//            packetsCount.pointee = 1
+//            return noErr
+//
+//
+            
+            guard var desc = _ring?.readPacket(into: &_buffer) else {
                 packetsCount.pointee = 0
                 outDataPacketDescription?.pointee = nil
                 return OSStatus.empty
             }
-            let buf = AudioBuffer(mNumberChannels: 2, mDataByteSize: desc.mDataByteSize, mData: &buffer)
+            let buf = AudioBuffer(mNumberChannels: 2, mDataByteSize: desc.mDataByteSize, mData: &_buffer)
             ioData.pointee.mNumberBuffers = 1
             ioData.pointee.mBuffers = buf
             outDataPacketDescription?.pointee = UnsafeMutablePointer(&desc)

@@ -166,16 +166,17 @@ extension APlay {
                 }
                 if isEnabledAutomaticAudioSessionHandling {
                     do {
+                        let instance = AVAudioSession.sharedInstance()
                         if #available(iOS 11.0, *) {
-                            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longForm)
+                            try instance.setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longForm)
                         } else if #available(iOS 10.0, *) {
-                            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+                            try instance.setCategory(.playback, mode: .default)
                         } else {
                             if let error = AVAduioSessionWorkaround.setPlaybackCategory() {
                                 throw error
                             }
                         }
-                        try AVAudioSession.sharedInstance().setActive(true)
+                        try instance.setActive(true)
                     } catch {
                         debug_log("error: \(error)")
                     }

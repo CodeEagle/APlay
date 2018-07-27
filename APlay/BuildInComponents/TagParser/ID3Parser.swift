@@ -49,7 +49,7 @@ private extension ID3Parser {
             metas.append(contentsOf: list)
         }
         outputStream.call(.metadata(metas))
-        debug_log("done at \(_nextParseStartAt)")
+        debug_log("ID3Parser parse done, read \(_nextParseStartAt) bytes")
     }
 }
 

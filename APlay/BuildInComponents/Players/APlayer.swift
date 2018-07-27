@@ -186,16 +186,16 @@ extension APlayer {
                 let size = bytesPerFrame * frameCount
 
                 let (readSize, _) = sself.readClosure(size, sself._buffers)
-                sself.audioBufferList.mBuffers.mData = UnsafeMutableRawPointer(sself._buffers)
-                sself.audioBufferList.mBuffers.mNumberChannels = sself.asbd.mChannelsPerFrame
-                sself.audioBufferList.mBuffers.mDataByteSize = readSize
-
+                
                 var totalReadFrame: UInt32 = frameCount
-                guard readSize != 0 else { return nil }
-
                 if readSize != size {
                     totalReadFrame = readSize / bytesPerFrame
+                    memset(sself._buffers.advanced(by: Int(readSize)), 0, Int(size - readSize))
                 }
+                sself.audioBufferList.mBuffers.mData = UnsafeMutableRawPointer(sself._buffers)
+                sself.audioBufferList.mBuffers.mNumberChannels = sself.asbd.mChannelsPerFrame
+                sself.audioBufferList.mBuffers.mDataByteSize = size
+
                 sself._stateQueue.async(flags: .barrier) { sself._progress += Float(totalReadFrame) }
                 return withUnsafePointer(to: &sself.audioBufferList, { $0 })
             }
@@ -208,8 +208,17 @@ extension APlayer {
     }
 }
 
-@available(iOS 11.0, *)
-private func renderCallback(userInfo: UnsafeMutableRawPointer, ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>, inTimeStamp _: UnsafePointer<AudioTimeStamp>, inBusNumber _: UInt32, inNumberFrames: UInt32, ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
+/// renderCallback
+///
+/// - Parameters:
+///   - userInfo: Your context (aka, user info) pointer.
+///   - ioActionFlags: A bit field describing the purpose of the call. It’s often blank (0), and you can look up the possible values as the AudioUnitRenderActionFlag’s enum in the documentation or AUComponent.h.
+///   - inTimeStamp: An AudioTimeStamp structure that indicates the timing of this call relative to other calls to your render callback.
+///   - inBusNumber: Which bus (aka, element) of the Audio Unit is requesting audio data.
+///   - inNumberFrames: The number of frames to be rendered. Notice that this variable is prefixed as “in” instead of “io.”That indicates that this isn’t a case when you can render fewer frames and indicate that situation by passing back the number of frames actually rendered.Your callback must provide exactly the requested number of frames.
+///   - ioData: An AudioBufferList struct to be filled with data.You write your sam- ples into the mData members of the AudioBuffers contained in this struct.The list has a count of how many AudioBuffers are present, and each AudioBuffer has members for its channel count and byte size. Combined with inNumberFrames, you can figure out how much data can be safely written to these data buffers.
+/// - Returns: OSStatus
+@available(iOS 11.0, *) private func renderCallback(userInfo: UnsafeMutableRawPointer, ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>, inTimeStamp _: UnsafePointer<AudioTimeStamp>, inBusNumber _: UInt32, inNumberFrames: UInt32, ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
     let sself = userInfo.to(object: APlayer.self)
     var status = noErr
     _ = sself._renderBlock?(inNumberFrames, ioData!, &status)

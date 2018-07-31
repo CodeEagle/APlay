@@ -134,18 +134,19 @@ public struct StreamProvider {
 
         private static func localFileHit(from url: URL) -> AudioFileType {
             let name = url.asCFunctionString()
+            let tagSize = 4
             guard let fd = fopen(name, "r") else { return .mp3 }
             defer { fclose(fd) }
-            var buffer = malloc(4).assumingMemoryBound(to: UInt8.self)
+            var buffer = UnsafeMutablePointer.uint8Pointer(of: tagSize)
             defer { free(buffer) }
             fseek(fd, 8, SEEK_SET)
-            fread(buffer, 1, 4, fd)
-            var d = Data(bytes: buffer, count: 4)
+            fread(buffer, 1, tagSize, fd)
+            var d = Data(bytes: buffer, count: tagSize)
             var value = String(data: d, encoding: .utf8)
-            if value == "WAVE" { return .wave }
+            if value?.lowercased() == "wave" { return .wave }
             fseek(fd, 0, SEEK_SET)
-            fread(buffer, 1, 4, fd)
-            d = Data(bytes: buffer, count: 4)
+            fread(buffer, 1, tagSize, fd)
+            d = Data(bytes: buffer, count: tagSize)
             value = String(data: d, encoding: .utf8)
             if value?.lowercased() == "flac" { return .flac }
             return .mp3

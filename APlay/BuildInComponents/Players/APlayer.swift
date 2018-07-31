@@ -47,8 +47,7 @@ final class APlayer: PlayerCompatible {
 
     private lazy var _buffers: UnsafeMutablePointer<UInt8> = {
         let size = Player.minimumBufferSize
-        let b = malloc(size).assumingMemoryBound(to: UInt8.self)
-        return b
+        return UnsafeMutablePointer.uint8Pointer(of: size)
     }()
 
     private lazy var audioBufferList: AudioBufferList = {

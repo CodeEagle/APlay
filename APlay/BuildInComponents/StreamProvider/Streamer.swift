@@ -298,7 +298,7 @@ private extension Streamer {
         }
         guard let stream = targetStream, _canOutputData else { return }
         let bufferSize = 8192 // balance cpu, slow streaming but low cpu usage
-        let buffer = malloc(bufferSize)!.assumingMemoryBound(to: UInt8.self)
+        let buffer = UnsafeMutablePointer.uint8Pointer(of: bufferSize)
         // 50kb/s limit read speed
 //        let speed = 50 * 1024 / 1000
 //        defer { free(buffer) }
@@ -668,7 +668,7 @@ private extension Streamer {
             streamer._config.logger.log("Parsing an IceCast stream, received \(bufSize) bytes", to: .streamProvider)
             var offset = 0
             var bytesFound = 0
-            let buffers = malloc(bufSize).assumingMemoryBound(to: UInt8.self)
+            let buffers = UnsafeMutablePointer.uint8Pointer(of: bufSize)
             defer { free(buffers) }
             memcpy(buffers, pointer, bufSize)
             func readICYHeader() {

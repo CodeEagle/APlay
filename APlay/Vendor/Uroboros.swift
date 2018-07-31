@@ -200,12 +200,10 @@ extension Uroboros {
 
         init(capacity count: UInt32) {
             capacity = count
-            storagePointer = UnsafeMutableRawPointer.allocate(
-                byteCount: Int(capacity), alignment: MemoryLayout<Byte>.alignment
-            )
-            baseAddress = storagePointer.initializeMemory(as: UInt8.self, repeating: 0, count: Int(capacity))
-            
-            baseAddress = malloc(Int(count))?.assumingMemoryBound(to: Byte.self)
+            let intCount = Int(count)
+            let alignment = MemoryLayout<Byte>.alignment
+            storagePointer = UnsafeMutableRawPointer.allocate(byteCount: intCount, alignment: alignment)
+            baseAddress = storagePointer.bindMemory(to: Byte.self, capacity: intCount)
             assert(baseAddress != nil, "UroborosBody cant not be nil")
         }
 

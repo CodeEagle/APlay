@@ -83,7 +83,7 @@ extension ID3Parser {
     private func appendTagData(_ data: UnsafeMutablePointer<UInt8>, count: UInt32) {
         if let size = _v2Info?.size, _data.count >= size, _v2State != .initial { return }
         let bytesSize = Int(count)
-        let raw = malloc(bytesSize)!.assumingMemoryBound(to: UInt8.self)
+        let raw = UnsafeMutablePointer.uint8Pointer(of: bytesSize)
         defer { free(raw) }
         memcpy(raw, data, bytesSize)
         let dat = Data(bytes: raw, count: bytesSize)

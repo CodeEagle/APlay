@@ -62,6 +62,13 @@ extension UnsafeMutableRawPointer {
     }
 }
 
+extension UnsafeMutablePointer where Pointee == UInt8 {
+    static func uint8Pointer(of size: Int) -> UnsafeMutablePointer<UInt8> {
+        let alignment = MemoryLayout<UInt8>.alignment
+        return UnsafeMutableRawPointer.allocate(byteCount: size, alignment: alignment).bindMemory(to: UInt8.self, capacity: size)
+    }
+}
+
 extension AudioFileStreamParseFlags {
     static let continuity = AudioFileStreamParseFlags(rawValue: 0)
 }

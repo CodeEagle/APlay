@@ -40,7 +40,7 @@ extension FlacParser: MetadataParserCompatible {
 extension FlacParser {
     private func appendTagData(_ data: UnsafeMutablePointer<UInt8>, count: UInt32) {
         let bytesSize = Int(count)
-        let raw = malloc(bytesSize)!.assumingMemoryBound(to: UInt8.self)
+        let raw = UnsafeMutablePointer.uint8Pointer(of: bytesSize)
         defer { free(raw) }
         memcpy(raw, data, bytesSize)
         let dat = Data(bytes: raw, count: bytesSize)

@@ -91,7 +91,7 @@ extension DefaultAudioDecoder: AudioDecoderCompatible {
 
     func prepare(for provider: StreamProviderCompatible, at position: StreamProvider.Position) throws {
         _streamProvider = provider
-        if position.value == 0 { info.reset() }
+        if position == 0 { info.reset() }
         try prepareParser(for: provider)
     }
 

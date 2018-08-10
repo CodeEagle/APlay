@@ -20,7 +20,7 @@ final class Streamer: StreamProviderCompatible {
 
     var bufferingProgress: Float {
         guard contentLength > 0 else { return 0 }
-        let start = Float(position.value) + Float(_httpInfo.bytesRead)
+        let start = Float(position) + Float(_httpInfo.bytesRead)
         return start / Float(contentLength)
     }
 
@@ -92,7 +92,7 @@ extension Streamer {
                 setScheduledInRunLoop(run: false, for: stream)
                 throw APlay.Error.open("CFReadStreamOpen faile: \(position)")
             }
-            if position.value == 0 { _tagParser?.parseID3V1Tag(at: info.url) }
+            if position == 0 { _tagParser?.parseID3V1Tag(at: info.url) }
             if info.isRemote {
                 _watchDogInfo.reopenTimes += 1
                 _watchDogInfo.isReadedData = false
@@ -197,7 +197,7 @@ private extension Streamer {
         guard let stream = CFReadStreamCreateWithFile(kCFAllocatorDefault, url as CFURL) else {
             throw APlay.Error.open("CFReadStreamCreateWithFile faile: \(url)")
         }
-        if position.value > 0 {
+        if position > 0 {
             var position = position
             let p = CFNumberCreate(kCFAllocatorDefault, .longLongType, &position)
             CFReadStreamSetProperty(stream, CFStreamPropertyKey.fileCurrentOffset, p)
@@ -213,8 +213,8 @@ private extension Streamer {
 
         CFHTTPMessageSetHeaderFieldValue(request, Keys.icyMetadata.cf, Keys.icyMetaDataValue.cf)
 
-        if position.value > 0 {
-            let range = "bytes=\(position.value)-" as CFString
+        if position > 0 {
+            let range = "bytes=\(position)-" as CFString
             CFHTTPMessageSetHeaderFieldValue(request, Keys.range.cf, range)
         }
 
@@ -321,7 +321,7 @@ private extension Streamer {
             // why it is not reading real data, sometime?
             let bytesRead = CFReadStreamRead(stream, buffer, CFIndex(bufferSize))
             // error, reading empty data back
-            if _isFirstPacket == true, position.value == 0, buffer.advanced(by: 0).pointee == 0 {
+            if _isFirstPacket == true, position == 0, buffer.advanced(by: 0).pointee == 0 {
                 _watchDogInfo.isReadedData = false
                 close(resetTimer: false)
                 startReconnectWatchDog()
@@ -336,7 +336,7 @@ private extension Streamer {
             if info.isRemote {
                 if CFReadStreamGetStatus(stream) == CFStreamStatus.error {
                     if contentLength > 0 {
-                        let p = StreamProvider.Position(position.value + _httpInfo.bytesRead)
+                        let p = StreamProvider.Position(position + _httpInfo.bytesRead)
                         _watchDogInfo.reset()
                         _open(at: p)
                         _isLooping = false
@@ -359,7 +359,7 @@ private extension Streamer {
                 return
             }
             let count = UInt32(bytesRead)
-            if _icyCastInfo.isIcyStream == false, position.value == 0 {
+            if _icyCastInfo.isIcyStream == false, position == 0 {
                 _tagParser?.acceptInput(data: buffer, count: count)
             }
 
@@ -386,7 +386,7 @@ private extension Streamer {
             let code = CFHTTPMessageGetResponseStatusCode(resp as! CFHTTPMessage)
             if code == 401 { return }
         }
-        let read = _httpInfo.bytesRead + position.value
+        let read = _httpInfo.bytesRead + position
         if read < contentLength {
             _config.logger.log("HTTP stream end encountered whithout streamimg all content[\(contentLength)] , restart at postion \(read)", to: .streamProvider)
             startReconnectWatchDog()
@@ -406,7 +406,7 @@ private extension Streamer {
             error = .none
         }
         guard info.isRemote else { return }
-        let read = _httpInfo.bytesRead + position.value
+        let read = _httpInfo.bytesRead + position
         if read < contentLength {
             _watchDogInfo.startWatchDog(with: 2, at: _runloop) { [weak self] reachMaxRetryTime in
                 guard let sself = self else { return }
@@ -414,11 +414,11 @@ private extension Streamer {
                     sself.reachMaxRetryAndStopWatchDog()
                     return
                 }
-                let p = StreamProvider.Position(sself.position.value + sself._httpInfo.bytesRead)
+                let p = StreamProvider.Position(sself.position + sself._httpInfo.bytesRead)
                 sself.close(resetTimer: false)
-                guard p.value < sself.contentLength else {
+                guard p < sself.contentLength else {
                     sself._watchDogInfo.invalidateTimer()
-                    let error = APlay.Error.streamParse("Start position[\(p.value)] exceeded content length[\(sself.contentLength)]")
+                    let error = APlay.Error.streamParse("Start position[\(p)] exceeded content length[\(sself.contentLength)]")
                     sself.outputPipeline.call(.errorOccurred(error))
                     return
                 }
@@ -589,8 +589,8 @@ private extension Streamer {
             let p: StreamProvider.Position
             sself._watchDogInfo.invalidateTimer()
             if sself._watchDogInfo.isReadedData == false { p = sself.position }
-            else if sself.position.value + sself._httpInfo.bytesRead < sself.contentLength, sself.contentLength > 0 {
-                p = StreamProvider.Position(sself.position.value + sself._httpInfo.bytesRead)
+            else if sself.position + sself._httpInfo.bytesRead < sself.contentLength, sself.contentLength > 0 {
+                p = StreamProvider.Position(sself.position + sself._httpInfo.bytesRead)
                 sself.destroy()
             } else { p = 0 }
             sself._open(at: p)
@@ -861,7 +861,7 @@ private extension Streamer {
         }
 
         func disposeIfNeeded(at position: StreamProvider.Position) {
-            guard position.value != _fileWritten else { return }
+            guard position != _fileWritten else { return }
             if let h = _filehandle { fclose(h) }
             _filehandle = nil
         }

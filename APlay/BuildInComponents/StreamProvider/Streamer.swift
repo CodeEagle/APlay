@@ -97,7 +97,7 @@ extension Streamer {
                 _watchDogInfo.reopenTimes += 1
                 _watchDogInfo.isReadedData = false
             } else {
-                outputPipeline.call(.readyForReady)
+                outputPipeline.call(.readyForRead)
             }
             _isFirstPacket = true
             _readStream = stream
@@ -540,7 +540,7 @@ private extension Streamer {
                 streamer._config.logger.log("Content Length:\(streamer.contentLength)", to: .streamProvider)
             }
             if status200 || statusCode == 206 {
-                streamer.outputPipeline.call(.readyForReady)
+                streamer.outputPipeline.call(.readyForRead)
             } else {
                 if [401, 407].contains(statusCode) {
                     let responseHeader = CFReadStreamCopyProperty(readStream, CFStreamPropertyKey(rawValue: kCFStreamPropertyHTTPResponseHeader)) as! CFHTTPMessage
@@ -736,7 +736,7 @@ private extension Streamer {
                 }
                 isHeadersParsed = true
                 offset += 1
-                streamer.outputPipeline.call(.readyForReady)
+                streamer.outputPipeline.call(.readyForRead)
             }
 
             func readICY() {

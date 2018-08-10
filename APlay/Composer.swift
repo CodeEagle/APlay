@@ -56,7 +56,7 @@ final class Composer {
                 sself.eventPipeline.call(.flac(value))
             case let .unknown(error):
                 sself.eventPipeline.call(.unknown(error))
-            case .readyForReady:
+            case .readyForRead:
                 sself.prepare()
             case let .hasBytesAvailable(data, count, isFirstPacket):
                 let bufProgress = sself._streamer.bufferingProgress

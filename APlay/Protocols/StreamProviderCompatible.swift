@@ -29,7 +29,7 @@ extension StreamProviderCompatible {
 
 public struct StreamProvider {
     public enum Event {
-        case readyForReady
+        case readyForRead
         case hasBytesAvailable(UnsafePointer<UInt8>, UInt32, Bool)
         case endEncountered
         case errorOccurred(APlay.Error)

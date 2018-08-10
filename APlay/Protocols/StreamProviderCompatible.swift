@@ -38,13 +38,8 @@ public struct StreamProvider {
         case flac(FlacMetadata)
         case unknown(Error)
     }
-
-    public struct Position: ExpressibleByIntegerLiteral {
-        public typealias IntegerLiteralType = UInt
-        public var value: UInt = 0
-        public init(_ value: UInt) { self.value = value }
-        public init(integerLiteral value: UInt) { self.value = value }
-    }
+    
+    public typealias Position = UInt
 
     public enum URLInfo {
         case remote(URL, AudioFileType)

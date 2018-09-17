@@ -10,6 +10,9 @@ import APlay
 ...
 let url = URL(string: "path/to/audio/resource")!
 let player = APlay()
+player.eventPipeline.delegate(to: self, with: { (target, event) in
+    //  event handling
+})
 player.play(url)
 ...
 ```

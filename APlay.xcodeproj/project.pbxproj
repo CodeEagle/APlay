@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		10779AA6215DB977000D2847 /* AirPlayer2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10779AA5215DB977000D2847 /* AirPlayer2.swift */; };
 		10F83A8620F3427E00AF8222 /* APlay.h in Headers */ = {isa = PBXBuildFile; fileRef = 10F83A8420F3427E00AF8222 /* APlay.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		10F83AB420F342C400AF8222 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A8E20F342C400AF8222 /* Configuration.swift */; };
 		10F83AB520F342C400AF8222 /* InternalLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9020F342C400AF8222 /* InternalLogger.swift */; };
@@ -39,6 +40,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		10779AA5215DB977000D2847 /* AirPlayer2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayer2.swift; sourceTree = "<group>"; };
 		10F83A8120F3427E00AF8222 /* APlay.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = APlay.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		10F83A8420F3427E00AF8222 /* APlay.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = APlay.h; sourceTree = "<group>"; };
 		10F83A8520F3427E00AF8222 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -117,10 +119,10 @@
 		10F83A8C20F342C400AF8222 /* BuildInComponents */ = {
 			isa = PBXGroup;
 			children = (
+				10F83A9120F342C400AF8222 /* Players */,
 				10F83AD020F344A600AF8222 /* AVAduioSessionWorkaround */,
 				10F83A8D20F342C400AF8222 /* Configuration */,
 				10F83A8F20F342C400AF8222 /* Logger */,
-				10F83A9120F342C400AF8222 /* Players */,
 				10F83A9420F342C400AF8222 /* NowPlaying */,
 				10F83A9620F342C400AF8222 /* StreamProvider */,
 				10F83A9820F342C400AF8222 /* TagParser */,
@@ -148,6 +150,7 @@
 		10F83A9120F342C400AF8222 /* Players */ = {
 			isa = PBXGroup;
 			children = (
+				10779AA5215DB977000D2847 /* AirPlayer2.swift */,
 				10F83A9220F342C400AF8222 /* APlayer.swift */,
 				10F83A9320F342C400AF8222 /* AUPlayer.swift */,
 			);
@@ -330,6 +333,7 @@
 				10F83ABD20F342C400AF8222 /* DefaultAudioDecoder.swift in Sources */,
 				10F83ABA20F342C400AF8222 /* ID3Parser.swift in Sources */,
 				10F83ACC20F342C400AF8222 /* GCDTimer.swift in Sources */,
+				10779AA6215DB977000D2847 /* AirPlayer2.swift in Sources */,
 				10F83ACE20F342C400AF8222 /* Uroboros.swift in Sources */,
 				10F83AC720F342C400AF8222 /* StreamProviderCompatible.swift in Sources */,
 				10F83AC520F342C400AF8222 /* MetadataPaserCompatible.swift in Sources */,

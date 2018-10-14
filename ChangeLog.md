@@ -1,3 +1,11 @@
+v0.0.4
+---
+>2018.10.14
+
+1. Change playlist also triiger event `playingIndexChanged`
+2. Alter `PlayList` init method to internal
+3. Fixed reconnect not working
+
 v0.0.3
 ---
 >2018.07.20

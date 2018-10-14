@@ -79,9 +79,15 @@ final class Streamer: StreamProviderCompatible {
 extension Streamer {
     func _open(at position: StreamProvider.Position) {
         do {
-            guard _readStream == nil else { return }
+            guard _readStream == nil else {
+                _config.logger.log("_readStream not nil", to: .streamProvider)
+                outputPipeline.call(.errorOccurred(.open("_readStream not nil")))
+                return
+            }
+            _isRequestClose = false
             _cacheInfo.disposeIfNeeded(at: position)
             self.position = position
+            _config.logger.log("open at \(position)", to: .streamProvider)
             let stream = try createStream(at: position, httpInfo: _httpInfo)
             try addReadCallBack(for: stream)
             setScheduledInRunLoop(run: true, for: stream)
@@ -309,7 +315,7 @@ private extension Streamer {
             if _isRequestClose == true {
                 defer { _isRequestClose = false }
                 close(resetTimer: true)
-                debug_log("Streamer real closing stream")
+                _config.logger.log("Streamer real closing stream", to: .streamProvider)
                 return
             }
             if _isRuning == false {
@@ -330,6 +336,7 @@ private extension Streamer {
             }
             guard bytesRead > 0 else {
                 _isLooping = false
+                _config.logger.log("bytesRead(\(bytesRead)) <= 0", to: .streamProvider)
                 return
             }
 
@@ -389,7 +396,8 @@ private extension Streamer {
         let read = _httpInfo.bytesRead + position
         if read < contentLength {
             _config.logger.log("HTTP stream end encountered whithout streamimg all content[\(contentLength)] , restart at postion \(read)", to: .streamProvider)
-            startReconnectWatchDog()
+            close(resetTimer: true)
+            startReconnectWatchDog(notStreamingEnd: true)
         } else {
             _watchDogInfo.reset()
             outputPipeline.call(.endEncountered)
@@ -579,7 +587,8 @@ private extension Streamer {
         outputPipeline.call(.errorOccurred(APlay.Error.reachMaxRetryTime))
     }
 
-    func startReconnectWatchDog() {
+    func startReconnectWatchDog(notStreamingEnd: Bool = false) {
+        _config.logger.log("startReconnectWatchDog", to: Logger.Channel.streamProvider)
         _watchDogInfo.startWatchDog(with: 0.5, at: _runloop) { [weak self] reachMaxRetryTime in
             guard let sself = self else { return }
             if reachMaxRetryTime {
@@ -588,11 +597,16 @@ private extension Streamer {
             }
             let p: StreamProvider.Position
             sself._watchDogInfo.invalidateTimer()
-            if sself._watchDogInfo.isReadedData == false { p = sself.position }
-            else if sself.position + sself._httpInfo.bytesRead < sself.contentLength, sself.contentLength > 0 {
-                p = StreamProvider.Position(sself.position + sself._httpInfo.bytesRead)
-                sself.destroy()
-            } else { p = 0 }
+            if sself._watchDogInfo.isReadedData == false, notStreamingEnd == false { p = sself.position }
+            else {
+                let totalReadLength = sself.position + sself._httpInfo.bytesRead
+                sself._config.logger.log("totalReadLength:\(totalReadLength) < contentLength:\(sself.contentLength): \(totalReadLength < sself.contentLength)", to: Logger.Channel.streamProvider)
+                if  totalReadLength < sself.contentLength,
+                    sself.contentLength > 0 {
+                    p = StreamProvider.Position(totalReadLength)
+                } else { p = 0 }
+            }
+            sself._httpInfo.bytesRead = 0
             sself._open(at: p)
         }
     }

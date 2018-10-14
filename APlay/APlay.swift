@@ -14,7 +14,7 @@ import Foundation
 /// A public class for control audio playback
 public final class APlay {
     /// Current framework version
-    public static var version: String = "0.0.3"
+    public static var version: String = "0.0.4"
 
     /// Loop pattern for playback list
     public var loopPattern: PlayList.LoopPattern {
@@ -36,7 +36,7 @@ public final class APlay {
     private let _nowPlayingInfo: NowPlayingInfo
 
     private var _state: State = .idle
-    private var _playlist = PlayList()
+    private var _playlist: PlayList
     private var _propertiesQueue = DispatchQueue(concurrentName: "APlay.properties")
 
     private lazy var __isSteamerEndEncounted = false
@@ -63,6 +63,9 @@ public final class APlay {
         } else {
             _player = AUPlayer(config: config)
         }
+
+        _playlist = PlayList(pipeline: eventPipeline)
+
         _nowPlayingInfo = NowPlayingInfo(config: config)
 
         _player.eventPipeline.delegate(to: self) { obj, event in
@@ -115,7 +118,6 @@ public extension APlay {
         let u = url()
         let urls = [u]
         playlist.changeList(to: urls, at: 0)
-        eventPipeline.call(.playlistChanged(urls, 0))
         _play(u)
     }
 
@@ -135,7 +137,6 @@ public extension APlay {
             return
         }
         playlist.changeList(to: urls, at: index)
-        eventPipeline.call(.playlistChanged(urls, index))
         _play(url)
     }
 
@@ -146,7 +147,6 @@ public extension APlay {
             return
         }
         _play(url)
-        indexChanged()
     }
 
     /// toggle play/pause for player

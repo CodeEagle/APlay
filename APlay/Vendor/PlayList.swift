@@ -17,17 +17,23 @@ public final class PlayList {
 
     private lazy var _randomList: [URL] = []
 
+    private unowned let _pipeline: Delegated<APlay.Event, Void>
+
     #if DEBUG
         deinit {
             debug_log("\(self) \(#function)")
         }
     #endif
 
-    public init() {}
+    init(pipeline: Delegated<APlay.Event, Void>) {
+        _pipeline = pipeline
+    }
 
     public func changeList(to value: [URL], at index: Int) {
         list = value
         playingIndex = index
+        _pipeline.call(.playlistChanged(value, index))
+        _pipeline.call(.playingIndexChanged(index))
         updateRandomList()
     }
 
@@ -120,6 +126,7 @@ public final class PlayList {
             }
         }
         playingIndex = index
+        _pipeline.call(.playingIndexChanged(index))
         return url
     }
 }

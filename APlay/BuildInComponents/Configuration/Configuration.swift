@@ -48,10 +48,12 @@ extension APlay {
         public let predefinedHttpHeaderValues: [String: String]
         /** 自动控制 AudioSession */
         public let isEnabledAutomaticAudioSessionHandling: Bool
-        /** 远程连接最大重试次数 */
+        /** 远程连接最大重试次数 默认5次*/
         public let maxRemoteStreamOpenRetry: UInt
         /** 自动填充ID3的信息到 NowPlayingCenter */
-        public let autoFillID3InfoToNowPlayingCenter: Bool
+        public let isAutoFillID3InfoToNowPlayingCenter: Bool
+        /** 自动处理中断事件 */
+        public let isAutoHandlingInterruptEvent: Bool
         /// If YES then volume control will be enabled on iOS
         public let isEnabledVolumeMixer: Bool
         /// A pointer to a 0 terminated array of band frequencies (iOS 5.0 and later, OSX 10.9 and later)
@@ -102,6 +104,7 @@ extension APlay {
                     maxRemoteStreamOpenRetry: UInt = 5,
                     equalizerBandFrequencies: [Float] = [50, 100, 200, 400, 800, 1600, 2600, 16000],
                     autoFillID3InfoToNowPlayingCenter: Bool = true,
+                    autoHandlingInterruptEvent: Bool = true,
                     enableVolumeMixer: Bool = true,
                     sessionBuilder: SessionBuilder? = nil,
                     sessionDelegateBuilder: SessionDelegateBuilder? = nil,
@@ -128,7 +131,8 @@ extension APlay {
             self.maxRemoteStreamOpenRetry = maxRemoteStreamOpenRetry
             self.equalizerBandFrequencies = equalizerBandFrequencies
             isEnabledVolumeMixer = enableVolumeMixer
-            self.autoFillID3InfoToNowPlayingCenter = autoFillID3InfoToNowPlayingCenter
+            isAutoFillID3InfoToNowPlayingCenter = autoFillID3InfoToNowPlayingCenter
+            isAutoHandlingInterruptEvent = autoHandlingInterruptEvent
 
             logger = loggerBuilder?(logPolicy) ?? APlay.InternalLogger(policy: logPolicy)
 

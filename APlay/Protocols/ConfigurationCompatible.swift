@@ -34,6 +34,8 @@ public protocol ConfigurationCompatible: AnyObject {
     var isEnabledVolumeMixer: Bool { get }
     var equalizerBandFrequencies: [Float] { get }
     var logger: LoggerCompatible { get }
+    var isAutoFillID3InfoToNowPlayingCenter: Bool { get }
+    var isAutoHandlingInterruptEvent: Bool { get }
 
     func startBackgroundTask(isToDownloadImage: Bool)
     func endBackgroundTask(isToDownloadImage: Bool)

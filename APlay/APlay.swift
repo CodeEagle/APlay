@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import AVFoundation
 #if canImport(UIKit)
     import UIKit
 #endif
@@ -49,8 +50,11 @@ public final class APlay {
     private let _maxOpenRestry = 5
     private lazy var _currentOpenRestry = 0
 
+    private lazy var _obs: [NSObjectProtocol] = []
+
     deinit {
         destroy()
+        _obs.forEach({ NotificationCenter.default.removeObserver($0) })
         config.endBackgroundTask(isToDownloadImage: false)
         debug_log("\(self) \(#function)")
     }
@@ -67,6 +71,8 @@ public final class APlay {
         _playlist = PlayList(pipeline: eventPipeline)
 
         _nowPlayingInfo = NowPlayingInfo(config: config)
+
+        addInteruptOb()
 
         _player.eventPipeline.delegate(to: self) { obj, event in
             switch event {
@@ -324,9 +330,10 @@ private extension APlay {
                 obj.eventPipeline.call(.state(state))
             case let .flac(value):
                 obj.eventPipeline.call(.flac(value))
-            case let .metadata(value):
-                obj.metadatas = value
-                let values = value
+            case let .metadata(values):
+                obj.metadatas = values
+                obj.eventPipeline.call(.metadata(values))
+                guard obj.config.isAutoFillID3InfoToNowPlayingCenter else { return }
                 for val in values {
                     switch val {
                     case let .album(text): obj._nowPlayingInfo.album = text
@@ -339,11 +346,40 @@ private extension APlay {
                     }
                 }
                 obj._nowPlayingInfo.update()
-                obj.eventPipeline.call(.metadata(value))
             }
         }
         return com
     }
+
+    private func addInteruptOb() {
+        guard config.isAutoHandlingInterruptEvent else { return }
+        /// RouteChange
+        let note1 = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) {[weak self] (note) in
+            let interuptionDict = note.userInfo
+            // "Headphone/Line was pulled. Stopping player...."
+            if let routeChangeReason = interuptionDict?[AVAudioSessionRouteChangeReasonKey] as? UInt, routeChangeReason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
+                self?.pause()
+            }
+        }
+
+        var playingStateBeforeInterrupte = state.isPlaying
+        let note2 = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self](note) -> Void in
+            guard let sself = self else { return }
+            let info = note.userInfo
+            guard let type = info?[AVAudioSessionInterruptionTypeKey] as? UInt else { return }
+            if type == AVAudioSession.InterruptionType.began.rawValue {
+                // 中断开始
+                playingStateBeforeInterrupte = sself.state.isPlaying
+                if playingStateBeforeInterrupte == true { sself.pause() }
+            } else {
+                // 中断结束
+                guard let options = info?[AVAudioSessionInterruptionOptionKey] as? UInt, options == AVAudioSession.InterruptionOptions.shouldResume.rawValue, playingStateBeforeInterrupte == true else { return }
+                sself.resume()
+            }
+        }
+        _obs = [note1, note2]
+    }
+
 }
 
 // MARK: - Thread Safe

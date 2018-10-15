@@ -66,12 +66,13 @@ public struct Logger {
 
     /// Log channel
     public enum Channel: CaseIterable {
-        case audioDecoder, streamProvider, metadataParser
+        case audioDecoder, streamProvider, metadataParser, player
         var symbole: String {
             switch self {
             case .audioDecoder: return "🌈"
             case .streamProvider: return "🌊"
             case .metadataParser: return "⚡️"
+            case .player:  return "🍵"
             }
         }
 

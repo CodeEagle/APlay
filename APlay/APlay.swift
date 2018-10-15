@@ -352,12 +352,16 @@ private extension APlay {
     }
 
     private func addInteruptOb() {
+        config.logger.log("config.isAutoHandlingInterruptEvent: \(config.isAutoHandlingInterruptEvent)", to: .player)
         guard config.isAutoHandlingInterruptEvent else { return }
         /// RouteChange
+
         let note1 = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) {[weak self] (note) in
             let interuptionDict = note.userInfo
             // "Headphone/Line was pulled. Stopping player...."
+            self?.config.logger.log("routeChange: \(interuptionDict ?? [:])", to: .player)
             if let routeChangeReason = interuptionDict?[AVAudioSessionRouteChangeReasonKey] as? UInt, routeChangeReason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
+                self?.config.logger.log("routeChange pause", to: .player)
                 self?.pause()
             }
         }
@@ -366,6 +370,7 @@ private extension APlay {
         let note2 = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self](note) -> Void in
             guard let sself = self else { return }
             let info = note.userInfo
+            sself.config.logger.log("interruption event \(info ?? [:])", to: .player)
             guard let type = info?[AVAudioSessionInterruptionTypeKey] as? UInt else { return }
             if type == AVAudioSession.InterruptionType.began.rawValue {
                 // 中断开始

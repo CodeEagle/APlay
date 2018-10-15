@@ -62,17 +62,30 @@ public final class PlayList {
         switch pattern {
         case .order:
             if let idx = playingIndex { index = idx + 1 }
-            if index >= list.count { index = 0 }
+            if index >= list.count {
+                if loopPattern.isGonnaStopAtEndOfList {
+                    return nil
+                }
+                index = 0
+            }
             playingIndex = index
             let url = list[index]
             return url
         case .random:
             if let idx = playingIndex { index = idx + 1 }
-            if index >= list.count { index = 0 }
+            if index >= list.count {
+                if loopPattern.isGonnaStopAtEndOfList {
+                    return nil
+                }
+                index = 0
+            }
             playingIndex = index
             let url = _randomList[index]
             return url
         case .single:
+            if loopPattern.isGonnaStopAtEndOfList {
+                return nil
+            }
             if let idx = playingIndex { index = idx }
             playingIndex = index
             let url = list[index]
@@ -139,5 +152,12 @@ extension PlayList {
         case order
         case random
         case stopWhenAllPlayed(LoopPattern)
+
+        var isGonnaStopAtEndOfList: Bool {
+            switch self {
+            case .stopWhenAllPlayed: return true
+            default: return false
+            }
+        }
     }
 }

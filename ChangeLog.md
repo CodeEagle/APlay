@@ -1,3 +1,10 @@
+v0.0.5
+---
+>2019.01.14
+
+1. Support `stopWhenAllPlayed` mode
+2. Add interruption handler, fixed auto fill `metadata` bug
+
 v0.0.4
 ---
 >2018.10.14

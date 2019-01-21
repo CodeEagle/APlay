@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'APlay'
-  s.version          = '0.0.5'
+  s.version          = '0.1.0'
   s.summary          = 'A Better(Maybe) iOS Audio Stream & Play Swift Framework.'
   s.swift_version = '4.2'
   s.description      = <<-DESC

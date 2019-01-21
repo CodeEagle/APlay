@@ -291,9 +291,7 @@ extension APlay.Configuration {
                 let raw = url.path
                 guard let dat = raw.data(using: .utf8) else { return raw }
                 let sub = dat.base64EncodedString()
-                let range = NSMakeRange(0, min(24, sub.count))
-                let value = String(sub[Range(range, in: sub)!])
-                return value
+                return sub
             })
         }
     }

@@ -47,9 +47,11 @@ Features
 
 - [x] Open protocols to support customizing. `AudioDecoderCompatible`, `ConfigurationCompatible`, `LoggerCompatible`...
 
-Installtion
+Installation
 ---
 [Carthage](https://github.com/Carthage/Carthage) `github "CodeEagle/APlay"`
+
+[CocoaPods](https://cocoapods.org/) `pod 'APlay'`
 
 Todo
 ---

@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		106D4F0421F5D9B700EA58C4 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106D4F0321F5D9B700EA58C4 /* AppDelegate.swift */; };
+		106D4F0621F5D9B700EA58C4 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106D4F0521F5D9B700EA58C4 /* ViewController.swift */; };
+		106D4F0921F5D9B700EA58C4 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 106D4F0721F5D9B700EA58C4 /* Main.storyboard */; };
+		106D4F0B21F5D9B800EA58C4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 106D4F0A21F5D9B800EA58C4 /* Assets.xcassets */; };
+		106D4F0E21F5D9B900EA58C4 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 106D4F0C21F5D9B800EA58C4 /* LaunchScreen.storyboard */; };
+		106D4F1321F5D9C000EA58C4 /* APlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 10F83A8120F3427E00AF8222 /* APlay.framework */; };
+		106D4F1421F5D9C000EA58C4 /* APlay.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 10F83A8120F3427E00AF8222 /* APlay.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		10F83A8620F3427E00AF8222 /* APlay.h in Headers */ = {isa = PBXBuildFile; fileRef = 10F83A8420F3427E00AF8222 /* APlay.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		10F83AB420F342C400AF8222 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A8E20F342C400AF8222 /* Configuration.swift */; };
 		10F83AB520F342C400AF8222 /* InternalLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9020F342C400AF8222 /* InternalLogger.swift */; };
@@ -38,7 +45,38 @@
 		10F83AD420F344A600AF8222 /* AVAudioSession+Workaround.h in Headers */ = {isa = PBXBuildFile; fileRef = 10F83AD220F344A600AF8222 /* AVAudioSession+Workaround.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		106D4F1521F5D9C000EA58C4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 10F83A8020F3427E00AF8222;
+			remoteInfo = APlay;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		106D4F1721F5D9C000EA58C4 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				106D4F1421F5D9C000EA58C4 /* APlay.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		106D4F0121F5D9B700EA58C4 /* APlayDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = APlayDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		106D4F0321F5D9B700EA58C4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		106D4F0521F5D9B700EA58C4 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		106D4F0821F5D9B700EA58C4 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		106D4F0A21F5D9B800EA58C4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		106D4F0D21F5D9B800EA58C4 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		106D4F0F21F5D9B900EA58C4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		10F83A8120F3427E00AF8222 /* APlay.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = APlay.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		10F83A8420F3427E00AF8222 /* APlay.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = APlay.h; sourceTree = "<group>"; };
 		10F83A8520F3427E00AF8222 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -73,6 +111,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		106D4EFE21F5D9B700EA58C4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				106D4F1321F5D9C000EA58C4 /* APlay.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		10F83A7E20F3427D00AF8222 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -83,10 +129,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		106D4F0221F5D9B700EA58C4 /* APlayDemo */ = {
+			isa = PBXGroup;
+			children = (
+				106D4F0321F5D9B700EA58C4 /* AppDelegate.swift */,
+				106D4F0521F5D9B700EA58C4 /* ViewController.swift */,
+				106D4F0721F5D9B700EA58C4 /* Main.storyboard */,
+				106D4F0A21F5D9B800EA58C4 /* Assets.xcassets */,
+				106D4F0C21F5D9B800EA58C4 /* LaunchScreen.storyboard */,
+				106D4F0F21F5D9B900EA58C4 /* Info.plist */,
+			);
+			path = APlayDemo;
+			sourceTree = "<group>";
+		};
 		10F83A7720F3427D00AF8222 = {
 			isa = PBXGroup;
 			children = (
 				10F83A8320F3427E00AF8222 /* APlay */,
+				106D4F0221F5D9B700EA58C4 /* APlayDemo */,
 				10F83A8220F3427E00AF8222 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -95,6 +155,7 @@
 			isa = PBXGroup;
 			children = (
 				10F83A8120F3427E00AF8222 /* APlay.framework */,
+				106D4F0121F5D9B700EA58C4 /* APlayDemo.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -247,6 +308,25 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		106D4F0021F5D9B700EA58C4 /* APlayDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 106D4F1221F5D9B900EA58C4 /* Build configuration list for PBXNativeTarget "APlayDemo" */;
+			buildPhases = (
+				106D4EFD21F5D9B700EA58C4 /* Sources */,
+				106D4EFE21F5D9B700EA58C4 /* Frameworks */,
+				106D4EFF21F5D9B700EA58C4 /* Resources */,
+				106D4F1721F5D9C000EA58C4 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				106D4F1621F5D9C000EA58C4 /* PBXTargetDependency */,
+			);
+			name = APlayDemo;
+			productName = APlayDemo;
+			productReference = 106D4F0121F5D9B700EA58C4 /* APlayDemo.app */;
+			productType = "com.apple.product-type.application";
+		};
 		10F83A8020F3427E00AF8222 /* APlay */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 10F83A8920F3427E00AF8222 /* Build configuration list for PBXNativeTarget "APlay" */;
@@ -271,9 +351,13 @@
 		10F83A7820F3427D00AF8222 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				LastSwiftUpdateCheck = 1010;
 				LastUpgradeCheck = 1000;
 				ORGANIZATIONNAME = SelfStudio;
 				TargetAttributes = {
+					106D4F0021F5D9B700EA58C4 = {
+						CreatedOnToolsVersion = 10.1;
+					};
 					10F83A8020F3427E00AF8222 = {
 						CreatedOnToolsVersion = 10.0;
 						LastSwiftMigration = 1000;
@@ -286,6 +370,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				Base,
 			);
 			mainGroup = 10F83A7720F3427D00AF8222;
 			productRefGroup = 10F83A8220F3427E00AF8222 /* Products */;
@@ -293,11 +378,22 @@
 			projectRoot = "";
 			targets = (
 				10F83A8020F3427E00AF8222 /* APlay */,
+				106D4F0021F5D9B700EA58C4 /* APlayDemo */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		106D4EFF21F5D9B700EA58C4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				106D4F0E21F5D9B900EA58C4 /* LaunchScreen.storyboard in Resources */,
+				106D4F0B21F5D9B800EA58C4 /* Assets.xcassets in Resources */,
+				106D4F0921F5D9B700EA58C4 /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		10F83A7F20F3427E00AF8222 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -308,6 +404,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		106D4EFD21F5D9B700EA58C4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				106D4F0621F5D9B700EA58C4 /* ViewController.swift in Sources */,
+				106D4F0421F5D9B700EA58C4 /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		10F83A7D20F3427D00AF8222 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -344,7 +449,72 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		106D4F1621F5D9C000EA58C4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 10F83A8020F3427E00AF8222 /* APlay */;
+			targetProxy = 106D4F1521F5D9C000EA58C4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		106D4F0721F5D9B700EA58C4 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				106D4F0821F5D9B700EA58C4 /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+		106D4F0C21F5D9B800EA58C4 /* LaunchScreen.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				106D4F0D21F5D9B800EA58C4 /* Base */,
+			);
+			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
+		106D4F1021F5D9B900EA58C4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = APlayDemo/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.selftsudio.APlayDemo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 4.2;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		106D4F1121F5D9B900EA58C4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = APlayDemo/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.selftsudio.APlayDemo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 4.2;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		10F83A8720F3427E00AF8222 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -523,6 +693,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		106D4F1221F5D9B900EA58C4 /* Build configuration list for PBXNativeTarget "APlayDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				106D4F1021F5D9B900EA58C4 /* Debug */,
+				106D4F1121F5D9B900EA58C4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		10F83A7B20F3427D00AF8222 /* Build configuration list for PBXProject "APlay" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

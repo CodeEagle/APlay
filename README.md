@@ -17,6 +17,10 @@ player.play(url)
 ...
 ```
 
+⚠️⚠️⚠️ Known issue
+---
+This project can only run in `DEBUG` mode，cause optimazation mode will stall the decode loop.
+
 Docs
 ---
 Run `./generate_docs.sh`

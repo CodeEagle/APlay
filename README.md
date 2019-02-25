@@ -35,6 +35,20 @@ pre_install do |installer|
 end
 ```
 
+if install with CocoaPods, add this block of code in your podfile
+```ruby
+pre_install do |installer|
+ installer.pods_project.targets.each do |target|
+        target.build_configurations.each do |config|
+            swiftPods = ['APlay']
+            if swiftPods.include?(target.name)
+                config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] =  '-Onone'
+            end
+        end
+    end
+end
+```
+
 Docs
 ---
 Run `./generate_docs.sh`

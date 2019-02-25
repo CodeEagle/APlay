@@ -476,13 +476,13 @@ private extension Streamer {
                     let buf = buffer.advanced(by: i).pointee
                     datas.append(buf)
                 }
-                var data = Data(bytes: datas)
+                var data = Data(datas)
                 icy = String(data: data, encoding: .ascii) ?? ""
                 for i in 4 ..< 10 {
                     let buf = buffer.advanced(by: i).pointee
                     datas.append(buf)
                 }
-                data = Data(bytes: datas)
+                data = Data(datas)
                 icy = String(data: data, encoding: .ascii) ?? ""
                 // This is an ICY stream, don't try to parse the HTTP headers
                 if icy.lowercased() == "icy 200 ok" { return }

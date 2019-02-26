@@ -23,7 +23,7 @@ This project can only run in `DEBUG` mode，cause optimization mode will pause t
 
 if install with CocoaPods, add this block of code in your podfile
 ```ruby
-pre_install do |installer|
+post_install do |installer|
  installer.pods_project.targets.each do |target|
         target.build_configurations.each do |config|
             swiftPods = ['APlay']

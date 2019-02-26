@@ -19,7 +19,7 @@ player.play(url)
 
 ⚠️⚠️⚠️ Known issue
 ---
-This project can only run in `DEBUG` mode，cause optimazation mode will pause the decode loop.
+This project can only run in `DEBUG` mode，cause optimization mode will pause the decode loop.
 
 if install with CocoaPods, add this block of code in your podfile
 ```ruby

@@ -69,7 +69,10 @@ final class GCDTimer {
 // MARK: - Hashable
 
 extension GCDTimer: Hashable {
-    var hashValue: Int { return index }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(index)
+    }
+    
     static func == (lhs: GCDTimer, rhs: GCDTimer) -> Bool {
         return lhs.index == rhs.index
     }

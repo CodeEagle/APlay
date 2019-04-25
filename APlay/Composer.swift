@@ -171,7 +171,9 @@ extension Composer {
         } else {
             // FIXME: May minus more bytes
             /// http://www.beaglebuddy.com/content/pages/javadocs/index.html
-            audioFileLength = contentLength - _metaDataSizeInBytes
+            if contentLength > _metaDataSizeInBytes {
+                audioFileLength = contentLength - _metaDataSizeInBytes
+            }
         }
         if audioFileLength > 0 {
             let bitrate = Float(_decoder.info.bitrate)

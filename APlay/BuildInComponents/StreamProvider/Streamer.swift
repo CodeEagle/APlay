@@ -476,13 +476,13 @@ private extension Streamer {
                     let buf = buffer.advanced(by: i).pointee
                     datas.append(buf)
                 }
-                var data = Data(bytes: datas)
+                var data = Data(datas)
                 icy = String(data: data, encoding: .ascii) ?? ""
                 for i in 4 ..< 10 {
                     let buf = buffer.advanced(by: i).pointee
                     datas.append(buf)
                 }
-                data = Data(bytes: datas)
+                data = Data(datas)
                 icy = String(data: data, encoding: .ascii) ?? ""
                 // This is an ICY stream, don't try to parse the HTTP headers
                 if icy.lowercased() == "icy 200 ok" { return }
@@ -541,13 +541,21 @@ private extension Streamer {
             }
 
             let status200 = statusCode == 200
+            let status206 = statusCode == 206
             let serverError = 500 ... 599
             let clen = CFHTTPMessageCopyHeaderFieldValue(response, Keys.contentLength.cf)?.takeRetainedValue()
-            if let len = clen, status200 {
-                streamer.contentLength = UInt(UInt64(CFStringGetIntValue(len)))
-                streamer._config.logger.log("Content Length:\(streamer.contentLength)", to: .streamProvider)
+            if let len = clen  {
+                let l = UInt(UInt64(CFStringGetIntValue(len)))
+                if status200 {
+                    streamer.contentLength = l
+                    streamer._config.logger.log("200 Content Length:\(streamer.contentLength)", to: .streamProvider)
+                } else if status206 {
+                    streamer.contentLength = l + streamer.position
+                    streamer._config.logger.log("206 Content Length:\(streamer.contentLength)", to: .streamProvider)
+                }
+                
             }
-            if status200 || statusCode == 206 {
+            if status200 || status206 {
                 streamer.outputPipeline.call(.readyForRead)
             } else {
                 if [401, 407].contains(statusCode) {

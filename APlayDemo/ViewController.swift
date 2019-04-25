@@ -11,7 +11,13 @@ import APlay
 
 class ViewController: UIViewController {
 
-    private let player = APlay()
+    private lazy var config: APlay.Configuration = {
+        let c = APlay.Configuration(cachePolicy: .disable)
+        return c
+    }()
+    private lazy var player: APlay = {
+       return APlay(configuration: self.config)
+    }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -27,7 +33,14 @@ class ViewController: UIViewController {
             default: break
             }
         }
-        player.play(URL(string: "https://umemore.shaunwill.cn/game/emotion/game_little_bgm.mp3")!)
+        player.play(URL(string: "https://s1.vocaroo.com/media/download_temp/Vocaroo_s1tpYgEhVDS6.mp3")!)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            self.player.seek(to: 60)
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            self.player.seek(to: 180)
+        }
     }
 }
 

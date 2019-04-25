@@ -208,7 +208,7 @@ private extension DefaultAudioDecoder {
             var fileFormat: [UInt8] = Array(repeating: 0, count: 4)
             var fileFormatSize = UInt32(4)
             AudioFileStreamGetProperty(stream, kAudioFileStreamProperty_FileFormat, &fileFormatSize, &fileFormat)
-            let data = Data(bytes: fileFormat.reversed())
+            let data = Data(fileFormat.reversed())
             guard let type = String(data: data, encoding: .utf8) else { return }
             info.fileHint = StreamProvider.URLInfo.fileHint(from: type)
         }

@@ -21,26 +21,27 @@ class ViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        player.loopPattern = .stopWhenAllPlayed(.order)
-        player.eventPipeline.delegate(to: self) { (target, event) in
-            switch event {
-            case .playEnded:
-                self.player.pause()
-                DispatchQueue.main.async {
-                    let vc = ViewControllerB()
-                    self.show(vc, sender: nil)
-                }
-            default: break
-            }
-        }
-        player.play(URL(string: "https://s1.vocaroo.com/media/download_temp/Vocaroo_s1tpYgEhVDS6.mp3")!)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            self.player.seek(to: 60)
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            self.player.seek(to: 180)
-        }
+//        player.loopPattern = .stopWhenAllPlayed(.order)
+//        player.eventPipeline.delegate(to: self) { (target, event) in
+//            switch event {
+//            case .playEnded:
+//                self.player.pause()
+//                DispatchQueue.main.async {
+//                    let vc = ViewControllerB()
+//                    self.show(vc, sender: nil)
+//                }
+//            default: break
+//            }
+//        }
+        player.loopPattern = .random
+        player.play(URL(fileURLWithPath: Bundle.main.path(forResource: "a", ofType: "m4a")!), URL(string: "https://umemore.shaunwill.cn/game/emotion/game_bgmusic.mp3")!)
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+//            self.player.seek(to: 60)
+//        }
+//
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+//            self.player.seek(to: 180)
+//        }
     }
 }
 

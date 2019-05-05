@@ -137,12 +137,12 @@ public extension APlay {
     ///
     /// - Parameter urls: URL array
     func play(_ urls: [URL], at index: Int = 0) {
-        guard let url = urls[ap_safe: index] else {
+        playlist.changeList(to: urls, at: index)
+        guard let url = playlist.currentList[ap_safe: index] else {
             let msg = "Can not found item at \(index) in list \(urls)"
             eventPipeline.call(.error(.playItemNotFound(msg)))
             return
         }
-        playlist.changeList(to: urls, at: index)
         _play(url)
     }
 

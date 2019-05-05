@@ -327,13 +327,13 @@ private extension Streamer {
             // why it is not reading real data, sometime?
             let bytesRead = CFReadStreamRead(stream, buffer, CFIndex(bufferSize))
             // error, reading empty data back
-            if _isFirstPacket == true, position == 0, buffer.advanced(by: 0).pointee == 0 {
-                _watchDogInfo.isReadedData = false
-                close(resetTimer: false)
-                startReconnectWatchDog()
-                debug_log("reading empty data back, try to reopen")
-                break
-            }
+//            if _isFirstPacket == true, position == 0, buffer.advanced(by: 0).pointee == 0 {
+//                _watchDogInfo.isReadedData = false
+//                close(resetTimer: false)
+//                startReconnectWatchDog()
+//                debug_log("reading empty data back, try to reopen")
+//                break
+//            }
             guard bytesRead > 0 else {
                 _isLooping = false
                 _config.logger.log("bytesRead(\(bytesRead)) <= 0", to: .streamProvider)

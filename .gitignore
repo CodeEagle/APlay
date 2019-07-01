@@ -5,6 +5,7 @@
 ## Build generated
 build/
 DerivedData/
+.DS_Store
 
 ## Various settings
 *.pbxuser
@@ -37,7 +38,6 @@ playground.xcworkspace
 # Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
 # Packages/
 # Package.pins
-# Package.resolved
 .build/
 
 # CocoaPods
@@ -51,9 +51,10 @@ playground.xcworkspace
 # Carthage
 #
 # Add this line if you want to avoid checking in source code from Carthage dependencies.
-# Carthage/Checkouts
-
-Carthage
+Plugin/Carthage/Checkouts
+Plugin/Carthage/Build
+Carthage/Checkouts
+Carthage/Build
 
 # fastlane
 #
@@ -64,10 +65,8 @@ Carthage
 
 fastlane/report.xml
 fastlane/Preview.html
-fastlane/screenshots/**/*.png
+fastlane/screenshots
 fastlane/test_output
 
-*.zip
-.DS_Store
-
-docs/
+#swift package manager
+.swiftpm

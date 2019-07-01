@@ -1,9 +1,9 @@
-public enum URLInfo {
+public enum PlayableURLInfo {
     case remote(URL, AudioFileType)
     case local(URL, AudioFileType)
     case unknown(URL)
     
-    public static let none = URLInfo.unknown(URL(string: "https://APlay.URLInfo.unknown")!)
+    public static let none = PlayableURLInfo.unknown(URL(string: "APlay.PlayableURLInfo.unknown")!)
     
     public var isRemote: Bool { if case .remote = self { return true }; return false }
     
@@ -15,50 +15,14 @@ public enum URLInfo {
         }
     }
     
-    public var fileHint: AudioFileType {
-        switch self {
-        case let .remote(_, hint): return hint
-        case let .local(_, hint): return hint
-        default: return .mp3
-        }
-    }
-    
-    public var isWave: Bool {
-        switch self {
-        case let .remote(_, hint): return hint == .wave
-        case let .local(_, hint): return hint == .wave
-        default: return false
-        }
-    }
-    
-    public var isRemoteWave: Bool {
-        switch self {
-        case let .remote(_, hint): return hint == .wave
-        default: return false
-        }
-    }
-    
-    public var isLocalWave: Bool {
-        switch self {
-        case let .local(_, hint): return hint == .wave
-        default: return false
-        }
-    }
-    
-    public var fileName: String {
-        var coms = url.lastPathComponent.split(separator: ".")
-        coms.removeLast()
-        return coms.joined(separator: ".")
-    }
-    
     public init(url: URL) {
         guard let scheme = url.scheme?.lowercased() else {
             self = .unknown(url)
             return
         }
         if scheme == "file" {
-            let localFileHint = URLInfo.localFileHit(from: url)
-            let pathExtensionHint = URLInfo.fileHint(from: url.pathExtension)
+            let localFileHint = PlayableURLInfo.localFileHit(from: url)
+            let pathExtensionHint = PlayableURLInfo.fileHintFromFileTypeOrContentType(url.pathExtension)
             if localFileHint != .mp3 {
                 self = .local(url, localFileHint)
             } else if pathExtensionHint != .mp3 {
@@ -67,24 +31,14 @@ public enum URLInfo {
                 self = .local(url, .mp3)
             }
         } else {
-            self = .remote(url, URLInfo.fileHint(from: url.pathExtension))
+            self = .remote(url, PlayableURLInfo.fileHintFromFileTypeOrContentType(url.pathExtension))
         }
     }
+}
+// MARK: - FileHint Stuff
+public extension PlayableURLInfo {
     
-    static func isWave(for url: URL) -> Bool {
-        return fileHint(from: url.pathExtension) == .wave
-    }
-    
-    func localContentLength() -> UInt {
-        guard case let URLInfo.local(url, _) = self else { return 0 }
-        let name = url.asCFunctionString()
-        var buff = stat()
-        if stat(name, &buff) != 0 { return 0 }
-        let size = buff.st_size
-        return UInt(size)
-    }
-    
-    private static func localFileHit(from url: URL) -> AudioFileType {
+    static func localFileHit(from url: URL) -> AudioFileType {
         let name = url.asCFunctionString()
         let tagSize = 4
         guard let fd = fopen(name, "r") else { return .mp3 }
@@ -108,7 +62,7 @@ public enum URLInfo {
     ///
     /// - Parameter value: fileformat, file extension or content type
     /// - Returns: AudioFileTypeID, default value is `kAudioFileMP3Type`
-    static func fileHint(from value: String) -> AudioFileType {
+    static func fileHintFromFileTypeOrContentType(_ value: String) -> AudioFileType {
         switch value.lowercased() {
         case "flac": return .flac
         case "mp3", "mpg3", "audio/mpeg", "audio/mp3": return .mp3
@@ -122,5 +76,59 @@ public enum URLInfo {
         case "opus", "audio/opus": return .opus
         default: return .mp3
         }
+    }
+}
+// MARK: - Info From Url
+public extension PlayableURLInfo {
+    func localContentLength() -> UInt {
+        guard case let PlayableURLInfo.local(url, _) = self else { return 0 }
+        let name = url.asCFunctionString()
+        var buff = stat()
+        if stat(name, &buff) != 0 { return 0 }
+        let size = buff.st_size
+        return UInt(size)
+    }
+    
+    var fileHint: AudioFileType {
+        switch self {
+        case let .remote(_, hint): return hint
+        case let .local(_, hint): return hint
+        default: return .mp3
+        }
+    }
+    
+    var fileName: String {
+        var coms = url.lastPathComponent.split(separator: ".")
+        coms.removeLast()
+        return coms.joined(separator: ".")
+    }
+}
+
+// MARK: - Wave Stuff
+public extension PlayableURLInfo {
+    var isWave: Bool {
+        switch self {
+        case let .remote(_, hint): return hint == .wave
+        case let .local(_, hint): return hint == .wave
+        default: return false
+        }
+    }
+    
+    var isRemoteWave: Bool {
+        switch self {
+        case let .remote(_, hint): return hint == .wave
+        default: return false
+        }
+    }
+    
+    var isLocalWave: Bool {
+        switch self {
+        case let .local(_, hint): return hint == .wave
+        default: return false
+        }
+    }
+    
+    static func isWave(for url: URL) -> Bool {
+        return fileHintFromFileTypeOrContentType(url.pathExtension) == .wave
     }
 }

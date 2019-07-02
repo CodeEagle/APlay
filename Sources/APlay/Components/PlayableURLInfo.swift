@@ -37,7 +37,15 @@ public enum PlayableURLInfo {
 }
 // MARK: - FileHint Stuff
 public extension PlayableURLInfo {
-    
+    /**
+     read format for local file
+     
+     WaveFormat: http://soundfile.sapp.org/doc/WaveFormat/
+     
+     FlacFormat: https://xiph.org/flac/format.html
+     - Parameter url: local file url
+     - Returns: AudioFileTypeID, default value is `.mp3`
+     */
     static func localFileHit(from url: URL) -> AudioFileType {
         let name = url.asCFunctionString()
         let tagSize = 4
@@ -61,7 +69,7 @@ public extension PlayableURLInfo {
     /// Get fileHint from fileformat, file extension or content type,
     ///
     /// - Parameter value: fileformat, file extension or content type
-    /// - Returns: AudioFileTypeID, default value is `kAudioFileMP3Type`
+    /// - Returns: AudioFileTypeID, default value is `.mp3`
     static func fileHintFromFileTypeOrContentType(_ value: String) -> AudioFileType {
         switch value.lowercased() {
         case "flac": return .flac

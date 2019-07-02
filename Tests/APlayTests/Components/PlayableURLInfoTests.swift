@@ -51,6 +51,16 @@ final class PlayableURLInfoTests: XCTestCase {
     }
     
     func testLocalFileHit() {
+        let localWaveFile = "12345678WAVE".data(using: .utf8)!
+        let waveUrl = URL(fileURLWithPath: "/var/tmp/b.wave")
+        FileManager.createFileIfNeeded(at: waveUrl)
+        try! localWaveFile.write(to: waveUrl)
+        let localFlacFile = "fLaC".data(using: .utf8)!
+        let flacUrl = URL(fileURLWithPath: "/var/tmp/c.flac")
+        FileManager.createFileIfNeeded(at: flacUrl)
+        try! localFlacFile.write(to: flacUrl)
         
+        assert(PlayableURLInfo.localFileHit(from: waveUrl) == .wave)
+        assert(PlayableURLInfo.localFileHit(from: flacUrl) == .flac)
     }
 }

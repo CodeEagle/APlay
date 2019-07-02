@@ -1,6 +1,6 @@
 public final class APlay {
     
-    public private(set) var state: CurrentValueSubject<State, Never> = .init(.idle)
+    @Published public private(set) var state: State = .idle
     
     public init(){}
 }

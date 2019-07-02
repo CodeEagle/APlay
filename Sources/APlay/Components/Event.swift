@@ -25,7 +25,7 @@ public enum Event {
     case playingIndexChanged(PlayingIndex)
     case playlistChanged([URL])
     case playLoopPatternChanged(LoopPattern)
-    case error(Error)
+    case error(APlay.Error)
     case metadata([MetadataParser.Item])
     case flac(FlacMetadata)
 }

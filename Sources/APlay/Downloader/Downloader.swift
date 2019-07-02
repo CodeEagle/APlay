@@ -1,42 +1,92 @@
 import os.log
 import Combine
 
-public final class Downloader {
+// MARK: - Downloader
+public final class Downloader: NSObject {
     static let logger = OSLog(subsystem: "com.selfstudio.aplay.downloader", category: "Downloader")
-    public private(set) var session: URLSession = URLSession.shared
+    public private(set) var session: URLSession = URLSession(configuration: .default)
     public private(set) var delegator: URLSessionDelegator = .init()
-    private var _task: URLSessionDownloadTask?
+    private var _task: URLSessionDataTask?
+    private unowned let _configuration: ConfigurationCompatible
+    @Published private var _event: Event = .idle
+    
+    public var eventPipeline: AnyPublisher<Event, Never> { $_event.eraseToAnyPublisher() }
     
     deinit {
         _task?.cancel()
     }
     
-    public init(config: URLSessionConfiguration = URLSession.shared.configuration) {
-        session = URLSession(configuration: config, delegate: delegator, delegateQueue: nil)
-        _ = delegator.eventPublisher.sink(receiveCompletion: { (result) in
-            
-        }, receiveValue: { event in
-            
+    public init(configuration: ConfigurationCompatible) {
+        self._configuration = configuration
+        super.init()
+        let s = configuration.session
+        session = URLSession(configuration: s.configuration, delegate: delegator, delegateQueue: nil)
+        
+        _ = delegator.eventPublisher.sink(receiveValue: { [weak self] event in
+            guard let sself = self else { return }
+            switch event {
+            case let .completed(err): sself._event = .completed(err)
+            case .initialize, .onResponse, .onStartPostition: break
+            case let .onTotalByte(v): sself._event = .onTotalByte(v)
+            case let .onReceiveByte(v): sself._event = .onAvailableLength(v)
+            case let .onData(v): sself._event = .onData(v)
+            case let .onProgress(v): sself._event = .onProgress(v)
+            }
         })
     }
 }
 
+// MARK: - Download
 public extension Downloader {
     
     func download(_ resource: URL, at position: UInt64 = 0) {
         delegator.download(resource, at: position)
-        session.downloadTask(with: resource)
+        var request = URLRequest(url: resource, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 20)
+        if position > 0 {
+            request.addValue("bytes=\(position)-", forHTTPHeaderField: "Range")
+        }
+        _event = .onStartPosition(position)
+        _event = .onRequest(request)
+        _task = session.dataTask(with: request)
+        _task?.resume()
+    }
+    
+    func cancel() {
+        _event = .onCancel
+        _task?.cancel()
     }
 }
 
-public final class URLSessionDelegator: NSObject {
+// MARK: - Enum
+extension Downloader {
+    public enum Event {
+        case idle
+        case onRequest(URLRequest)
+        case onStartPosition(UInt64)
+        case onTotalByte(UInt64)
+        case onAvailableLength(UInt64)
+        case onData(Data)
+        case onProgress(Float)
+        case onCancel
+        case completed(Error?)
+    }
+}
+
+
+// MARK: - URLSessionDelegator
+public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
     
     @Published private var _event: Event = .initialize
+    public var passthrougthDelegate: URLSessionDataDelegate?
     private var _startPosition: UInt64 = 0
     private var _totalBytes: UInt64 = 0
     private var _currentTaskTotalBytes: UInt64 = 0
     private var _currentTaskReceivedTotalBytes: UInt64 = 0
     private var _queue: DispatchQueue = DispatchQueue(concurrentName: "URLSessionDelegator")
+    
+    deinit {
+        print("ajja")
+    }
     
     private func reset() {
         event = .initialize
@@ -51,8 +101,41 @@ public final class URLSessionDelegator: NSObject {
         startPosition = position
         event = .onStartPostition(position)
     }
+    
+    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        os_log("%@ - %d: receive response: %@", log: Downloader.logger, type: .debug, #function, #line, response)
+        let totalLength = UInt64(response.expectedContentLength)
+        if let resp = response as? HTTPURLResponse {
+            _queue.async(flags: .barrier) {
+                if resp.statusCode == 200 {
+                    self._totalBytes = totalLength
+                } else if resp.statusCode == 206 {
+                    self._currentTaskTotalBytes = totalLength
+                    self._totalBytes = totalLength + self._startPosition
+                }
+            }
+        }
+        completionHandler(.allow)
+        event = .onResponse(response)
+    }
+    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        os_log("%@ - %d: didReceive data: %d", log: Downloader.logger, type: .debug, #function, #line, data.count)
+        let dataCount = UInt64(data.count)
+        currentTaskReceivedTotalBytes += dataCount
+        event = .onReceiveByte(currentTaskReceivedTotalBytes)
+        event = .onData(data)
+        let total = Float(totalBytes)
+        guard total.isNaN == false, total.isZero == false else { return }
+        event = .onProgress(Float(currentTaskReceivedTotalBytes) / total)
+    }
+    
+    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Swift.Error?) {
+        os_log("%@ - %d: didCompleteWithError: %@", log: Downloader.logger, type: .debug, #function, #line, String.init(describing: error))
+        event = .completed(error)
+    }
 }
 
+// MARK: - Public API
 extension URLSessionDelegator {
     public private(set) var event: Event {
         get { return _queue.sync { _event } }
@@ -84,6 +167,7 @@ extension URLSessionDelegator {
     }
 }
 
+// MARK: - Enum
 extension URLSessionDelegator {
     public enum Event {
         case initialize
@@ -94,38 +178,5 @@ extension URLSessionDelegator {
         case onData(Data)
         case onProgress(Float)
         case completed(Error?)
-    }
-}
-
-extension URLSessionDelegator: URLSessionDelegate {
-    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        os_log("%@ - %d", log: Downloader.logger, type: .debug, #function, #line)
-        let totalLength = UInt64(response.expectedContentLength)
-        if let resp = response as? HTTPURLResponse {
-            _queue.async(flags: .barrier) {
-                if resp.statusCode == 200 {
-                    self._totalBytes = totalLength
-                } else if resp.statusCode == 206 {
-                    self._currentTaskTotalBytes = totalLength
-                    self._totalBytes = totalLength + self._startPosition
-                }
-            }
-        }
-        completionHandler(.allow)
-        event = .onResponse(response)
-    }
-    
-    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        os_log("%@ - %d", log: Downloader.logger, type: .debug, #function, #line, data.count)
-        let dataCount = UInt64(data.count)
-        currentTaskReceivedTotalBytes += dataCount
-        event = .onReceiveByte(currentTaskReceivedTotalBytes)
-        event = .onData(data)
-        event = .onProgress(Float(currentTaskReceivedTotalBytes) / Float(totalBytes))
-    }
-    
-    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        os_log("%@ - %d", log: Downloader.logger, type: .debug, #function, #line)
-        event = .completed(error)
     }
 }

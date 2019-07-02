@@ -4,13 +4,13 @@
 public struct FlacMetadata {
     static let tag = "fLaC"
     public let streamInfo: StreamInfo
-    fileprivate(set) var headerData: Data = Data()
-    public fileprivate(set) var vorbisComments: VorbisComments?
-    public fileprivate(set) var picture: Picture?
-    public fileprivate(set) var application: Application?
-    public fileprivate(set) var seekTable: SeekTable?
-    public fileprivate(set) var cueSheet: CUESheet?
-    public fileprivate(set) var paddings: [Padding]?
+    var headerData: Data = Data()
+    public internal(set) var vorbisComments: VorbisComments?
+    public internal(set) var picture: Picture?
+    public internal(set) var application: Application?
+    public internal(set) var seekTable: SeekTable?
+    public internal(set) var cueSheet: CUESheet?
+    public internal(set) var paddings: [Padding]?
     
     init(streamInfo: StreamInfo) { self.streamInfo = streamInfo }
     

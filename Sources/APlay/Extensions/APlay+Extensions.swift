@@ -120,6 +120,6 @@ extension OSStatus {
 
     func throwCheck(file: String = #file, method: String = #function, line: Int = #line) throws {
         guard let msg = check(file: file, method: method, line: line) else { return }
-        throw Error.player(msg)
+        throw APlay.Error.player(msg)
     }
 }

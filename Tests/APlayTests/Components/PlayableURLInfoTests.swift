@@ -1,5 +1,3 @@
-import Foundation
-
 final class PlayableURLInfoTests: XCTestCase {
     func testInitFromURL() {
         let expectation: [URL : PlayableURLInfo] = [

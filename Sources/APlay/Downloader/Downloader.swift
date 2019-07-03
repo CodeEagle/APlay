@@ -8,12 +8,14 @@ public final class Downloader: NSObject {
     public private(set) var delegator: URLSessionDelegator = .init()
     private var _task: URLSessionDataTask?
     private unowned let _configuration: ConfigurationCompatible
+    private var _data: Data = .init()
     @Published private var _event: Event = .idle
     
     public var eventPipeline: AnyPublisher<Event, Never> { $_event.eraseToAnyPublisher() }
     
     deinit {
-        _task?.cancel()
+        guard _task != nil else { return }
+        cancel()
     }
     
     public init(configuration: ConfigurationCompatible) {
@@ -25,11 +27,23 @@ public final class Downloader: NSObject {
         _ = delegator.eventPublisher.sink(receiveValue: { [weak self] event in
             guard let sself = self else { return }
             switch event {
-            case let .completed(err): sself._event = .completed(err)
+            case let .completed(err):
+                let result: Result<Data, Error>
+                if let e = err {
+                    result = .failure(e)
+                } else {
+                    result = .success(sself._data)
+                }
+                sself._task = nil
+                sself._event = .completed(result)
+                
             case .initialize, .onResponse, .onStartPostition: break
             case let .onTotalByte(v): sself._event = .onTotalByte(v)
             case let .onReceiveByte(v): sself._event = .onAvailableLength(v)
-            case let .onData(v): sself._event = .onData(v)
+            case let .onData(v):
+                sself._event = .onData(v)
+                sself._data.append(v)
+                
             case let .onProgress(v): sself._event = .onProgress(v)
             }
         })
@@ -48,12 +62,23 @@ public extension Downloader {
         _event = .onStartPosition(position)
         _event = .onRequest(request)
         _task = session.dataTask(with: request)
-        _task?.resume()
+        resume()
     }
     
     func cancel() {
-        _event = .onCancel
         _task?.cancel()
+        _task = nil
+        _event = .onCancel
+    }
+    
+    func suspend() {
+        _task?.suspend()
+        _event = .onSuspend
+    }
+    
+    func resume() {
+        _task?.resume()
+        _event = .onResume
     }
 }
 
@@ -68,7 +93,9 @@ extension Downloader {
         case onData(Data)
         case onProgress(Float)
         case onCancel
-        case completed(Error?)
+        case onSuspend
+        case onResume
+        case completed(Result<Data, Error>)
     }
 }
 
@@ -83,10 +110,6 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
     private var _currentTaskTotalBytes: UInt64 = 0
     private var _currentTaskReceivedTotalBytes: UInt64 = 0
     private var _queue: DispatchQueue = DispatchQueue(concurrentName: "URLSessionDelegator")
-    
-    deinit {
-        print("ajja")
-    }
     
     private func reset() {
         event = .initialize

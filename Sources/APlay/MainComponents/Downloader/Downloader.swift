@@ -6,6 +6,7 @@ public final class Downloader: NSObject {
     static let logger = OSLog(subsystem: "com.selfstudio.aplay.downloader", category: "Downloader")
     public private(set) var session: URLSession = URLSession(configuration: .default)
     public private(set) var delegator: URLSessionDelegator = .init()
+    public private(set) var targetURL: URL = URL(string: "https://APlay.placehoder.url")!
     private var _task: URLSessionDataTask?
     private unowned let _configuration: ConfigurationCompatible
     private var _data: Data = .init()
@@ -39,12 +40,9 @@ public final class Downloader: NSObject {
                 
             case .initialize, .onResponse, .onStartPostition: break
             case let .onTotalByte(v): sself._event = .onTotalByte(v)
-            case let .onReceiveByte(v): sself._event = .onAvailableLength(v)
-            case let .onData(v):
-                sself._event = .onData(v)
+            case let .onData(v, info):
                 sself._data.append(v)
-                
-            case let .onProgress(v): sself._event = .onProgress(v)
+                sself._event = .onData(v, info)
             }
         })
     }
@@ -54,6 +52,7 @@ public final class Downloader: NSObject {
 public extension Downloader {
     
     func download(_ resource: URL, at position: UInt64 = 0) {
+        targetURL = resource
         delegator.download(resource, at: position)
         var request = URLRequest(url: resource, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 20)
         if position > 0 {
@@ -89,9 +88,7 @@ extension Downloader {
         case onRequest(URLRequest)
         case onStartPosition(UInt64)
         case onTotalByte(UInt64)
-        case onAvailableLength(UInt64)
-        case onData(Data)
-        case onProgress(Float)
+        case onData(Data, URLSessionDelegator.Info)
         case onCancel
         case onSuspend
         case onResume
@@ -145,11 +142,10 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
         os_log("%@ - %d: didReceive data: %d", log: Downloader.logger, type: .debug, #function, #line, data.count)
         let dataCount = UInt64(data.count)
         currentTaskReceivedTotalBytes += dataCount
-        event = .onReceiveByte(currentTaskReceivedTotalBytes)
-        event = .onData(data)
-        let total = Float(totalBytes)
-        guard total.isNaN == false, total.isZero == false else { return }
-        event = .onProgress(Float(currentTaskReceivedTotalBytes) / total)
+        let info: Info = _queue.sync { () -> Info in
+            return .init(_totalBytes, _startPosition, _currentTaskReceivedTotalBytes)
+        }
+        event = .onData(data, info)
     }
     
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Swift.Error?) {
@@ -192,14 +188,35 @@ extension URLSessionDelegator {
 
 // MARK: - Enum
 extension URLSessionDelegator {
+    
+    public struct Info {
+        public let totalByte: UInt64
+        public let startPostition: UInt64
+        public let receivedByte: UInt64
+        public var currentProgress: Float {
+            let delta = Float(totalByte) - Float(startPostition)
+            guard delta > 0 else { return 0 }
+            return Float(receivedByte) / delta
+        }
+        
+        public var progress: Float {
+            guard totalByte > 0 else { return 0 }
+            return Float(receivedByte) / Float(totalByte)
+        }
+        
+        init(_ totalByte: UInt64, _ startPostition: UInt64, _ receivedByte: UInt64) {
+            self.totalByte = totalByte
+            self.startPostition = startPostition
+            self.receivedByte = receivedByte
+        }
+    }
+    
     public enum Event {
         case initialize
         case onResponse(URLResponse)
         case onTotalByte(UInt64)
         case onStartPostition(UInt64)
-        case onReceiveByte(UInt64)
-        case onData(Data)
-        case onProgress(Float)
+        case onData(Data, Info)
         case completed(Error?)
     }
 }

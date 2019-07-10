@@ -8,20 +8,44 @@ final class DownloaderTests: XCTestCase {
         let resource = URL(string: "https://umemore.shaunwill.cn/game/emotion/game_bgmusic.mp3")!
         let path = "/var/tmp/aplay.download.test.tmp"
         FileManager.createFileIfNeeded(at: URL(fileURLWithPath: path))
-        let handle = FileHandle(forReadingAtPath: path)
+        let readWritePipe: ReadWritePipe = try! .init(localPath: path)
         
-        asyncTest { (e) in
+        asyncTest(timeout: 300) { (e) in
+            
             _ = downloader.eventPipeline.sink { (event) in
-                print(event)
-                
                 switch event {
+                case .onTotalByte(let len):
+                    print("schedule read")
+                    self.scheduleRead(readWritePipe, total: Int(len), read: 0, completion: { e.fulfill() })
+                    
+                case let .onData(d, _):
+                    print("write")
+                    readWritePipe.write(d)
+                    
                 case let .completed(er):
                     print(String.init(describing: er))
-                    e.fulfill()
+                    
                 default: break
                 }
             }
             downloader.download(resource, at: 1200)
+            
+        }
+    }
+    
+    private func scheduleRead(_ readHandle: ReadWritePipe, total: Int, read: Int, completion: @escaping () -> Void) {
+        let fixedLength = 8192
+        var totalRead = read
+        
+        if totalRead < total {
+            let count = readHandle.readData(ofLength: fixedLength).count
+            totalRead += count
+            print("read :\(count)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + DispatchTimeInterval.milliseconds(15)) {
+                self.scheduleRead(readHandle, total: total, read: totalRead, completion: completion)
+            }
+        } else {
+            completion()
         }
     }
 }

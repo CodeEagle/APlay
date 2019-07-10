@@ -135,6 +135,8 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
                 }
             }
         }
+        let total = totalBytes
+        event = .onTotalByte(total)
         completionHandler(.allow)
         event = .onResponse(response)
     }

@@ -28,8 +28,7 @@ final class DownloaderTests: XCTestCase {
                 default: break
                 }
             }
-            downloader.download(resource, at: 1200)
-            
+            downloader.download(StreamProvider.URLInfo(url: resource, position: 1200))
         }
     }
     

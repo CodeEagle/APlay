@@ -275,6 +275,19 @@ extension APlay.Configuration {
         }
     }
 
+    public enum RetryPolicy {
+        public struct Config {
+            public var delay: DispatchTimeInterval = .seconds(2)
+            public var maxRetry: UInt = UInt.max
+            public init(delay: DispatchTimeInterval = .seconds(2), maxRetry: UInt = UInt.max) {
+                self.delay = delay
+                self.maxRetry = maxRetry
+            }
+        }
+        case never
+        case retry((Error) -> Config)
+    }
+
     /// Cache Plolicy
     ///
     /// - enable: enable with extra folders

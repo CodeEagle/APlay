@@ -30,78 +30,62 @@ public struct StreamProvider {
         case unknown(Error)
     }
     
-    public typealias Position = UInt
+    public typealias Position = UInt64
 
-    public enum URLInfo {
-        case remote(URL, AudioFileType)
-        case local(URL, AudioFileType)
-        case unknown(URL)
+    public struct URLInfo {
+        public let startPosition: Position
+        public let originalURL: URL
+        public let cachedURL: URL
+        public let fileHint: AudioFileType
+        public let resourceLocation: ResourceLocation
 
-        public static let none = URLInfo.unknown(URL(string: "https://URLInfo.none")!)
-
-        public var isRemote: Bool { if case .remote = self { return true }; return false }
-
-        public var url: URL {
-            switch self {
-            case let .remote(url, _): return url
-            case let .local(url, _): return url
-            case let .unknown(url): return url
-            }
-        }
-
-        public var fileHint: AudioFileType {
-            switch self {
-            case let .remote(_, hint): return hint
-            case let .local(_, hint): return hint
-            default: return .mp3
-            }
-        }
-
-        public var isWave: Bool {
-            switch self {
-            case let .remote(_, hint): return hint == .wave
-            case let .local(_, hint): return hint == .wave
-            default: return false
-            }
-        }
-
-        public var isRemoteWave: Bool {
-            switch self {
-            case let .remote(_, hint): return hint == .wave
-            default: return false
-            }
-        }
-
-        public var isLocalWave: Bool {
-            switch self {
-            case let .local(_, hint): return hint == .wave
-            default: return false
-            }
-        }
+        public enum ResourceLocation { case remote, local, unknown }
+        
+        public static let none = URLInfo()
+        public var hasLocalCached: Bool { return cachedURL.isLocalCachedURL }
+        public var isRemote: Bool { resourceLocation == .remote }
+        public var isLocal: Bool { resourceLocation == .local }
+        public var isWave: Bool { fileHint == .wave }
+        public var isRemoteWave: Bool { resourceLocation == .remote && fileHint == .wave }
+        public var isLocalWave: Bool { resourceLocation == .local && fileHint == .wave }
 
         public var fileName: String {
-            var coms = url.lastPathComponent.split(separator: ".")
+            var coms = originalURL.lastPathComponent.split(separator: ".")
             coms.removeLast()
             return coms.joined(separator: ".")
         }
 
-        public init(url: URL) {
+        private init() {
+            startPosition = 0
+            originalURL = .URLInfoNone
+            cachedURL = .URLInfoNone
+            fileHint = .mp3
+            resourceLocation = .unknown
+        }
+
+        public init(url: URL, cachedURL cURL: URL = .URLInfoNone, position: Position = 0) {
+            startPosition = position
+            originalURL = url
+            cachedURL = cURL
             guard let scheme = url.scheme?.lowercased() else {
-                self = .unknown(url)
+                resourceLocation = .unknown
+                fileHint = .mp3
                 return
             }
+            let pathExtensionHint = URLInfo.fileHint(from: url.pathExtension)
             if scheme == "file" {
                 let localFileHint = URLInfo.localFileHit(from: url)
-                let pathExtensionHint = URLInfo.fileHint(from: url.pathExtension)
                 if localFileHint != .mp3 {
-                    self = .local(url, localFileHint)
+                    fileHint = localFileHint
                 } else if pathExtensionHint != .mp3 {
-                    self = .local(url, pathExtensionHint)
+                    fileHint = pathExtensionHint
                 } else {
-                    self = .local(url, .mp3)
+                    fileHint = .mp3
                 }
+                resourceLocation = .local
             } else {
-                self = .remote(url, URLInfo.fileHint(from: url.pathExtension))
+                resourceLocation = .remote
+                fileHint = pathExtensionHint
             }
         }
 
@@ -109,9 +93,14 @@ public struct StreamProvider {
             return fileHint(from: url.pathExtension) == .wave
         }
 
+        func localData() -> Data? {
+            guard cachedURL.canReuseLocalData else { return nil }
+            return try? Data(contentsOf: cachedURL)
+        }
+        
         func localContentLength() -> UInt {
-            guard case let URLInfo.local(url, _) = self else { return 0 }
-            let name = url.asCFunctionString()
+            guard resourceLocation == .local else { return 0 }
+            let name = originalURL.asCFunctionString()
             var buff = stat()
             if stat(name, &buff) != 0 { return 0 }
             let size = buff.st_size
@@ -157,5 +146,18 @@ public struct StreamProvider {
             default: return .mp3
             }
         }
+    }
+}
+
+extension URL {
+    public static var URLInfoNone: URL = URL(string: "https://URLInfo.none")!
+    var isTmp: Bool { return pathExtension == "tmp" }
+    var isInComplete: Bool { return pathExtension == "incomplete" }
+    var isLocalCachedURL: Bool {
+        return self != .URLInfoNone && isTmp == false && isInComplete == false
+    }
+
+    var canReuseLocalData: Bool {
+        return self != .URLInfoNone && isInComplete == false
     }
 }

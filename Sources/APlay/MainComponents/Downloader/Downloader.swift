@@ -4,9 +4,8 @@ import Combine
 // MARK: - Downloader
 public final class Downloader: NSObject {
     static let logger = OSLog(subsystem: "com.selfstudio.aplay.downloader", category: "Downloader")
-    public private(set) var session: URLSession = URLSession(configuration: .default)
+    @LateInit public private(set) var session: URLSession
     public private(set) var delegator: URLSessionDelegator = .init()
-    public private(set) var targetURL: URL = URL(string: "https://APlay.placehoder.url")!
     private var _task: URLSessionDataTask?
     private unowned let _configuration: ConfigurationCompatible
     private var _data: Data = .init()
@@ -28,17 +27,14 @@ public final class Downloader: NSObject {
         _ = delegator.eventPublisher.sink(receiveValue: { [weak self] event in
             guard let sself = self else { return }
             switch event {
+            case .initialize, .onStartPostition: break
             case let .completed(err):
                 let result: Result<Data, Error>
-                if let e = err {
-                    result = .failure(e)
-                } else {
-                    result = .success(sself._data)
-                }
+                if let e = err { result = .failure(e) }
+                else { result = .success(sself._data) }
                 sself._task = nil
                 sself._event = .completed(result)
-                
-            case .initialize, .onResponse, .onStartPostition: break
+            case let .onResponse(r): sself._event = .onResponse(r)
             case let .onTotalByte(v): sself._event = .onTotalByte(v)
             case let .onData(v, info):
                 sself._data.append(v)
@@ -50,15 +46,22 @@ public final class Downloader: NSObject {
 
 // MARK: - Download
 public extension Downloader {
-    
-    func download(_ resource: URL, at position: UInt64 = 0) {
-        targetURL = resource
-        delegator.download(resource, at: position)
-        var request = URLRequest(url: resource, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 20)
+
+    func download(_ info: StreamProvider.URLInfo) {
+        delegator.update(info)
+
+        var request = URLRequest(url: info.originalURL, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 30)
+        let p: StreamProvider.Position
+        let position = info.startPosition
+        if let d = info.localData() { _data = d }
+        let fileLength = UInt64(_data.count)
         if position > 0 {
-            request.addValue("bytes=\(position)-", forHTTPHeaderField: "Range")
+            p = fileLength != 0 ? fileLength : position
+        } else {
+            p = fileLength
         }
-        _event = .onStartPosition(position)
+        if p > 0 { request.addValue("bytes=\(p)-", forHTTPHeaderField: "Range") }
+        _event = .onStartPosition(p)
         _event = .onRequest(request)
         _task = session.dataTask(with: request)
         resume()
@@ -85,6 +88,7 @@ public extension Downloader {
 extension Downloader {
     public enum Event {
         case idle
+        case onResponse(URLResponse)
         case onRequest(URLRequest)
         case onStartPosition(UInt64)
         case onTotalByte(UInt64)
@@ -116,10 +120,11 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
         currentTaskReceivedTotalBytes = 0
     }
     
-    public func download(_ resource: URL, at position: UInt64 = 0) {
+    public func update(_ info: StreamProvider.URLInfo) {
         reset()
-        startPosition = position
-        event = .onStartPostition(position)
+        let p = info.startPosition
+        startPosition = p
+        event = .onStartPostition(p)
     }
     
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
@@ -140,18 +145,17 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
         completionHandler(.allow)
         event = .onResponse(response)
     }
+
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         os_log("%@ - %d: didReceive data: %d", log: Downloader.logger, type: .debug, #function, #line, data.count)
         let dataCount = UInt64(data.count)
         currentTaskReceivedTotalBytes += dataCount
-        let info: Info = _queue.sync { () -> Info in
-            return .init(_totalBytes, _startPosition, _currentTaskReceivedTotalBytes)
-        }
+        let info: Info = _queue.sync { .init(_totalBytes, _startPosition, _currentTaskReceivedTotalBytes) }
         event = .onData(data, info)
     }
     
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Swift.Error?) {
-        os_log("%@ - %d: didCompleteWithError: %@", log: Downloader.logger, type: .debug, #function, #line, String.init(describing: error))
+        os_log("%@ - %d: didCompleteWithError: %@", log: Downloader.logger, type: .debug, #function, #line, String(describing: error))
         event = .completed(error)
     }
 }

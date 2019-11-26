@@ -18,6 +18,8 @@ public protocol ConfigurationCompatible: AnyObject {
     var cachePolicy: APlay.Configuration.CachePolicy { get }
     var proxyPolicy: APlay.Configuration.ProxyPolicy { get }
     var networkPolicy: APlay.Configuration.NetworkPolicy { get }
+    var retryPolicy: APlay.Configuration.RetryPolicy { get }
+    var remoteDataVerifyPolicy: APlay.Configuration.RemoteDataVerifyPolicy { get }
     var predefinedHttpHeaderValues: [String: String] { get }
     var isEnabledAutomaticAudioSessionHandling: Bool { get }
     var isEnabledVolumeMixer: Bool { get }

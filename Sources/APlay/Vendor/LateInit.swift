@@ -1,12 +1,11 @@
-@propertyWrapper
-public struct LateInit<Value> {
+@propertyWrapper public struct LateInit<Value> {
     
     var storage: Value?
     
     public init() {
         storage = nil
     }
-    
+
     public var wrappedValue: Value {
         get {
             guard let storage = storage else {
@@ -14,8 +13,6 @@ public struct LateInit<Value> {
             }
             return storage
         }
-        set {
-            storage = newValue
-        }
+        set { storage = newValue }
     }
 }

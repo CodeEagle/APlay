@@ -18,9 +18,10 @@ final class PlayableURLInfoTests: XCTestCase {
     }
     
     func testLocalContentLength() {
+        let path = "/var/tmp/a.mp3"
         let url = URL(fileURLWithPath: "/var/tmp/a.mp3")
         let d = "hello world".data(using: .utf8)!
-        FileManager.createFileIfNeeded(at: url)
+        FileManager.createFileIfNeeded(at: path)
         try! d.write(to: url)
         let result = PlayableURLInfo.init(url: url)
         assert(result.localContentLength() == d.count)
@@ -50,12 +51,14 @@ final class PlayableURLInfoTests: XCTestCase {
     
     func testLocalFileHit() {
         let localWaveFile = "12345678WAVE".data(using: .utf8)!
-        let waveUrl = URL(fileURLWithPath: "/var/tmp/b.wave")
-        FileManager.createFileIfNeeded(at: waveUrl)
+        let wavePath = "/var/tmp/b.wave"
+        let waveUrl = URL(fileURLWithPath: wavePath)
+        FileManager.createFileIfNeeded(at: wavePath)
         try! localWaveFile.write(to: waveUrl)
         let localFlacFile = "fLaC".data(using: .utf8)!
-        let flacUrl = URL(fileURLWithPath: "/var/tmp/c.flac")
-        FileManager.createFileIfNeeded(at: flacUrl)
+        let flacPath = "/var/tmp/c.flac"
+        let flacUrl = URL(fileURLWithPath: flacPath)
+        FileManager.createFileIfNeeded(at: flacPath)
         try! localFlacFile.write(to: flacUrl)
         
         assert(PlayableURLInfo.localFileHit(from: waveUrl) == .wave)

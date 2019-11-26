@@ -14,7 +14,8 @@ extension APlay {
         /** 远程 Wave 文件的预缓冲大小(先缓冲到10%再播放) */
         public let preBufferWaveFormatPercentageBeforePlay: Float
         /** 每个解码的大小 */
-        public let decodeBufferSize: UInt
+        @Clamping(initialValue: 0, range: 0...UInt(Int.max))
+        public private(set) var decodeBufferSize: UInt
         /** 监控播放器，超时没播放则🚔 */
         public let startupWatchdogPeriod: UInt
         /** 磁盘最大缓存数(bytes) */
@@ -47,6 +48,10 @@ extension APlay {
         public let equalizerBandFrequencies: [Float]
         /// logger
         public let logger: LoggerCompatible
+        /// Retry Policy
+        public let retryPolicy: RetryPolicy
+        /// Remote Data Verify Policy
+        public let remoteDataVerifyPolicy: RemoteDataVerifyPolicy
 
         /// streamer factory
 //        public private(set) var streamerBuilder: StreamerBuilder = { Streamer(config: $0) }
@@ -86,6 +91,8 @@ extension APlay {
                     cachePolicy: CachePolicy = .enable([]),
                     cacheDirectory: String = Configuration.defaultCachedDirectory,
                     networkPolicy: NetworkPolicy = .noRestrict,
+                    retryPolicy: RetryPolicy = .retry({ _  -> RetryPolicy.Config in .init() }),
+                    remoteDataVerifyPolicy: RemoteDataVerifyPolicy = .md5Verifier,
                     predefinedHttpHeaderValues: [String: String] = [:],
                     automaticAudioSessionHandlingEnabled: Bool = true,
                     maxRemoteStreamOpenRetry: UInt = 5,
@@ -104,7 +111,6 @@ extension APlay {
             self.logPolicy = logPolicy
             self.httpFileCompletionValidator = httpFileCompletionValidator
             self.preBufferWaveFormatPercentageBeforePlay = preBufferWaveFormatPercentageBeforePlay
-            self.decodeBufferSize = decodeBufferSize
             self.startupWatchdogPeriod = startupWatchdogPeriod
             self.maxDiskCacheSize = maxDiskCacheSize
             self.maxDecodedByteCount = maxDecodedByteCount
@@ -113,6 +119,8 @@ extension APlay {
             self.cachePolicy = cachePolicy
             self.cacheDirectory = cacheDirectory
             self.networkPolicy = networkPolicy
+            self.retryPolicy = retryPolicy
+            self.remoteDataVerifyPolicy = remoteDataVerifyPolicy
             self.predefinedHttpHeaderValues = predefinedHttpHeaderValues
             isEnabledAutomaticAudioSessionHandling = automaticAudioSessionHandlingEnabled
             self.maxRemoteStreamOpenRetry = maxRemoteStreamOpenRetry
@@ -145,6 +153,7 @@ extension APlay {
             } else {
                 session = URLSession(configuration: URLSessionConfiguration.default)
             }
+            self.decodeBufferSize = decodeBufferSize
         }
 
         /// Start background task
@@ -275,10 +284,33 @@ extension APlay.Configuration {
         }
     }
 
+    public enum RemoteDataVerifyPolicy {
+        case none
+        case custom((URLResponse, Data) -> Bool)
+
+        public func verify(response: URLResponse, data: Data) -> Bool {
+            switch self {
+            case .none: return true
+            case let .custom(h): return h(response, data)
+            }
+        }
+
+        public static var md5Verifier: RemoteDataVerifyPolicy {
+            return .custom({ resp, data -> Bool in
+                if let response = resp as? HTTPURLResponse,
+                    let eTag = response.allHeaderFields["Etag"] as? String {
+                    let raw = eTag.replacingOccurrences(of: "\"", with: "").lowercased()
+                    return data.md5.lowercased() == raw
+                }
+                return false
+            })
+        }
+    }
+
     public enum RetryPolicy {
         public struct Config {
-            public var delay: DispatchTimeInterval = .seconds(2)
-            public var maxRetry: UInt = UInt.max
+            public let delay: DispatchTimeInterval
+            public let maxRetry: UInt
             public init(delay: DispatchTimeInterval = .seconds(2), maxRetry: UInt = UInt.max) {
                 self.delay = delay
                 self.maxRetry = maxRetry
@@ -286,6 +318,15 @@ extension APlay.Configuration {
         }
         case never
         case retry((Error) -> Config)
+
+        func canRetry(with error: Error, count: UInt) -> (Bool, DispatchTimeInterval) {
+            switch self {
+                case .never: return (false, .never)
+                case let .retry(handler):
+                    let config = handler(error)
+                    return (count < config.maxRetry, config.delay)
+            }
+        }
     }
 
     /// Cache Plolicy

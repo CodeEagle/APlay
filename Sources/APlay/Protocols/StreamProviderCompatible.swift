@@ -1,21 +1,16 @@
+public protocol DataReader: AnyObject {
+    func read(count: Int) -> ReadWritePipe.ReadResult
+}
+
 /// Protocol for stream provider
 public protocol StreamProviderCompatible: AnyObject {
     var outputPipeline: AnyPublisher<StreamProvider.Event, Never> { get }
-    var position: StreamProvider.Position { get }
-    var contentLength: UInt { get }
-    var info: StreamProvider.URLInfo { get }
-    var bufferingProgress: Float { get }
 
-    func open(url: URL, at position: StreamProvider.Position)
+    func startStream(with handler: (UInt) -> Data)
     func destroy()
     func pause()
     func resume()
     init(config: ConfigurationCompatible)
-}
-
-extension StreamProviderCompatible {
-    @inline(__always)
-    public func open(url: URL) { return open(url: url, at: 0) }
 }
 
 public struct StreamProvider {
@@ -32,16 +27,17 @@ public struct StreamProvider {
     
     public typealias Position = UInt64
 
-    public struct URLInfo {
+    public struct URLInfo: Equatable {
         public let startPosition: Position
         public let originalURL: URL
         public let cachedURL: URL
         public let fileHint: AudioFileType
         public let resourceLocation: ResourceLocation
+        public var remoteContentLength: UInt64 = 0
 
         public enum ResourceLocation { case remote, local, unknown }
         
-        public static let none = URLInfo()
+        public static let `default` = URLInfo()
         public var hasLocalCached: Bool { return cachedURL.isLocalCachedURL }
         public var isRemote: Bool { resourceLocation == .remote }
         public var isLocal: Bool { resourceLocation == .local }

@@ -39,3 +39,9 @@ public final class ResourcesManager {
         return StreamProvider.URLInfo(url: url, cachedURL: URL(fileURLWithPath: pathToStore), position: position)
     }
 }
+
+extension ResourcesManager: DataReader {
+    public func read(count: Int) -> ReadWritePipe.ReadResult {
+        return readWritePipeline.readData(of: count)
+    }
+}

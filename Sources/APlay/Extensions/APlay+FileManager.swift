@@ -7,11 +7,17 @@ public extension FileManager {
         }
     }
     
-    static func createFileIfNeeded(at url: URL) {
+    static func createFileIfNeeded(at path: String) {
         let fm = FileManager.default
-        let path = url.absoluteString.replacingOccurrences(of: "file://", with: "")
+//        let path = url.absoluteString.replacingOccurrences(of: "file://", with: "")
         if fm.fileExists(atPath: path) == false {
-            try? fm.createFile(atPath: path, contents: nil, attributes: nil)
+            _ = fm.createFile(atPath: path, contents: nil, attributes: nil)
         }
+    }
+
+    static func copyItemByStripingTmpSuffix(at path: String) {
+        let fm = FileManager.default
+        let finalPath = path.replacingOccurrences(of: ".tmp", with: "")
+        try? fm.copyItem(atPath: path, toPath: finalPath)
     }
 }

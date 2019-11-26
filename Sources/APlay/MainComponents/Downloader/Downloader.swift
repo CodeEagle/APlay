@@ -12,8 +12,9 @@ public final class Downloader: NSObject {
     @Published private var _event: Event = .idle
     
     public var eventPipeline: AnyPublisher<Event, Never> { $_event.eraseToAnyPublisher() }
-    
+    public private(set) var cancelSinkToken: AnyCancellable?
     deinit {
+        cancelSinkToken?.cancel()
         guard _task != nil else { return }
         cancel()
     }
@@ -24,7 +25,7 @@ public final class Downloader: NSObject {
         let s = configuration.session
         session = URLSession(configuration: s.configuration, delegate: delegator, delegateQueue: nil)
         
-        _ = delegator.eventPublisher.sink(receiveValue: { [weak self] event in
+        cancelSinkToken = delegator.eventPublisher.sink(receiveValue: { [weak self] event in
             guard let sself = self else { return }
             switch event {
             case .initialize, .onStartPostition: break
@@ -164,31 +165,31 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
 extension URLSessionDelegator {
     public private(set) var event: Event {
         get { return _queue.sync { _event } }
-        set { _queue.async(flags: .barrier) { self._event = newValue } }
+        set { _queue.asyncWrite { self._event = newValue } }
     }
     
     public private(set) var startPosition: UInt64 {
         get { return _queue.sync { _startPosition } }
-        set { _queue.async(flags: .barrier) { self._startPosition = newValue } }
+        set { _queue.asyncWrite { self._startPosition = newValue } }
     }
     
     public private(set) var totalBytes: UInt64 {
         get { return _queue.sync { _totalBytes } }
-        set { _queue.async(flags: .barrier) { self._totalBytes = newValue } }
+        set { _queue.asyncWrite { self._totalBytes = newValue } }
     }
     
     public private(set) var currentTaskTotalBytes: UInt64 {
         get { return _queue.sync { _currentTaskTotalBytes } }
-        set { _queue.async(flags: .barrier) { self._currentTaskTotalBytes = newValue } }
+        set { _queue.asyncWrite { self._currentTaskTotalBytes = newValue } }
     }
     
     public private(set) var currentTaskReceivedTotalBytes: UInt64 {
         get { return _queue.sync { _currentTaskReceivedTotalBytes } }
-        set { _queue.async(flags: .barrier) { self._currentTaskReceivedTotalBytes = newValue } }
+        set { _queue.asyncWrite { self._currentTaskReceivedTotalBytes = newValue } }
     }
     
     public var eventPublisher: AnyPublisher<Event, Never> {
-        return $_event.eraseToAnyPublisher()
+        return _queue.sync { $_event.eraseToAnyPublisher() }
     }
 }
 
@@ -199,15 +200,16 @@ extension URLSessionDelegator {
         public let totalByte: UInt64
         public let startPostition: UInt64
         public let receivedByte: UInt64
+        /// Progress For Current Download Session
         public var currentProgress: Float {
             let delta = Float(totalByte) - Float(startPostition)
             guard delta > 0 else { return 0 }
             return Float(receivedByte) / delta
         }
-        
+
         public var progress: Float {
             guard totalByte > 0 else { return 0 }
-            return Float(receivedByte) / Float(totalByte)
+            return Float(receivedByte + startPostition) / Float(totalByte)
         }
         
         init(_ totalByte: UInt64, _ startPostition: UInt64, _ receivedByte: UInt64) {
@@ -215,6 +217,8 @@ extension URLSessionDelegator {
             self.startPostition = startPostition
             self.receivedByte = receivedByte
         }
+
+        static var `default`: Info = .init(0, 0, 0)
     }
     
     public enum Event {

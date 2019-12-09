@@ -10,11 +10,11 @@ public final class Composer {
     private var _progressSubject: CurrentValueSubject<URLSessionDelegator.Info, Never> = .init(.default)
     private unowned let _configuration: ConfigurationCompatible
     private var _resourceManager: ResourcesManager
-    private var _sownloadSubscriber: AnyCancellable?
+    private var _downloadSubscriber: AnyCancellable?
     private var _urlReponse: URLResponse?
     private lazy var _retryCount: UInt = 0
 
-    deinit { _sownloadSubscriber?.cancel() }
+    deinit { _downloadSubscriber?.cancel() }
 
     public init(configuration: ConfigurationCompatible) {
         let resMan: ResourcesManager = .init(configuration: configuration)
@@ -62,7 +62,7 @@ public final class Composer {
             default: break
             }
         }
-        _sownloadSubscriber = AnyCancellable(val)
+        _downloadSubscriber = AnyCancellable(val)
     }
 }
 

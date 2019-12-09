@@ -1,12 +1,6 @@
-//
-//  ID3Parser.swift
-//  APlay
-//
-//  Created by lincoln on 2018/6/6.
-//  Copyright © 2018年 SelfStudio. All rights reserved.
-//
-
 import Foundation
+import Combine
+
 final class ID3Parser {
     private lazy var _outputStream: PassthroughSubject<MetadataParser.Event, Never> = .init()
     private lazy var _data = Data()

@@ -6,6 +6,6 @@ func debug_log(_ msg: String) {
     #if DEBUG
         var message = msg
         if message.contains("deinit") { message = "\(msg) ✅" }
-    print("[Debug]: \(message)")
+        print("[Debug]: \(message)")
     #endif
 }

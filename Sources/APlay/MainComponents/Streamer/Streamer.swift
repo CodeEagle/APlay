@@ -11,6 +11,33 @@ public final class Streamer {
         _dataReader = dataReader
         _bufferSize = Int(configuration.decodeBufferSize)
     }
+    
+    private func tagParser(for urlInfo: StreamProvider.URLInfo) -> MetadataParserCompatible? {
+        var parser = _configuration.metadataParserBuilder(urlInfo.fileHint, _configuration)
+        if parser == nil {
+            if _urlInfo.fileHint == .mp3 {
+                parser = ID3Parser(config: _configuration)
+            } else if _urlInfo.fileHint == .flac {
+                parser = FlacParser(config: _configuration)
+            } else {
+//                outputPipeline.call(.metadata([]))
+                return nil
+            }
+        }
+        parser?.outputStream.sink(receiveValue: { [weak self] (event) in
+            guard let self = self else { return }
+            
+        })
+        parser?.outputStream.delegate(to: self, with: { sself, value in
+//            switch value {
+//            case let .metadata(data): sself.outputPipeline.call(.metadata(data))
+//            case let .tagSize(size): sself.outputPipeline.call(.metadataSize(size))
+//            case let .flac(value): sself.outputPipeline.call(.flac(value))
+//            default: break
+//            }
+        })
+        return parser
+    }
 }
 
 extension Streamer {

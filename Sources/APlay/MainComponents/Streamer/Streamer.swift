@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 public final class Streamer {
@@ -11,7 +12,13 @@ public final class Streamer {
         _dataReader = dataReader
         _bufferSize = Int(configuration.decodeBufferSize)
     }
-    
+
+    private var _subscriber: AnyCancellable?
+
+    deinit {
+        _subscriber?.cancel()
+    }
+
     private func tagParser(for urlInfo: StreamProvider.URLInfo) -> MetadataParserCompatible? {
         var parser = _configuration.metadataParserBuilder(urlInfo.fileHint, _configuration)
         if parser == nil {
@@ -24,18 +31,18 @@ public final class Streamer {
                 return nil
             }
         }
-        parser?.outputStream.sink(receiveValue: { [weak self] (event) in
+        _subscriber = parser?.outputStream.sink(receiveValue: { [weak self] _ in
             guard let self = self else { return }
-            
+
         })
-        parser?.outputStream.delegate(to: self, with: { sself, value in
+//        parser?.outputStream.delegate(to: self, with: { sself, value in
 //            switch value {
 //            case let .metadata(data): sself.outputPipeline.call(.metadata(data))
 //            case let .tagSize(size): sself.outputPipeline.call(.metadataSize(size))
 //            case let .flac(value): sself.outputPipeline.call(.flac(value))
 //            default: break
 //            }
-        })
+//        })
         return parser
     }
 }

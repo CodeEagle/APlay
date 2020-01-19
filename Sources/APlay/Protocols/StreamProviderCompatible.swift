@@ -24,7 +24,7 @@ public struct StreamProvider {
         case flac(FlacMetadata)
         case unknown(Error)
     }
-    
+
     public typealias Position = UInt64
 
     public struct URLInfo: Equatable {
@@ -36,7 +36,7 @@ public struct StreamProvider {
         public var remoteContentLength: UInt64 = 0
 
         public enum ResourceLocation { case remote, local, unknown }
-        
+
         public static let `default` = URLInfo()
         public var hasLocalCached: Bool { return cachedURL.isLocalCachedURL }
         public var isRemote: Bool { resourceLocation == .remote }
@@ -93,7 +93,7 @@ public struct StreamProvider {
             guard cachedURL.canReuseLocalData else { return nil }
             return try? Data(contentsOf: cachedURL)
         }
-        
+
         func localContentLength() -> UInt {
             guard resourceLocation == .local else { return 0 }
             let name = originalURL.asCFunctionString()

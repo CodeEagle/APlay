@@ -1,5 +1,5 @@
-import CoreGraphics
 import Combine
+import CoreGraphics
 
 final class FlacParser {
     private lazy var _outputStream: PassthroughSubject<MetadataParser.Event, Never> = .init()

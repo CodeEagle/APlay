@@ -4,15 +4,16 @@
 public struct AudioFileType: RawRepresentable, Hashable {
     public typealias RawValue = String
     public var rawValue: String
-    
+
     public init(rawValue: RawValue) { self.rawValue = rawValue }
-    
+
     public init(_ value: RawValue) { rawValue = value }
-    
+
     public init?(value: AudioFileTypeID) {
         guard let result = String(from: value) else { return nil }
         self.init(rawValue: result)
     }
+
     // https://developer.apple.com/documentation/audiotoolbox/1576497-anonymous?language=objc
     public static let aiff = AudioFileType("AIFF")
     public static let aifc = AudioFileType("AIFC")
@@ -34,9 +35,9 @@ public struct AudioFileType: RawRepresentable, Hashable {
     public static let amr = AudioFileType("amrf")
     public static let flac = AudioFileType("flac")
     public static let opus = AudioFileType("opus")
-    
+
     private static var map: [AudioFileType: AudioFileTypeID] = [:]
-    
+
     public var audioFileTypeID: AudioFileTypeID {
         let value: AudioFileTypeID
         if let result = AudioFileType.map[self] {

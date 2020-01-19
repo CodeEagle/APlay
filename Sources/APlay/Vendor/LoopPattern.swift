@@ -7,7 +7,7 @@ public indirect enum LoopPattern: Equatable {
     case random
     /// Stop when play once for pattern single/order/random
     case stopWhenAllPlayed(LoopPattern)
-    
+
     public var isGonnaStopAtEndOfList: Bool {
         switch self {
         case .stopWhenAllPlayed: return true

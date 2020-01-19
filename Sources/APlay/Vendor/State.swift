@@ -11,7 +11,7 @@ public enum State {
     case paused
     case error(Error)
     case unknown(Swift.Error)
-    
+
     public var isPlaying: Bool {
         switch self {
         case .playing: return true

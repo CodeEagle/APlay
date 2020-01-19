@@ -8,7 +8,7 @@ extension Array where Element == UInt8 {
         }
         return ret
     }
-    
+
     func unpackUInt64(isLittleEndian: Bool = false) -> UInt64 {
         precondition(count <= 8, "Array count can not larger than 8")
         var ret: UInt64 = 0
@@ -20,17 +20,16 @@ extension Array where Element == UInt8 {
     }
 }
 
-
 extension Array {
     subscript(ap_safe index: Int) -> Element? {
         return indices ~= index ? self[index] : nil
     }
-    
+
     subscript(ap_safe index: UInt) -> Element? {
         let idx = Int(index)
         return indices ~= idx ? self[idx] : nil
     }
-    
+
     subscript(_ index: UInt) -> Element {
         let idx = Int(index)
         return self[idx]

@@ -145,6 +145,7 @@ public struct AudioDecoder {
             guard let result = String(from: value) else { return nil }
             self.init(rawValue: result)
         }
+
         // https://developer.apple.com/documentation/audiotoolbox/1576497-anonymous?language=objc
         public static let aiff = AudioFileType("AIFF")
         public static let aifc = AudioFileType("AIFC")

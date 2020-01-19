@@ -14,5 +14,4 @@ extension APlay {
     public enum Error: Swift.Error {
         case none, open(String), openedAlready(String), streamParse(String), network(String), networkPermission(String), reachMaxRetryTime, networkStatusCode(Int), parser(OSStatus), player(String), playItemNotFound(String)
     }
-
 }

@@ -1,7 +1,7 @@
-import Foundation
-import var CommonCrypto.CC_MD5_DIGEST_LENGTH
-import func CommonCrypto.CC_MD5
 import typealias CommonCrypto.CC_LONG
+import func CommonCrypto.CC_MD5
+import var CommonCrypto.CC_MD5_DIGEST_LENGTH
+import Foundation
 
 extension Data {
     var md5: String {

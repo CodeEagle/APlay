@@ -72,7 +72,7 @@ public struct Logger {
             case .audioDecoder: return "🌈"
             case .streamProvider: return "🌊"
             case .metadataParser: return "⚡️"
-            case .player:  return "🍵"
+            case .player: return "🍵"
             }
         }
 

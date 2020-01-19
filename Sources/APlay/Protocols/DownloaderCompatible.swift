@@ -1,4 +1,2 @@
 
-public protocol DownloaderCompatible {
-    
-}
+public protocol DownloaderCompatible {}

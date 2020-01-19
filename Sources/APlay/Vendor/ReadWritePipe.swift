@@ -9,6 +9,7 @@ public final class ReadWritePipe {
         get { return _queue.sync { _targetFileLength } }
         set { _queue.asyncWrite { self._targetFileLength = newValue } }
     }
+
     public var readOffset: UInt64 {
         get { return _queue.sync { _readOffset } }
         set { _queue.asyncWrite { self._readOffset = newValue } }
@@ -23,6 +24,7 @@ public final class ReadWritePipe {
         _writePipe = try .init(forWritingTo: url)
         _writePipe.seekToEndOfFile()
     }
+
     var storePath: String { _storePath }
 }
 
@@ -30,7 +32,7 @@ extension ReadWritePipe {
     public func write(_ data: Data) {
         _queue.asyncWrite { self._writePipe.write(data) }
     }
-    
+
     public func readData(of length: Int) -> ReadWritePipe.ReadResult {
         return _queue.sync {
             guard _targetFileLength > 0 else { return .targetFileLenNotSet }
@@ -38,7 +40,7 @@ extension ReadWritePipe {
             guard _readOffset <= _targetFileLength else { return .complete }
             let data = _readPipe.readData(ofLength: length)
             let count = data.count
-            if count == 0 { return.waitingForData }
+            if count == 0 { return .waitingForData }
             _readOffset += UInt64(count)
             return .available(data)
         }
@@ -53,5 +55,4 @@ extension ReadWritePipe {
         case waitingForData
         case complete
     }
-
 }

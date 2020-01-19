@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 final class DownloaderTests: XCTestCase {
     private var _cancelToken: AnyCancellable?
@@ -12,25 +12,25 @@ final class DownloaderTests: XCTestCase {
         try? FileManager.default.removeItem(atPath: path)
         FileManager.createFileIfNeeded(at: path)
         let readWritePipe: ReadWritePipe = try! .init(localPath: path)
-        
-        asyncTest(timeout: 300) { (e) in
+
+        asyncTest(timeout: 300) { e in
             var start: UInt64 = 0
-            _cancelToken = downloader.eventPipeline.sink { (event) in
+            _cancelToken = downloader.eventPipeline.sink { event in
                 switch event {
                 case let .onStartPosition(position): start = position
-                case .onTotalByte(let len):
+                case let .onTotalByte(len):
                     print("schedule read")
                     let actureLen = len - start
                     readWritePipe.targetFileLength = actureLen
                     self.scheduleRead(readWritePipe, total: Int(actureLen), read: 0, completion: { e.fulfill() })
-                    
+
                 case let .onData(d, _):
                     print("write")
                     readWritePipe.write(d)
-                    
+
                 case let .completed(er):
-                    print(String.init(describing: er))
-                    
+                    print(String(describing: er))
+
                 default: print(event)
                 }
             }
@@ -39,11 +39,11 @@ final class DownloaderTests: XCTestCase {
             downloader.download(StreamProvider.URLInfo(url: resource, position: 0))
         }
     }
-    
+
     private func scheduleRead(_ readHandle: ReadWritePipe, total: Int, read: Int, completion: @escaping () -> Void) {
         let fixedLength = 8192 * 8
         var totalRead = read
-        
+
         if totalRead < total {
             let result = readHandle.readData(of: fixedLength)
             switch result {
@@ -62,7 +62,9 @@ final class DownloaderTests: XCTestCase {
         }
     }
 }
+
 // MARK: - Test FileHandle sync problem
+
 extension DownloaderTests {
     func testRead() {
         let path = "/var/tmp/testReadFile.tmp"
@@ -87,28 +89,28 @@ extension DownloaderTests {
         try? FileManager.default.removeItem(atPath: path)
         FileManager.createFileIfNeeded(at: path)
         let writeHandle = FileHandle(forWritingAtPath: path)
-        writeHandle?.readabilityHandler = { handle in
+        writeHandle?.readabilityHandler = { _ in
             print("can write now")
         }
         let readHandle = FileHandle(forReadingAtPath: path)
-        readHandle?.readabilityHandler = { handle in
+        readHandle?.readabilityHandler = { _ in
             print("can read now")
         }
-        asyncTest { (e) in
+        asyncTest { e in
             DispatchQueue.global().async {
                 writeHandle?.seekToEndOfFile()
                 let text = "hello world"
                 writeHandle?.write(text.data(using: .utf8)!)
-                
+
                 let d = readHandle?.readData(ofLength: text.count)
-                print(String.init(data: d!, encoding: .utf8)!)
+                print(String(data: d!, encoding: .utf8)!)
                 let d2 = readHandle?.readData(ofLength: text.count)
-                print(String.init(describing: d2))
+                print(String(describing: d2))
                 let text2 = "hello world2"
                 writeHandle?.seekToEndOfFile()
                 writeHandle?.write(text2.data(using: .utf8)!)
                 let d3 = readHandle?.readData(ofLength: text2.count)
-                print(String.init(data: d3!, encoding: .utf8)!)
+                print(String(data: d3!, encoding: .utf8)!)
                 e.fulfill()
             }
         }

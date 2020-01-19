@@ -9,7 +9,7 @@ extension String {
         }
         self.init(data: Data(buffer: bytePtr), encoding: .utf8)
     }
-    
+
     func audioFileTypeID() -> AudioFileTypeID {
         let offsetSize = 8
         let array: [UInt8] = Array(utf8)

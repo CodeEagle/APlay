@@ -11,23 +11,23 @@ public struct FlacMetadata {
     public internal(set) var seekTable: SeekTable?
     public internal(set) var cueSheet: CUESheet?
     public internal(set) var paddings: [Padding]?
-    
+
     init(streamInfo: StreamInfo) { self.streamInfo = streamInfo }
-    
+
     mutating func addPadding(_ padding: Padding) {
         var value = paddings ?? [Padding]()
         value.append(padding)
         paddings = value
     }
-    
+
     func totalSize() -> UInt32 {
         var total: UInt32 = 4
-        let headers = [streamInfo.header, vorbisComments?.header, picture?.header, application?.header, seekTable?.header, cueSheet?.header].compactMap({ $0 }) + (paddings?.compactMap({ $0.header }) ?? [])
-        total += headers.reduce(0, { $0 + $1.metadataBlockDataSize })
+        let headers = [streamInfo.header, vorbisComments?.header, picture?.header, application?.header, seekTable?.header, cueSheet?.header].compactMap { $0 } + (paddings?.compactMap { $0.header } ?? [])
+        total += headers.reduce(0) { $0 + $1.metadataBlockDataSize }
         total += UInt32(headers.count * Header.size)
         return total
     }
-    
+
     func nearestOffset(for time: TimeInterval) -> (TimeInterval, UInt64)? {
         guard let table = seekTable, table.points.count > 0 else { return nil }
         var delta: TimeInterval = 999
@@ -45,13 +45,13 @@ public struct FlacMetadata {
         }
         return (targetTime, offset)
     }
-    
+
     public struct Header {
         static let size = 4
         public let isLastMetadataBlock: Bool
         public let blockType: BlockType
         public let metadataBlockDataSize: UInt32
-        
+
         public enum BlockType: UInt8 {
             case streamInfo
             case padding
@@ -61,14 +61,14 @@ public struct FlacMetadata {
             case cueSheet
             case picture
             case undifined
-            
+
             init?(bytes: UInt8) {
                 let type = bytes & 0x7F
                 if let value = BlockType(rawValue: type) { self = value }
                 else { return nil }
             }
         }
-        
+
         public init(bytes: Data) {
             var data = bytes.advanced(by: 0)
             isLastMetadataBlock = (data[0] & 0x80) != 0
@@ -78,7 +78,7 @@ public struct FlacMetadata {
             metadataBlockDataSize = Array(data[0 ..< 3]).unpack()
         }
     }
-    
+
     public struct StreamInfo {
         public let header: Header
         public let minimumBlockSize: UInt32
@@ -90,7 +90,7 @@ public struct FlacMetadata {
         public let bitsPerSample: UInt32
         public let totalSamples: UInt64
         public let md5: String
-        
+
         // https://github.com/xiph/flac/blob/64b7142a3601717a533cd0d7e6ef19f8aaba3db8/src/libFLAC/metadata_iterators.c#L2177-L2200
         init(data: Data, header: Header) {
             self.header = header
@@ -104,27 +104,28 @@ public struct FlacMetadata {
             let point14 = point13 + 1
             let point18 = point14 + 4
             let point34 = point18 + 16
-            
+
             minimumBlockSize = Array(data[point0 ..< point2]).unpack()
             maximumBlockSize = Array(data[point2 ..< point4]).unpack()
             minimumFrameSize = Array(data[point4 ..< point7]).unpack()
             maximumFrameSize = Array(data[point7 ..< point10]).unpack()
-            
+
             let a = Array(data[point10 ..< point12]).unpack() << 4
             sampleRate = a | (UInt32(data[point12]) & 0xF0) >> 4
             channels = (UInt32(data[point12]) & 0x0E) >> 1 + 1
             bitsPerSample = (UInt32(data[point12]) & 0x01) << 4 | (UInt32(data[point13]) & 0xF0) >> 4 + 1
             totalSamples = (UInt64(data[point13]) & 0x0F) << 32 | Array(data[point14 ..< point18]).unpackUInt64()
-            md5 = data[point18 ..< point34].compactMap({ Optional(String(format: "%02x", $0)) }).joined()
+            md5 = data[point18 ..< point34].compactMap { Optional(String(format: "%02x", $0)) }.joined()
         }
     }
+
     // https://github.com/xiph/flac/blob/64b7142a3601717a533cd0d7e6ef19f8aaba3db8/src/libFLAC/metadata_iterators.c#L2303-L2353
     public struct VorbisComments {
         public let header: Header
         public let vendor: String
         public let metadata: [Field: String]
         public let rawMeta: [String]
-        
+
         init(bytes: Data, header: Header) {
             self.header = header
             var data = bytes.advanced(by: 0)
@@ -152,7 +153,7 @@ public struct FlacMetadata {
             rawMeta = metas
             metadata = map
         }
-        
+
         public func asMetadata() -> [MetadataParser.Item] {
             var ret: [MetadataParser.Item] = []
             for (key, value) in metadata {
@@ -169,7 +170,7 @@ public struct FlacMetadata {
             }
             return ret
         }
-        
+
         public enum Field: String {
             case title = "TITLE"
             case version = "VERSION"
@@ -188,7 +189,7 @@ public struct FlacMetadata {
             case isrc = "ISRC"
         }
     }
-    
+
     public struct Picture {
         public let header: Header
         public let type: MetadataParser.PictureType
@@ -200,7 +201,7 @@ public struct FlacMetadata {
         public let colorUsed: UInt32
         public let length: UInt32
         public let picData: Data
-        
+
         init(bytes: Data, header: Header) {
             self.header = header
             var data = bytes.advanced(by: 0)
@@ -235,23 +236,23 @@ public struct FlacMetadata {
             picData = data[0 ..< Int(length)]
         }
     }
-    
+
     public struct Padding {
         public let header: Header
         /// in bytes
         public let length: UInt32
     }
-    
+
     public struct CUESheet {
         public let header: Header
         public let mediaCatalogNumber: String
         public let leadIn: UInt64
         public let isCD: Bool
         public let tracks: [Track]
-        
+
         init(bytes: Data, header: Header) {
             self.header = header
-            
+
             var data = bytes.advanced(by: 0)
             mediaCatalogNumber = String(data: data[0 ..< 128], encoding: .ascii)?.trimZeroTerminator() ?? ""
             data = data.advanced(by: 128)
@@ -291,7 +292,7 @@ public struct FlacMetadata {
             }
             self.tracks = tracks
         }
-        
+
         public struct Track {
             public let offset: UInt64
             public let number: UInt8
@@ -300,7 +301,7 @@ public struct FlacMetadata {
             public let isPreEmphasis: Bool
             public let numberOfIndexPoints: UInt8
             public let indexPoints: [Index]
-            
+
             public struct Index {
                 static let size = 8 + 1 + 3
                 public let offset: UInt64
@@ -308,12 +309,12 @@ public struct FlacMetadata {
             }
         }
     }
-    
+
     public struct Application {
         public let header: Header
         public let name: String
         public let data: Data
-        
+
         init(bytes: Data, header: Header) {
             self.header = header
             let point0 = bytes.startIndex
@@ -323,11 +324,11 @@ public struct FlacMetadata {
             data = Data(bytes[point4 ..< Int(header.metadataBlockDataSize)])
         }
     }
-    
+
     public struct SeekTable {
         public let header: Header
         public let points: [SeekPoint]
-        
+
         init(bytes: Data, header: Header) {
             self.header = header
             let size = Int(header.metadataBlockDataSize)
@@ -342,23 +343,23 @@ public struct FlacMetadata {
             }
             points = pointTable.sorted(by: { $0.sampleNumber < $1.sampleNumber })
         }
-        
+
         public struct SeekPoint: Hashable, CustomStringConvertible {
             private static let placeHolder: UInt64 = 0xFFFF_FFFF_FFFF_FFFF
             public let sampleNumber: UInt64
             public let streamOffset: UInt64
             public let frameSamples: UInt32
-            
+
             init(bytes: Data) {
                 let point0 = bytes.startIndex
                 let point8 = point0 + 8
                 let point16 = point8 + 8
                 let point18 = point16 + 2
-                sampleNumber = bytes[point0 ..< point8].compactMap({ $0 }).unpackUInt64()
-                streamOffset = bytes[point8 ..< point16].compactMap({ $0 }).unpackUInt64()
-                frameSamples = bytes[point16 ..< point18].compactMap({ $0 }).unpack()
+                sampleNumber = bytes[point0 ..< point8].compactMap { $0 }.unpackUInt64()
+                streamOffset = bytes[point8 ..< point16].compactMap { $0 }.unpackUInt64()
+                frameSamples = bytes[point16 ..< point18].compactMap { $0 }.unpack()
             }
-            
+
             public var description: String {
                 let clz = "\(type(of: self))"
                 if sampleNumber == SeekPoint.placeHolder { return "\(clz).PlaceHolder" }

@@ -36,7 +36,7 @@ extension APlay {
             _filePath = "\(dir)/\(_date).log"
 
             let u = URL(fileURLWithPath: _filePath)
-            if access(_filePath.withCString({ $0 }), F_OK) == -1 { // file not exists
+            if access(_filePath.withCString { $0 }, F_OK) == -1 { // file not exists
                 FileManager.default.createFile(atPath: _filePath, contents: nil, attributes: nil)
             }
             _fileHandler = try? FileHandle(forWritingTo: u)

@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 final class ID3Parser {
     private lazy var _outputStream: PassthroughSubject<MetadataParser.Event, Never> = .init()
@@ -104,7 +104,7 @@ extension ID3Parser {
         // Skip Extended Header
         if info.version >= 3, _isSkippedExtendedHeader == false, info.hasExtendedHeader {
             guard _data.count >= 4 else { return }
-            let size = Int(_data[0 ..< 4].compactMap({ $0 }).unpack())
+            let size = Int(_data[0 ..< 4].compactMap { $0 }.unpack())
             guard _data.count >= size else { return }
             _data = _data.advanced(by: size)
         }
@@ -222,7 +222,7 @@ extension ID3Parser {
                 _config.logger.log("(\(frameName))(\(mimeType))(\(picType))(\(frameSize)bytes)", to: .metadataParser)
             } else {
                 if let encoding = StringEncoding(rawValue: encodingIndex) {
-                    var d = _data[readlength ..< frameSize].compactMap({ $0 })
+                    var d = _data[readlength ..< frameSize].compactMap { $0 }
                     if let text = CFStringCreateWithBytes(kCFAllocatorDefault, &d, d.count, encoding.enc, encoding.isExternalRepresentation) as String?, text.isEmpty == false {
                         let value = text.trimZeroTerminator()
                         var meta = _metadatas[info.ver] ?? []

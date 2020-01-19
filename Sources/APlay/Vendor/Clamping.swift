@@ -29,7 +29,7 @@ public struct Clamping<Value: Comparable> {
 
     public init(initialValue: Value, range: ClosedRange<Value>) {
         self.range = range
-        self.storage = range.clamp(initialValue)
+        storage = range.clamp(initialValue)
     }
 
     public var wrappedValue: Value {
@@ -38,10 +38,10 @@ public struct Clamping<Value: Comparable> {
     }
 }
 
-fileprivate extension ClosedRange {
-    func clamp(_ value : Bound) -> Bound {
-        return self.lowerBound > value ? self.lowerBound
-            : self.upperBound < value ? self.upperBound
+private extension ClosedRange {
+    func clamp(_ value: Bound) -> Bound {
+        return lowerBound > value ? lowerBound
+            : upperBound < value ? upperBound
             : value
     }
 }

@@ -11,6 +11,7 @@ public final class Composer {
     private unowned let _configuration: ConfigurationCompatible
     private var _resourceManager: ResourcesManager
     private var _downloadSubscriber: AnyCancellable?
+    private var _dataParser: DataParser
     private var _urlReponse: URLResponse?
     private lazy var _retryCount: UInt = 0
 
@@ -20,26 +21,27 @@ public final class Composer {
         let resMan: ResourcesManager = .init(configuration: configuration)
         downloader = .init(configuration: configuration)
         streamer = .init(configuration: configuration, dataReader: resMan)
+        _dataParser = .init()
         _configuration = configuration
         _resourceManager = resMan
         addDownloadEventHandler()
     }
 
     func addDownloadEventHandler() {
-        let val = downloader.eventPipeline.sink { [weak self] (event) in
+        let val = downloader.eventPipeline.sink { [weak self] event in
             guard let sself = self else { return }
             switch event {
-
             case let .onResponse(resp):
                 sself._urlReponse = resp
 
             case let .onTotalByte(len):
                 sself.urlInfo.remoteContentLength = len
                 sself._resourceManager.readWritePipeline.targetFileLength = len - sself.urlInfo.startPosition
-                
+
             case let .onData(data, info):
                 sself._resourceManager.write(data: data)
                 sself._progressSubject.send(info)
+                sself._dataParser.onData(data)
 
             case let .completed(result):
                 switch result {
@@ -67,7 +69,7 @@ public final class Composer {
 }
 
 public extension Composer {
-    func play(_ url: URL, at position: StreamProvider.Position = 0, info: AudioDecoder.Info? = nil) throws {
+    func play(_ url: URL, at position: StreamProvider.Position = 0, info _: AudioDecoder.Info? = nil) throws {
         urlInfo = try _resourceManager.updateResource(for: url, at: position)
         if urlInfo.hasLocalCached {
             print("local file: \(urlInfo)")

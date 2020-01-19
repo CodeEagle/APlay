@@ -1,16 +1,15 @@
-@_exported import Foundation
-@_exported import Combine
 @_exported import AVFoundation
+@_exported import Combine
 @_exported import Dispatch
+@_exported import Foundation
 
 #if canImport(UIKit)
-@_exported import UIKit
-public typealias APlayImage = UIImage
+    @_exported import UIKit
+    public typealias APlayImage = UIImage
 #elseif canImport(AppKit)
-@_exported import AppKit
-public typealias APlayImage = NSImage
+    @_exported import AppKit
+    public typealias APlayImage = NSImage
 #endif
-
 
 /// (ConfigurationCompatible) -> StreamProviderCompatible
 public typealias StreamerBuilder = (ConfigurationCompatible) -> StreamProviderCompatible

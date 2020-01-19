@@ -14,7 +14,7 @@ extension APlay {
         /** 远程 Wave 文件的预缓冲大小(先缓冲到10%再播放) */
         public let preBufferWaveFormatPercentageBeforePlay: Float
         /** 每个解码的大小 */
-        @Clamping(initialValue: 0, range: 0...UInt(Int.max))
+        @Clamping(initialValue: 0, range: 0 ... UInt(Int.max))
         public private(set) var decodeBufferSize: UInt
         /** 监控播放器，超时没播放则🚔 */
         public let startupWatchdogPeriod: UInt
@@ -36,7 +36,7 @@ extension APlay {
         public let predefinedHttpHeaderValues: [String: String]
         /** 自动控制 AudioSession */
         public let isEnabledAutomaticAudioSessionHandling: Bool
-        /** 远程连接最大重试次数 默认5次*/
+        /** 远程连接最大重试次数 默认5次 */
         public let maxRemoteStreamOpenRetry: UInt
         /** 自动填充ID3的信息到 NowPlayingCenter */
         public let isAutoFillID3InfoToNowPlayingCenter: Bool
@@ -91,7 +91,7 @@ extension APlay {
                     cachePolicy: CachePolicy = .enable([]),
                     cacheDirectory: String = Configuration.defaultCachedDirectory,
                     networkPolicy: NetworkPolicy = .noRestrict,
-                    retryPolicy: RetryPolicy = .retry({ _  -> RetryPolicy.Config in .init() }),
+                    retryPolicy: RetryPolicy = .retry { _ -> RetryPolicy.Config in .init() },
                     remoteDataVerifyPolicy: RemoteDataVerifyPolicy = .md5Verifier,
                     predefinedHttpHeaderValues: [String: String] = [:],
                     automaticAudioSessionHandlingEnabled: Bool = true,
@@ -103,8 +103,8 @@ extension APlay {
                     sessionBuilder: SessionBuilder? = nil,
                     sessionDelegateBuilder: SessionDelegateBuilder? = nil,
                     loggerBuilder: LoggerBuilder? = nil,
-                    streamerBuilder: StreamerBuilder? = nil,
-                    audioDecoderBuilder: AudioDecoderBuilder? = nil,
+                    streamerBuilder _: StreamerBuilder? = nil,
+                    audioDecoderBuilder _: AudioDecoderBuilder? = nil,
                     metadataParserBuilder: MetadataParserBuilder? = nil) {
             self.defaultCoverImage = defaultCoverImage
             self.proxyPolicy = proxyPolicy
@@ -247,7 +247,7 @@ extension APlay.Configuration {
     /// - validateHeader->Bool: validate with header info, validator
     public enum HttpFileValidationPolicy {
         case notValidate
-        case validateHeader(keys: [String], validator: ((URL, String, [String: Any]) -> Bool))
+        case validateHeader(keys: [String], validator: (URL, String, [String: Any]) -> Bool)
 
         var keys: [String] {
             switch self {
@@ -275,12 +275,12 @@ extension APlay.Configuration {
 
         /// A default implementation for custom((URL) -> String)
         public static var defaultPolicy: CacheFileNamingPolicy {
-            return .custom({ (url) -> String in
+            return .custom { (url) -> String in
                 let raw = url.path
                 guard let dat = raw.data(using: .utf8) else { return raw }
                 let sub = dat.base64EncodedString()
                 return sub
-            })
+            }
         }
     }
 
@@ -296,14 +296,14 @@ extension APlay.Configuration {
         }
 
         public static var md5Verifier: RemoteDataVerifyPolicy {
-            return .custom({ resp, data -> Bool in
+            return .custom { resp, data -> Bool in
                 if let response = resp as? HTTPURLResponse,
                     let eTag = response.allHeaderFields["Etag"] as? String {
                     let raw = eTag.replacingOccurrences(of: "\"", with: "").lowercased()
                     return data.md5.lowercased() == raw
                 }
                 return false
-            })
+            }
         }
     }
 
@@ -316,15 +316,16 @@ extension APlay.Configuration {
                 self.maxRetry = maxRetry
             }
         }
+
         case never
         case retry((Error) -> Config)
 
         func canRetry(with error: Error, count: UInt) -> (Bool, DispatchTimeInterval) {
             switch self {
-                case .never: return (false, .never)
-                case let .retry(handler):
-                    let config = handler(error)
-                    return (count < config.maxRetry, config.delay)
+            case .never: return (false, .never)
+            case let .retry(handler):
+                let config = handler(error)
+                return (count < config.maxRetry, config.delay)
             }
         }
     }
@@ -354,7 +355,7 @@ extension APlay.Configuration {
 
     /// Network policy for accessing remote resources
     public enum NetworkPolicy {
-        public typealias PermissionHandler = (URL, (@escaping (Bool) -> Void)) -> Void
+        public typealias PermissionHandler = (URL, @escaping (Bool) -> Void) -> Void
         case noRestrict
         case requiredPermission(PermissionHandler)
         func requestPermission(for url: URL, handler: @escaping (Bool) -> Void) {

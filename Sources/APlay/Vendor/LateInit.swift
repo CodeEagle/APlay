@@ -1,7 +1,6 @@
 @propertyWrapper public struct LateInit<Value> {
-    
     var storage: Value?
-    
+
     public init() {
         storage = nil
     }

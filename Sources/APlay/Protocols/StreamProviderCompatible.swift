@@ -103,6 +103,20 @@ public struct StreamProvider {
             return UInt(size)
         }
 
+        func tagParser(with config: ConfigurationCompatible) -> MetadataParserCompatible? {
+            var parser = config.metadataParserBuilder(fileHint, config)
+            if parser == nil {
+                if fileHint == .mp3 {
+                    parser = ID3Parser(config: config)
+                } else if fileHint == .flac {
+                    parser = FlacParser(config: config)
+                } else {
+                    return nil
+                }
+            }
+            return parser
+        }
+
         private static func localFileHit(from url: URL) -> AudioFileType {
             let name = url.asCFunctionString()
             let tagSize = 4

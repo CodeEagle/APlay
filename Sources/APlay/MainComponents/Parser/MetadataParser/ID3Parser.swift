@@ -50,11 +50,11 @@ private extension ID3Parser {
 // MARK: - MetadataParserCompatible
 
 extension ID3Parser: MetadataParserCompatible {
-    var outputStream: AnyPublisher<MetadataParser.Event, Never> { return _outputStream.eraseToAnyPublisher() }
+    var eventPipeline: AnyPublisher<MetadataParser.Event, Never> { return _outputStream.eraseToAnyPublisher() }
 
-    func acceptInput(data: UnsafeMutablePointer<UInt8>, count: UInt32) {
+    func acceptInput(data: Data) {
         guard _v2State.isNeedData else { return }
-        _queue.async(flags: .barrier) { self.appendTagData(data, count: count) }
+        _queue.async(flags: .barrier) { self.appendTagData(data) }
         _queue.sync {
             if _v2State == .initial, _data.count < 10 { return }
             parse()
@@ -74,14 +74,9 @@ extension ID3Parser: MetadataParserCompatible {
 // MARK: - ID3v2 Parse
 
 extension ID3Parser {
-    private func appendTagData(_ data: UnsafeMutablePointer<UInt8>, count: UInt32) {
+    private func appendTagData(_ data: Data) {
         if let size = _v2Info?.size, _data.count >= size, _v2State != .initial { return }
-        let bytesSize = Int(count)
-        let raw = UnsafeMutablePointer.uint8Pointer(of: bytesSize)
-        defer { free(raw) }
-        memcpy(raw, data, bytesSize)
-        let dat = Data(bytes: raw, count: bytesSize)
-        _data.append(dat)
+        _data.append(data)
     }
 
     /// <http://id3.org/id3v2-00>, <http://id3.org/id3v2.3.0>, <http://id3.org/id3v2.4.0-structure>

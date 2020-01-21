@@ -37,7 +37,7 @@ extension ReadWritePipe {
         return _queue.sync {
             guard _targetFileLength > 0 else { return .targetFileLenNotSet }
             guard length > 0 else { return .lengthCanNotBeNegative }
-            guard _readOffset <= _targetFileLength else { return .complete }
+            guard _readOffset < _targetFileLength else { return .complete }
             let data = _readPipe.readData(ofLength: length)
             let count = data.count
             if count == 0 { return .waitingForData }

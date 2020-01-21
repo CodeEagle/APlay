@@ -9,7 +9,7 @@ public enum State {
     case idle
     case playing
     case paused
-    case error(Error)
+    case error(APlay.Error)
     case unknown(Swift.Error)
 
     public var isPlaying: Bool {

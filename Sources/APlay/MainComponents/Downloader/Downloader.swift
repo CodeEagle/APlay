@@ -65,6 +65,7 @@ public extension Downloader {
         if p > 0 { request.addValue("bytes=\(p)-", forHTTPHeaderField: "Range") }
         _event = .onStartPosition(p)
         _event = .onRequest(request)
+        if _task != nil { cancel() }
         _task = session.dataTask(with: request)
         resume()
     }
@@ -129,8 +130,13 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
         event = .onStartPostition(p)
     }
 
-    public func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+    public func urlSession(_: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         os_log("%@ - %d: receive response: %@", log: Downloader.logger, type: .debug, #function, #line, response)
+        guard response.expectedContentLength > 0 else {
+            event = .completed(NSError(domain: "", code: -1, userInfo: ["msg": "response.expectedContentLength < 0"]))
+            dataTask.cancel()
+            return
+        }
         let totalLength = UInt64(response.expectedContentLength)
         if let resp = response as? HTTPURLResponse {
             _queue.async(flags: .barrier) {

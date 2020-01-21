@@ -1,8 +1,8 @@
 
 /// Protocol for metadata parser
 public protocol MetadataParserCompatible: AnyObject {
-    var outputStream: AnyPublisher<MetadataParser.Event, Never> { get }
-    func acceptInput(data: UnsafeMutablePointer<UInt8>, count: UInt32)
+    var eventPipeline: AnyPublisher<MetadataParser.Event, Never> { get }
+    func acceptInput(data: Data)
     func parseID3V1Tag(at url: URL)
     init(config: ConfigurationCompatible)
 }

@@ -8,6 +8,13 @@
 let playList: PlayListTests = .init()
 
 final class APlayTests: XCTestCase {
+    let player = APlay(configuration: APlay.Configuration())
+    
+    func testPlay() {
+        let url = URL(fileURLWithPath: "/Users/lincolnlaw/Library/Caches/APlay/Tmp/LzIwMjAwMTIwMTAzODA2L2M5ZTc3MzJkNTU1Zjg2ZjFmODRmNzM0OGM2ODAwZjFkL2pkeXlhYWMvNTQwOC8wMzVhLzBlNWYvY2JiOGQwMGUxODQwYzIyN2E1MDA5NWViMTY2NjY1ODkubTRh")
+        player.play(url)
+    }
+    
     static var allTests = [
         ("testAddPublisher", playList.testAddPublisher),
         ("testChangeList", playList.testChangeList),

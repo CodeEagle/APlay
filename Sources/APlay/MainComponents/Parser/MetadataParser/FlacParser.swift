@@ -13,13 +13,13 @@ final class FlacParser {
 }
 
 extension FlacParser: MetadataParserCompatible {
-    var outputStream: AnyPublisher<MetadataParser.Event, Never> {
+    var eventPipeline: AnyPublisher<MetadataParser.Event, Never> {
         return _outputStream.eraseToAnyPublisher()
     }
 
-    func acceptInput(data: UnsafeMutablePointer<UInt8>, count: UInt32) {
+    func acceptInput(data: Data) {
         guard _state.isNeedData else { return }
-        _queue.async(flags: .barrier) { self.appendTagData(data, count: count) }
+        _queue.async(flags: .barrier) { self.appendTagData(data) }
         _queue.sync {
             if _state == .initial, _data.count < 4 { return }
             parse()
@@ -30,14 +30,9 @@ extension FlacParser: MetadataParserCompatible {
 // MARK: - Private
 
 extension FlacParser {
-    private func appendTagData(_ data: UnsafeMutablePointer<UInt8>, count: UInt32) {
-        let bytesSize = Int(count)
-        let raw = UnsafeMutablePointer.uint8Pointer(of: bytesSize)
-        defer { free(raw) }
-        memcpy(raw, data, bytesSize)
-        let dat = Data(bytes: raw, count: bytesSize)
-        _data.append(dat)
-        _backupHeaderData.append(dat)
+    private func appendTagData(_ data: Data) {
+        _data.append(data)
+        _backupHeaderData.append(data)
     }
 
     private func parse() {

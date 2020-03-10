@@ -133,6 +133,16 @@ public extension APlay {
             if let c = converter { AudioConverterReset(c) }
             // start parse and convert
             _playerTimer?.resume()
+            if !_engine.isRunning {
+                do {
+                    try _engine.start()
+                } catch {
+                    print(error)
+//                    os_log("Failed to start engine: %@", log: Streamer.logger, type: .error, error.localizedDescription)
+                }
+            }
+            _playerNode.play()
+            _engine.mainMixerNode.outputVolume = 1
         } catch {
             state = .unknown(error)
         }
@@ -150,15 +160,23 @@ private extension APlay {
 
     func addDataParserEventHandler() {
         _dataParserSubscriber?.cancel()
-        _dataParserSubscriber = _dataParser.eventPipeline.sink(receiveValue: { [weak self] event in
+        _dataParserSubscriber = _dataParser.eventPipeline.sink(receiveValue: {  [weak self] event in
             guard let self = self else { return }
             switch event {
+            case let .createConverter(info):
+                if self.converter == nil {
+                    let result = AudioConverterNew(info.srcFormat.streamDescription, self.readFormat.streamDescription, &self.converter)
+                    if result != noErr {
+                        print(result.check())
+                    }
+                }
             case let .parseFailure(state):
                 if let str = state.check() {
                     print(str)
                 }
             case let .packet(val):
                 self.packets.append(val)
+                self.scheduleNextBuffer()
 
             default: break
             }
@@ -221,18 +239,15 @@ extension APlay {
         case let .available(data):
             _dataParser.onData(data)
             _tagParser?.acceptInput(data: data)
-            if converter == nil {
-                let result = AudioConverterNew(_dataParser.info.srcFormat.streamDescription, readFormat.streamDescription, &converter)
-                if result != noErr {
-                    
-                }
-            }
         }
     }
 }
 // MARK: - Converter
 private extension APlay {
     func read(_ frames: AVAudioFrameCount) throws -> AVAudioPCMBuffer {
+        guard converter != nil else {
+            throw ReaderError.waitForConverter
+        }
         let framesPerPacket = readFormat.streamDescription.pointee.mFramesPerPacket
         var packets = frames / framesPerPacket
         
@@ -243,7 +258,7 @@ private extension APlay {
         buffer.frameLength = frames
         
         // Try to read the frames from the parser
-        try _queue.sync {
+//        try _queue.sync {
             let context = unsafeBitCast(self, to: UnsafeMutableRawPointer.self)
             let status = AudioConverterFillComplexBuffer(converter!, ReaderConverterCallback, context, &packets, buffer.mutableAudioBufferList, nil)
             guard status == noErr else {
@@ -258,7 +273,7 @@ private extension APlay {
                     throw ReaderError.converterFailed(status)
                 }
             }
-        }
+//        }
         return buffer
     }
 }
@@ -323,7 +338,7 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
     packetCount.pointee = 1
     reader.currentPacket = reader.currentPacket + 1
     
-    return noErr;
+    return noErr
 }
 // MARK: - Player
 
@@ -337,7 +352,7 @@ private extension APlay {
         let interval = 1 / (readFormat.sampleRate / Double(_readBufferSize))
         _playerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000 / 2)), callback: { [weak self] _ in
             guard let self = self else { return }
-            self.scheduleNextBuffer()
+            self.readLoop()
 //            self.handleTimeUpdate()
 //            self.notifyTimeUpdated()
         })
@@ -393,6 +408,7 @@ private extension APlay {
 //            os_log("Scheduler reached end of file", log: Streamer.logger, type: .debug)
             isFileSchedulingComplete = true
         } catch {
+            print(error)
 //            os_log("Cannot schedule buffer: %@", log: Streamer.logger, type: .debug, error.localizedDescription)
         }
     }
@@ -407,6 +423,7 @@ let ReaderMissingSourceFormatError: OSStatus = 932332583
 public enum ReaderError: LocalizedError {
     case cannotLockQueue
     case converterFailed(OSStatus)
+    case waitForConverter
     case failedToCreateDestinationFormat
     case failedToCreatePCMBuffer
     case notEnoughData
@@ -432,6 +449,8 @@ public enum ReaderError: LocalizedError {
             return "Reached the end of the file"
         case .unableToCreateConverter(let status):
             return localizedDescriptionFromConverterError(status)
+        case .waitForConverter:
+            return "Wait for converter"
         }
     }
     

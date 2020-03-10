@@ -11,6 +11,7 @@ public final class DataParser {
     private(set) var info = Info()
 
     @Published private var _event: Event = .idle
+    
     public var eventPipeline: AnyPublisher<Event, Never> { $_event.eraseToAnyPublisher() }
 
     init(configuration: ConfigurationCompatible, info: Info?) {
@@ -30,7 +31,7 @@ public final class DataParser {
         }
         let result = AudioFileStreamOpen(this, propertyCallback, callback, kAudioFileMP3Type, &_audioFileStream)
         if result != noErr {
-            _event = .openFailure(result)
+            _queue.asyncWrite { self._event = .openFailure(result) }
         }
     }
 
@@ -203,7 +204,7 @@ extension DataParser {
                 let packetStart = Int(packetDescription.mStartOffset)
                 let packetSize = Int(packetDescription.mDataByteSize)
                 let packetData = Data(bytes: data.advanced(by: packetStart), count: packetSize)
-                _event = .packet((packetData, packetDescription))
+                _queue.asyncWrite { self._event = .packet((packetData, packetDescription)) }
             }
         } else {
             let format = dataFormat.streamDescription.pointee
@@ -212,7 +213,7 @@ extension DataParser {
                 let packetStart = i * bytesPerPacket
                 let packetSize = bytesPerPacket
                 let packetData = Data(bytes: data.advanced(by: packetStart), count: packetSize)
-                _event = .packet((packetData, nil))
+                _queue.asyncWrite { self._event = .packet((packetData, nil)) }
             }
         }
     }

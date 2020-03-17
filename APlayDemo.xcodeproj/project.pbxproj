@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		101380A624207BEE008208D6 /* nameless.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 101380A524207BEE008208D6 /* nameless.m4a */; };
+		101380A82420A029008208D6 /* 06 VV-ALK.flac in Resources */ = {isa = PBXBuildFile; fileRef = 101380A72420A029008208D6 /* 06 VV-ALK.flac */; };
 		1064216B23D7DF8A0083D7B4 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1064216A23D7DF8A0083D7B4 /* AppDelegate.swift */; };
 		1064216D23D7DF8A0083D7B4 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1064216C23D7DF8A0083D7B4 /* SceneDelegate.swift */; };
 		1064216F23D7DF8A0083D7B4 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1064216E23D7DF8A0083D7B4 /* ViewController.swift */; };
@@ -59,6 +61,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		101380A524207BEE008208D6 /* nameless.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = nameless.m4a; sourceTree = "<group>"; };
+		101380A72420A029008208D6 /* 06 VV-ALK.flac */ = {isa = PBXFileReference; lastKnownFileType = file; path = "06 VV-ALK.flac"; sourceTree = "<group>"; };
 		1064216723D7DF8A0083D7B4 /* APlayDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = APlayDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1064216A23D7DF8A0083D7B4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1064216C23D7DF8A0083D7B4 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -146,6 +150,8 @@
 				1064216A23D7DF8A0083D7B4 /* AppDelegate.swift */,
 				1064216C23D7DF8A0083D7B4 /* SceneDelegate.swift */,
 				1064216E23D7DF8A0083D7B4 /* ViewController.swift */,
+				101380A524207BEE008208D6 /* nameless.m4a */,
+				101380A72420A029008208D6 /* 06 VV-ALK.flac */,
 				106421DD23D7E0570083D7B4 /* testAudio */,
 				1064217023D7DF8A0083D7B4 /* Main.storyboard */,
 				1064217323D7DF8C0083D7B4 /* Assets.xcassets */,
@@ -346,6 +352,8 @@
 				106421DE23D7E0570083D7B4 /* testAudio in Resources */,
 				1064217723D7DF8C0083D7B4 /* LaunchScreen.storyboard in Resources */,
 				1064217423D7DF8C0083D7B4 /* Assets.xcassets in Resources */,
+				101380A82420A029008208D6 /* 06 VV-ALK.flac in Resources */,
+				101380A624207BEE008208D6 /* nameless.m4a in Resources */,
 				1064217223D7DF8A0083D7B4 /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -546,6 +554,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7A9NPDDQRA;
 				INFOPLIST_FILE = APlayDemo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -563,6 +572,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7A9NPDDQRA;
 				INFOPLIST_FILE = APlayDemo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

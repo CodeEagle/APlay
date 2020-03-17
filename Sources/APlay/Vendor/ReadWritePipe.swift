@@ -1,7 +1,7 @@
 public final class ReadWritePipe {
     private lazy var _queue = DispatchQueue(concurrentName: "ReadWritePipe")
     private var _readPipe: FileHandle
-    private var _writePipe: FileHandle
+    private var _writePipe: FileHandle?
     private var _storePath: String
     private var _targetFileLength: UInt64 = 0
     private var _readOffset: UInt64 = 0
@@ -17,12 +17,17 @@ public final class ReadWritePipe {
 
     public init(localPath: String) throws {
         let path = localPath.replacingOccurrences(of: "file://", with: "")
-        let url = URL(fileURLWithPath: path)
-        _storePath = path
-        FileManager.createFileIfNeeded(at: path)
+        // fixed empty space in filename's bug
+        let p = path.removingPercentEncoding ?? path
+        let url = URL(fileURLWithPath: p)
+        _storePath = p
+        FileManager.createFileIfNeeded(at: p)
         _readPipe = try .init(forReadingFrom: url)
-        _writePipe = try .init(forWritingTo: url)
-        _writePipe.seekToEndOfFile()
+        // local resource dont need to init write Pipe
+        do {
+            _writePipe = try .init(forWritingTo: url)
+            _writePipe?.seekToEndOfFile()
+        } catch { }
     }
 
     var storePath: String { _storePath }
@@ -30,7 +35,7 @@ public final class ReadWritePipe {
 
 extension ReadWritePipe {
     public func write(_ data: Data) {
-        _queue.asyncWrite { self._writePipe.write(data) }
+        _queue.asyncWrite { self._writePipe?.write(data) }
     }
 
     public func readData(of length: Int) -> ReadWritePipe.ReadResult {

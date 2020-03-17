@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		101380A624207BEE008208D6 /* nameless.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 101380A524207BEE008208D6 /* nameless.m4a */; };
 		101380A82420A029008208D6 /* 06 VV-ALK.flac in Resources */ = {isa = PBXBuildFile; fileRef = 101380A72420A029008208D6 /* 06 VV-ALK.flac */; };
+		101380AE2420C5EA008208D6 /* PacketPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101380AD2420C5EA008208D6 /* PacketPackage.swift */; };
 		1064216B23D7DF8A0083D7B4 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1064216A23D7DF8A0083D7B4 /* AppDelegate.swift */; };
 		1064216D23D7DF8A0083D7B4 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1064216C23D7DF8A0083D7B4 /* SceneDelegate.swift */; };
 		1064216F23D7DF8A0083D7B4 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1064216E23D7DF8A0083D7B4 /* ViewController.swift */; };
@@ -63,6 +64,7 @@
 /* Begin PBXFileReference section */
 		101380A524207BEE008208D6 /* nameless.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = nameless.m4a; sourceTree = "<group>"; };
 		101380A72420A029008208D6 /* 06 VV-ALK.flac */ = {isa = PBXFileReference; lastKnownFileType = file; path = "06 VV-ALK.flac"; sourceTree = "<group>"; };
+		101380AD2420C5EA008208D6 /* PacketPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketPackage.swift; sourceTree = "<group>"; };
 		1064216723D7DF8A0083D7B4 /* APlayDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = APlayDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1064216A23D7DF8A0083D7B4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1064216C23D7DF8A0083D7B4 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -279,6 +281,7 @@
 				106421AD23D7DFBA0083D7B4 /* MetadataParser.swift */,
 				106421AE23D7DFBA0083D7B4 /* Import.swift */,
 				106421AF23D7DFBA0083D7B4 /* LateInit.swift */,
+				101380AD2420C5EA008208D6 /* PacketPackage.swift */,
 			);
 			path = Vendor;
 			sourceTree = "<group>";
@@ -371,6 +374,7 @@
 				106421BE23D7DFBA0083D7B4 /* APlay+Extensions.swift in Sources */,
 				106421CD23D7DFBA0083D7B4 /* UnfairLock.swift in Sources */,
 				106421CA23D7DFBA0083D7B4 /* DownloaderCompatible.swift in Sources */,
+				101380AE2420C5EA008208D6 /* PacketPackage.swift in Sources */,
 				106421CB23D7DFBA0083D7B4 /* LoopPattern.swift in Sources */,
 				106421D423D7DFBA0083D7B4 /* State.swift in Sources */,
 				106421C823D7DFBA0083D7B4 /* AudioDecoderCompatible.swift in Sources */,

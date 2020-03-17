@@ -23,8 +23,8 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         let timePitchNode = AVAudioUnitTimePitch()
-        timePitchNode.pitch = 2.0
-        timePitchNode.rate = 0.5
+        timePitchNode.pitch = 1
+        timePitchNode.rate = 1
         player.pluginNodes = [
             timePitchNode
         ]

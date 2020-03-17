@@ -45,11 +45,25 @@ public final class APlay {
     private var _tagParser: MetadataParserCompatible?
     private var _tagParserSubscriber: AnyCancellable?
 
-    private var _packets: [(Data, AudioStreamPacketDescription?)] = []
-    fileprivate var packets: [(Data, AudioStreamPacketDescription?)] {
-        get { return _queue.sync { self._packets } }
-        set { _queue.asyncWrite { self._packets = newValue } }
+    fileprivate var _packetCreatedCount: Int = 0
+    private var _packetHead: PacketPackage?
+    private weak var _packetTail: PacketPackage?
+    
+    fileprivate var packetHead: PacketPackage? {
+        get { return _queue.sync { self._packetHead } }
+        set { _queue.asyncWrite { self._packetHead = newValue } }
     }
+    
+    fileprivate var packetTail: PacketPackage? {
+        get { return _queue.sync { self._packetTail } }
+        set { _queue.asyncWrite { self._packetTail = newValue } }
+    }
+    
+//    private var _packets: [(Data, AudioStreamPacketDescription?)] = []
+//    fileprivate var packets: [(Data, AudioStreamPacketDescription?)] {
+//        get { return _queue.sync { self._packets } }
+//        set { _queue.asyncWrite { self._packets = newValue } }
+//    }
 
     private var _readBufferSize: AVAudioFrameCount { return AVAudioFrameCount(configuration.decodeBufferSize) }
     
@@ -68,7 +82,7 @@ public final class APlay {
             }
             
         }
-        return max(AVAudioPacketCount(packetCount), AVAudioPacketCount(packets.count))
+        return max(AVAudioPacketCount(packetCount), AVAudioPacketCount(_packetCreatedCount))
     }
     
     fileprivate var _isParsingComplete: Bool {
@@ -76,7 +90,7 @@ public final class APlay {
             return false
         }
         
-        return packets.count == totalPacketCount
+        return _packetCreatedCount == totalPacketCount
     }
     // MARK: Converter
     
@@ -85,6 +99,7 @@ public final class APlay {
         get { return _queue.sync { self._converter } }
         set { _queue.asyncWrite { self._converter = newValue } }
     }
+
     private(set) var _currentPacket: AVAudioPacketCount = 0
     fileprivate var currentPacket: AVAudioPacketCount {
         get { return _queue.sync { self._currentPacket } }
@@ -194,7 +209,22 @@ private extension APlay {
                     print(str)
                 }
             case let .packet(val):
-                sself.packets.append(contentsOf: val)
+                
+                for item in val {
+                    if sself.packetHead == nil {
+                        sself.packetHead = PacketPackage(index: sself._packetCreatedCount, data: item.0, packetDesc: item.1)
+                        sself.packetTail = sself.packetHead
+                    } else {
+                        let next = PacketPackage(index: sself._packetCreatedCount, data: item.0, packetDesc: item.1)
+                        if sself.packetTail?.next == nil {
+                            sself.packetTail?.next = next
+                        }
+                        sself.packetTail = next
+                    }
+                    sself._packetCreatedCount &+= 1
+                }
+                
+//                sself.packets.append(contentsOf: val)
 
             default: break
             }
@@ -322,8 +352,8 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
     //     2. We've reached the end of the data we currently have downloaded, but not the file
     //
     let packetIndex = Int(reader.currentPacket)
-    let packets = reader.packets
-    let isEndOfData = packetIndex >= packets.count
+    let packetsCreatedCount = reader._packetCreatedCount
+    let isEndOfData = packetIndex >= packetsCreatedCount
     if isEndOfData {
         if reader._isParsingComplete {
             packetCount.pointee = 0
@@ -336,8 +366,11 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
     //
     // Copy data over (note we've only processing a single packet of data at a time)
     //
-    let packet = packets[packetIndex]
-    let data = packet.0
+//    let packet = packets[packetIndex]
+    guard let packet = reader.packetHead else {
+        return ReaderNOPlayHEAD
+    }
+    let data = packet.data
     let dataCount = data.count
     ioData.pointee.mNumberBuffers = 1
     ioData.pointee.mBuffers.mData = UnsafeMutableRawPointer.allocate(byteCount: dataCount, alignment: 0)
@@ -363,7 +396,7 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
     }
     packetCount.pointee = 1
     reader.currentPacket &+= 1
-    
+    reader.packetHead = reader.packetHead?.next
     return noErr
 }
 // MARK: - Player
@@ -435,6 +468,7 @@ private extension APlay {
 //            os_log("Scheduler reached end of file", log: Streamer.logger, type: .debug)
             isFileSchedulingComplete = true
             print("isFileSchedulingComplete: true")
+            _playerTimer?.resume()
         } catch {
             print(error)
 //            os_log("Cannot schedule buffer: %@", log: Streamer.logger, type: .debug, error.localizedDescription)
@@ -445,7 +479,7 @@ private extension APlay {
 let ReaderReachedEndOfDataError: OSStatus = 932332581
 let ReaderNotEnoughDataError: OSStatus = 932332582
 let ReaderMissingSourceFormatError: OSStatus = 932332583
-
+let ReaderNOPlayHEAD: OSStatus = 932332584
 // MARK: - ReaderError
 
 public enum ReaderError: LocalizedError {

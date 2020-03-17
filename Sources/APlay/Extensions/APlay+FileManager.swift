@@ -9,7 +9,6 @@ public extension FileManager {
 
     static func createFileIfNeeded(at path: String) {
         let fm = FileManager.default
-//        let path = url.absoluteString.replacingOccurrences(of: "file://", with: "")
         if fm.fileExists(atPath: path) == false {
             _ = fm.createFile(atPath: path, contents: nil, attributes: nil)
         }

@@ -10,10 +10,6 @@ import Foundation
 
 /// Add Equatable support for AudioStreamBasicDescription
 extension AudioStreamBasicDescription: Equatable {
-    /// whether current mFormatID equal to kAudioFormatLinearPCM
-    public var isLinearPCM: Bool {
-        return mFormatID == kAudioFormatLinearPCM
-    }
 
     public static func == (source: AudioStreamBasicDescription, dst: AudioStreamBasicDescription) -> Bool {
         return dst.mFormatID == source.mFormatID &&

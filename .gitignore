@@ -70,3 +70,6 @@ fastlane/test_output
 
 #swift package manager
 .swiftpm
+
+*.flac
+*.m4a

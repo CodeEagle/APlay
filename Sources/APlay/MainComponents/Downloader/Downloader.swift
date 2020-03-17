@@ -49,7 +49,7 @@ public final class Downloader: NSObject {
 // MARK: - Download
 
 public extension Downloader {
-    func download(_ info: StreamProvider.URLInfo) {
+    func download(_ info: StreamProvider.URLInfo, preivous response: URLResponse? = nil) {
         delegator.update(info)
 
         var request = URLRequest(url: info.originalURL, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 30)
@@ -62,7 +62,16 @@ public extension Downloader {
         } else {
             p = fileLength
         }
-        if p > 0 { request.addValue("bytes=\(p)-", forHTTPHeaderField: "Range") }
+        var canUsingRangeParams = true
+        // in case of download attachment file to play, but not allow to using "Range" params
+        if let e = response, e.description.contains("Status Code: 416") == true {
+            canUsingRangeParams = false
+            // clean local cache to redownload complete file
+            info.cleanLocalCache()
+        }
+        if canUsingRangeParams {
+            if p > 0 { request.addValue("bytes=\(p)-", forHTTPHeaderField: "Range") }
+        }
         _event = .onStartPosition(p)
         _event = .onRequest(request)
         if _task != nil { cancel() }
@@ -133,6 +142,7 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
     public func urlSession(_: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         os_log("%@ - %d: receive response: %@", log: Downloader.logger, type: .debug, #function, #line, response)
         guard response.expectedContentLength > 0 else {
+            event = .onResponse(response)
             event = .completed(NSError(domain: "", code: -1, userInfo: ["msg": "response.expectedContentLength < 0"]))
             dataTask.cancel()
             return

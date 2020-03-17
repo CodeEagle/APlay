@@ -58,12 +58,6 @@ public final class APlay {
         get { return _queue.sync { self._packetTail } }
         set { _queue.asyncWrite { self._packetTail = newValue } }
     }
-    
-//    private var _packets: [(Data, AudioStreamPacketDescription?)] = []
-//    fileprivate var packets: [(Data, AudioStreamPacketDescription?)] {
-//        get { return _queue.sync { self._packets } }
-//        set { _queue.asyncWrite { self._packets = newValue } }
-//    }
 
     private var _readBufferSize: AVAudioFrameCount { return AVAudioFrameCount(configuration.decodeBufferSize) }
     
@@ -80,7 +74,6 @@ public final class APlay {
                 let totalPaddingSize = paddings.reduce(0, { $0 + $1.length })
                 packetCount -= UInt64(ceil(Float(totalPaddingSize) / Float(_dataParser.info.packetBufferSize)))
             }
-            
         }
         return max(AVAudioPacketCount(packetCount), AVAudioPacketCount(_packetCreatedCount))
     }
@@ -91,6 +84,31 @@ public final class APlay {
         }
         
         return _packetCreatedCount == totalPacketCount
+    }
+    
+    
+    public var duration: TimeInterval? {
+        guard _dataParser.info.isUpdated else {
+            return nil
+        }
+        let sampleRate = _dataParser.info.srcFormat.sampleRate
+        
+        guard let totalFrameCount = totalFrameCount else {
+            return nil
+        }
+        
+        return TimeInterval(totalFrameCount) / TimeInterval(sampleRate)
+    }
+    
+    public var totalFrameCount: AVAudioFrameCount? {
+        let framesPerPacket =
+            _dataParser.info.srcFormat.streamDescription.pointee.mFramesPerPacket
+        
+        guard let totalPacketCount = _totalPacketCount else {
+            return nil
+        }
+        
+        return AVAudioFrameCount(totalPacketCount) * AVAudioFrameCount(framesPerPacket)
     }
     // MARK: Converter
     
@@ -223,8 +241,6 @@ private extension APlay {
                     }
                     sself._packetCreatedCount &+= 1
                 }
-                
-//                sself.packets.append(contentsOf: val)
 
             default: break
             }
@@ -415,6 +431,8 @@ private extension APlay {
             self.scheduleNextBuffer()
 //            self.handleTimeUpdate()
 //            self.notifyTimeUpdated()
+//            print(self.currentTime)
+//            print(self.duration)
         })
         _playerTimer?.pause()
     }
@@ -448,6 +466,14 @@ private extension APlay {
         }
     }
     
+    var currentTime: TimeInterval {
+        guard let nodeTime = _playerNode.lastRenderTime,
+            let playerTime = _playerNode.playerTime(forNodeTime: nodeTime) else {
+            return currentTimeOffset
+        }
+        let currentTime = TimeInterval(playerTime.sampleTime) / playerTime.sampleRate
+        return currentTime + currentTimeOffset
+    }
     
     // MARK: - Scheduling Buffers
 
@@ -457,9 +483,7 @@ private extension APlay {
 //            return
 //        }
 
-        guard !isFileSchedulingComplete else {
-            return
-        }
+        guard isFileSchedulingComplete == false else { return }
 
         do {
             let nextScheduledBuffer = try read(_readBufferSize)
@@ -468,7 +492,6 @@ private extension APlay {
 //            os_log("Scheduler reached end of file", log: Streamer.logger, type: .debug)
             isFileSchedulingComplete = true
             print("isFileSchedulingComplete: true")
-            _playerTimer?.resume()
         } catch {
             print(error)
 //            os_log("Cannot schedule buffer: %@", log: Streamer.logger, type: .debug, error.localizedDescription)

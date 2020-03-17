@@ -36,8 +36,8 @@ class ViewController: UIViewController {
 //            os_log("Failed to activate audio session: %@", log: ViewController.logger, type: .default, #function, #line, error.localizedDescription)
         }
 //        let url = Bundle.main.url(forResource: "06 VV-ALK", withExtension: "flac")!
-//        let url = Bundle.main.url(forResource: "testAudio", withExtension: nil)!
-        let url = Bundle.main.url(forResource: "nameless", withExtension: "m4a")!
+        let url = Bundle.main.url(forResource: "testAudio", withExtension: nil)!
+//        let url = Bundle.main.url(forResource: "nameless", withExtension: "m4a")!
 //        let url = wavs[0]
         player.play(url)
         // Do any additional setup after loading the view.

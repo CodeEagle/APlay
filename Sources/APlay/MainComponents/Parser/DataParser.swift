@@ -62,7 +62,7 @@ extension DataParser {
         case parseFailure(OSStatus)
         case bitrate(UInt32)
         case createConverter(Info)
-        case packet((Data, AudioStreamPacketDescription?))
+        case packet([(Data, AudioStreamPacketDescription?)])
     }
 }
 
@@ -139,11 +139,6 @@ extension DataParser {
             } else {
                 info.packetBufferSize = packetBufferSize
             }
-            guard newASBD.mFormatID != kAudioFormatLinearPCM else {
-                info.srcFormat = AVAudioFormat(streamDescription: &newASBD)!
-                info.dstFormat = newASBD
-                return
-            }
             info.srcFormat = AVAudioFormat(streamDescription: &newASBD)!
             _event = .createConverter(info)
         }
@@ -198,13 +193,14 @@ extension DataParser {
         let dataFormat = info.srcFormat
 
 //        /// Iterate through the packets and store the data appropriately
+        var list: [(Data, AudioStreamPacketDescription?)] = []
         if isCompressed {
             for i in 0 ..< Int(packetCount) {
                 let packetDescription = packetDescriptions[i]
                 let packetStart = Int(packetDescription.mStartOffset)
                 let packetSize = Int(packetDescription.mDataByteSize)
                 let packetData = Data(bytes: data.advanced(by: packetStart), count: packetSize)
-                _queue.asyncWrite { self._event = .packet((packetData, packetDescription)) }
+                list.append((packetData, packetDescription))
             }
         } else {
             let format = dataFormat.streamDescription.pointee
@@ -213,9 +209,10 @@ extension DataParser {
                 let packetStart = i * bytesPerPacket
                 let packetSize = bytesPerPacket
                 let packetData = Data(bytes: data.advanced(by: packetStart), count: packetSize)
-                _queue.asyncWrite { self._event = .packet((packetData, nil)) }
+                list.append((packetData, nil))
             }
         }
+        self._event = .packet(list)
     }
 
     /// Decoder Info
@@ -239,7 +236,7 @@ extension DataParser {
         public lazy var metadataSize: UInt = 0
         public lazy var waveSubchunk1Size: UInt32 = 0
         public var flacMetadata: FlacMetadata?
-        var isUpdated = false
+        var isUpdated: Bool { return isUpdatedOnce }
         private lazy var bitrateIndexArray: [Double] = []
         private var isUpdatedOnce = false
 
@@ -261,13 +258,16 @@ extension DataParser {
             parseFlags = .discontinuity
             metadataSize = 0
             waveSubchunk1Size = 0
-            isUpdated = false
+            isUpdatedOnce = false
             bitrateIndexArray = []
             flacMetadata = nil
         }
 
+        func update(metadata size: UInt) {
+            metadataSize = size
+        }
+        
         func update(from info: Info) {
-            isUpdated = true
             srcFormat = info.srcFormat
             dstFormat = info.dstFormat
             audioDataByteCount = info.audioDataByteCount

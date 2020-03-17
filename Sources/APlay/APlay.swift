@@ -57,7 +57,17 @@ public final class APlay {
         guard _dataParser.info.isUpdated else {
             return nil
         }
-        let packetCount = UInt64(_dataParser.info.audioDataPacketCount)
+        var packetCount = UInt64(_dataParser.info.audioDataPacketCount)
+        if _dataParser.info.metadataSize != 0 {
+            // TODO: reduce packetCount if needed
+            
+            // remove haeder padding for flac to get precis packet count
+            if _dataParser.info.fileHint == .flac, let paddings = _dataParser.info.flacMetadata?.paddings {
+                let totalPaddingSize = paddings.reduce(0, { $0 + $1.length })
+                packetCount -= UInt64(ceil(Float(totalPaddingSize) / Float(_dataParser.info.packetBufferSize)))
+            }
+            
+        }
         return max(AVAudioPacketCount(packetCount), AVAudioPacketCount(packets.count))
     }
     
@@ -120,6 +130,7 @@ public extension APlay {
         do {
             urlInfo = try _resourceManager.updateResource(for: url, at: position)
             _dataParser = .init(configuration: configuration, info: info)
+            _dataParser.info.fileHint = urlInfo.fileHint
             _tagParser = urlInfo.tagParser(with: configuration)
             addTagParserEventHandler()
             addDataParserEventHandler()
@@ -145,6 +156,7 @@ public extension APlay {
             _engine.mainMixerNode.outputVolume = 1
         } catch {
             state = .unknown(error)
+            print(error)
         }
     }
 }
@@ -154,20 +166,27 @@ public extension APlay {
 private extension APlay {
     func addTagParserEventHandler() {
         _tagParserSubscriber?.cancel()
-        _tagParserSubscriber = _tagParser?.eventPipeline.sink { _ in
+        _tagParserSubscriber = _tagParser?.eventPipeline.sink { [weak self] e in
+            guard let sself = self else { return }
+            print(e)
+            switch e {
+            case let .tagSize(size): sself._dataParser.info.metadataSize = UInt(size)
+            case let .flac(value): sself._dataParser.info.flacMetadata = value
+            default: break
+            }
         }
     }
 
     func addDataParserEventHandler() {
         _dataParserSubscriber?.cancel()
         _dataParserSubscriber = _dataParser.eventPipeline.sink(receiveValue: {  [weak self] event in
-            guard let self = self else { return }
+            guard let sself = self else { return }
             switch event {
             case let .createConverter(info):
-                if self.converter == nil {
-                    let result = AudioConverterNew(info.srcFormat.streamDescription, self.readFormat.streamDescription, &self.converter)
+                if sself.converter == nil {
+                    let result = AudioConverterNew(info.srcFormat.streamDescription, sself.readFormat.streamDescription, &sself.converter)
                     if result != noErr {
-                        print(result.check())
+                        print(String(describing: result.check()))
                     }
                 }
             case let .parseFailure(state):
@@ -175,8 +194,7 @@ private extension APlay {
                     print(str)
                 }
             case let .packet(val):
-                self.packets.append(val)
-                self.scheduleNextBuffer()
+                sself.packets.append(contentsOf: val)
 
             default: break
             }
@@ -206,9 +224,9 @@ private extension APlay {
                     let r = sself.configuration.retryPolicy.canRetry(with: e, count: sself._retryCount)
                     if r.0 == true {
                         DispatchQueue.main.asyncAfter(deadline: .now() + r.1) { [weak self] in
-                            guard let self = self else { return }
-                            self._downloader.download(self.urlInfo)
-                            self._retryCount = self._retryCount.addingReportingOverflow(1).partialValue
+                            guard let sself = self else { return }
+                            sself._downloader.download(sself.urlInfo, preivous: sself._urlReponse)
+                            sself._retryCount = sself._retryCount.addingReportingOverflow(1).partialValue
                         }
                     }
 
@@ -230,7 +248,15 @@ private extension APlay {
 extension APlay {
     private func readLoop() {
         // already on queue.sync
-        let result = _resourceManager.read(count: Int(_readBufferSize))
+        let sizeToReadOnce: Int = {
+            let ret = Int(_readBufferSize)
+            if _dataParser.info.fileHint == .flac || _dataParser.info.fileHint == .wave {
+                // at least 10 to avoid lag(not enough data)
+                return ret * 10
+            }
+            return ret
+        }()
+        let result = _resourceManager.read(count: sizeToReadOnce)
         switch result {
         case .targetFileLenNotSet: break
         case .lengthCanNotBeNegative: break
@@ -297,7 +323,7 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
     //
     let packetIndex = Int(reader.currentPacket)
     let packets = reader.packets
-    let isEndOfData = packetIndex >= packets.count - 1
+    let isEndOfData = packetIndex >= packets.count
     if isEndOfData {
         if reader._isParsingComplete {
             packetCount.pointee = 0
@@ -336,7 +362,7 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
         outPacketDescriptions?.pointee?.pointee.mVariableFramesInPacket = 0
     }
     packetCount.pointee = 1
-    reader.currentPacket = reader.currentPacket + 1
+    reader.currentPacket &+= 1
     
     return noErr
 }
@@ -353,6 +379,7 @@ private extension APlay {
         _playerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000 / 2)), callback: { [weak self] _ in
             guard let self = self else { return }
             self.readLoop()
+            self.scheduleNextBuffer()
 //            self.handleTimeUpdate()
 //            self.notifyTimeUpdated()
         })
@@ -407,6 +434,7 @@ private extension APlay {
         } catch ReaderError.reachedEndOfFile {
 //            os_log("Scheduler reached end of file", log: Streamer.logger, type: .debug)
             isFileSchedulingComplete = true
+            print("isFileSchedulingComplete: true")
         } catch {
             print(error)
 //            os_log("Cannot schedule buffer: %@", log: Streamer.logger, type: .debug, error.localizedDescription)

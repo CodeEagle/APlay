@@ -97,6 +97,16 @@ public struct StreamProvider {
             guard cachedURL.canReuseLocalData else { return nil }
             return try? Data(contentsOf: cachedURL)
         }
+        
+        func cleanLocalCache() {
+            if FileManager.default.fileExists(atPath: cachedURL.absoluteString) {
+                do {
+                    try FileManager.default.removeItem(at: cachedURL)
+                } catch {
+                    print("remove local cache failed: \(error)")
+                }
+            }
+        }
 
         func localContentLength() -> UInt {
             guard resourceLocation == .local else { return 0 }

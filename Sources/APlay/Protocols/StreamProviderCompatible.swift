@@ -68,7 +68,11 @@ public struct StreamProvider {
                 fileHint = .mp3
                 return
             }
-            let pathExtensionHint = URLInfo.fileHint(from: url.pathExtension)
+            // https://www.audiocheck.net/download.php?filename=Audio/audiocheck.net_hdsweep_1Hz_44000Hz_-3dBFS_30s.wav
+            var pathExtensionHint = AudioFileType.mp3
+            if let ext = url.absoluteString.split(separator: ".").last {
+                pathExtensionHint = URLInfo.fileHint(from: String(ext))
+            }
             if scheme == "file" {
                 let localFileHint = URLInfo.localFileHit(from: url)
                 if localFileHint != .mp3 {

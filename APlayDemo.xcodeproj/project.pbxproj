@@ -161,7 +161,6 @@
 			isa = PBXGroup;
 			children = (
 				1064217F23D7DFBA0083D7B4 /* MainComponents */,
-				1064218B23D7DFBA0083D7B4 /* GCDTimer.swift */,
 				1064218C23D7DFBA0083D7B4 /* Extensions */,
 				1064219523D7DFBA0083D7B4 /* APlay+Version.swift */,
 				1064219623D7DFBA0083D7B4 /* APlay.swift */,
@@ -188,6 +187,7 @@
 		1064218023D7DFBA0083D7B4 /* ResourceManager */ = {
 			isa = PBXGroup;
 			children = (
+				1064218423D7DFBA0083D7B4 /* ResourcesManager.swift */,
 			);
 			path = ResourceManager;
 			sourceTree = "<group>";
@@ -203,7 +203,6 @@
 		1064218323D7DFBA0083D7B4 /* Downloader */ = {
 			isa = PBXGroup;
 			children = (
-				1064218423D7DFBA0083D7B4 /* ResourcesManager.swift */,
 				1064218523D7DFBA0083D7B4 /* Downloader.swift */,
 			);
 			path = Downloader;
@@ -259,6 +258,7 @@
 		1064219F23D7DFBA0083D7B4 /* Vendor */ = {
 			isa = PBXGroup;
 			children = (
+				1064218B23D7DFBA0083D7B4 /* GCDTimer.swift */,
 				106421A023D7DFBA0083D7B4 /* LoopPattern.swift */,
 				106421A123D7DFBA0083D7B4 /* Clamping.swift */,
 				106421A223D7DFBA0083D7B4 /* UnfairLock.swift */,
@@ -550,13 +550,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7A9NPDDQRA;
+				DEVELOPMENT_TEAM = 8YXEE39MJF;
 				INFOPLIST_FILE = APlayDemo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.netease.APlayDemo;
+				PRODUCT_BUNDLE_IDENTIFIER = com.netease.testdemo2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -568,13 +568,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7A9NPDDQRA;
+				DEVELOPMENT_TEAM = 8YXEE39MJF;
 				INFOPLIST_FILE = APlayDemo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.netease.APlayDemo;
+				PRODUCT_BUNDLE_IDENTIFIER = com.netease.testdemo2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

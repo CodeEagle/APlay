@@ -10,7 +10,6 @@ import Foundation
 
 /// Add Equatable support for AudioStreamBasicDescription
 extension AudioStreamBasicDescription: Equatable {
-
     public static func == (source: AudioStreamBasicDescription, dst: AudioStreamBasicDescription) -> Bool {
         return dst.mFormatID == source.mFormatID &&
             dst.mSampleRate == source.mSampleRate &&

@@ -1,6 +1,6 @@
-import Combine
 import AudioToolbox
 import AVFoundation
+import Combine
 
 public final class APlay {
     @Published public private(set) var state: State = .idle
@@ -10,7 +10,7 @@ public final class APlay {
     // MARK: Player
 
     private let _engine = AVAudioEngine()
-    fileprivate let _playerNode = AVAudioPlayerNode()
+    private let _playerNode = AVAudioPlayerNode()
     public var pluginNodes: [AVAudioNode] = [] {
         didSet {
             oldValue.forEach { _engine.detach($0) }
@@ -23,7 +23,17 @@ public final class APlay {
         return AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: 2, interleaved: false)!
     }
 
+    public var volume: Float {
+        get { return _engine.mainMixerNode.outputVolume }
+        set { _engine.mainMixerNode.outputVolume = newValue }
+    }
+
+    var volumeRampTimer: Timer?
+    var volumeRampTargetValue: Float?
+
     private var _playerTimer: GCDTimer?
+    private var _currentTime: TimeInterval = 0
+    private var _duration: TimeInterval = 0
 
     // MARK: Progress
 
@@ -45,89 +55,70 @@ public final class APlay {
     private var _tagParser: MetadataParserCompatible?
     private var _tagParserSubscriber: AnyCancellable?
 
-    fileprivate var _packetCreatedCount: Int = 0
-    private var _packetHead: PacketPackage?
-    private weak var _packetTail: PacketPackage?
-    
-    fileprivate var packetHead: PacketPackage? {
-        get { return _queue.sync { self._packetHead } }
-        set { _queue.asyncWrite { self._packetHead = newValue } }
-    }
-    
-    fileprivate var packetTail: PacketPackage? {
-        get { return _queue.sync { self._packetTail } }
-        set { _queue.asyncWrite { self._packetTail = newValue } }
-    }
+    fileprivate var _packetManager: PacketManager
 
     private var _readBufferSize: AVAudioFrameCount { return AVAudioFrameCount(configuration.decodeBufferSize) }
-    
-    fileprivate var _totalPacketCount: AVAudioPacketCount? {
+
+    private var _totalPacketCount: AVAudioPacketCount? {
         guard _dataParser.info.isUpdated else {
             return nil
         }
         var packetCount = UInt64(_dataParser.info.audioDataPacketCount)
         if _dataParser.info.metadataSize != 0 {
             // TODO: reduce packetCount if needed
-            
+
             // remove haeder padding for flac to get precis packet count
             if _dataParser.info.fileHint == .flac, let paddings = _dataParser.info.flacMetadata?.paddings {
-                let totalPaddingSize = paddings.reduce(0, { $0 + $1.length })
+                let totalPaddingSize = paddings.reduce(0) { $0 + $1.length }
                 packetCount -= UInt64(ceil(Float(totalPaddingSize) / Float(_dataParser.info.packetBufferSize)))
             }
         }
-        return max(AVAudioPacketCount(packetCount), AVAudioPacketCount(_packetCreatedCount))
+        return max(AVAudioPacketCount(packetCount), AVAudioPacketCount(_packetManager.packetCount))
     }
-    
+
     fileprivate var _isParsingComplete: Bool {
-        guard let totalPacketCount = _totalPacketCount else {
-            return false
-        }
-        
-        return _packetCreatedCount == totalPacketCount
+        guard let totalPacketCount = _totalPacketCount else { return false }
+
+        return _packetManager.packetCount == totalPacketCount
     }
-    
-    
+
     public var duration: TimeInterval? {
         guard _dataParser.info.isUpdated else {
             return nil
         }
         let sampleRate = _dataParser.info.srcFormat.sampleRate
-        
+
         guard let totalFrameCount = totalFrameCount else {
             return nil
         }
-        
+
         return TimeInterval(totalFrameCount) / TimeInterval(sampleRate)
     }
-    
+
     public var totalFrameCount: AVAudioFrameCount? {
         let framesPerPacket =
             _dataParser.info.srcFormat.streamDescription.pointee.mFramesPerPacket
-        
+
         guard let totalPacketCount = _totalPacketCount else {
             return nil
         }
-        
+
         return AVAudioFrameCount(totalPacketCount) * AVAudioFrameCount(framesPerPacket)
     }
+
     // MARK: Converter
-    
+
     private var _converter: AudioConverterRef?
     private var converter: AudioConverterRef? {
         get { return _queue.sync { self._converter } }
         set { _queue.asyncWrite { self._converter = newValue } }
     }
 
-    private(set) var _currentPacket: AVAudioPacketCount = 0
-    fileprivate var currentPacket: AVAudioPacketCount {
-        get { return _queue.sync { self._currentPacket } }
-        set { _queue.asyncWrite { self._currentPacket = newValue } }
-    }
     // MARK: Others
-    
+
     /// A `TimeInterval` used to calculate the current play time relative to a seek operation.
     var currentTimeOffset: TimeInterval = 0
-    
+
     /// A `Bool` indicating whether the file has been completely scheduled into the player node.
     var isFileSchedulingComplete = false
 
@@ -146,6 +137,7 @@ public final class APlay {
     public init(configuration: ConfigurationCompatible) {
         _resourceManager = .init(configuration: configuration)
         _downloader = .init(configuration: configuration)
+        _packetManager = .init(policy: configuration.seekPolicy)
         self.configuration = configuration
         addDownloadEventHandler()
         setupAudioEngine()
@@ -156,13 +148,9 @@ public final class APlay {
 
 public extension APlay {
     func play(_ url: URL) {
-        seek(url, at: 0, info: nil)
-    }
-
-    func seek(_ url: URL, at position: StreamProvider.Position = 0, info: DataParser.Info? = nil) {
         do {
-            urlInfo = try _resourceManager.updateResource(for: url, at: position)
-            _dataParser = .init(configuration: configuration, info: info)
+            urlInfo = try _resourceManager.updateResource(for: url, at: 0)
+            _dataParser = .init(configuration: configuration, info: nil)
             _dataParser.info.fileHint = urlInfo.fileHint
             _tagParser = urlInfo.tagParser(with: configuration)
             addTagParserEventHandler()
@@ -172,7 +160,7 @@ public extension APlay {
                 _downloader.download(urlInfo)
             } else {
                 let total = UInt64(urlInfo.localContentLength())
-                _resourceManager.readWritePipeline.targetFileLength = total > position ? total - position : 0
+                _resourceManager.readWritePipeline.targetFileLength = total
             }
             if let c = converter { AudioConverterReset(c) }
             // start parse and convert
@@ -182,15 +170,98 @@ public extension APlay {
                     try _engine.start()
                 } catch {
                     print(error)
-//                    os_log("Failed to start engine: %@", log: Streamer.logger, type: .error, error.localizedDescription)
+                    //                    os_log("Failed to start engine: %@", log: Streamer.logger, type: .error, error.localizedDescription)
                 }
             }
+            let lastVolume = volumeRampTargetValue ?? volume
+            volume = 0
             _playerNode.play()
-            _engine.mainMixerNode.outputVolume = 1
+            swellVolume(to: lastVolume)
+            state = .playing
         } catch {
             state = .unknown(error)
             print(error)
         }
+    }
+
+    func seek(at time: TimeInterval = 0) {
+        guard configuration.seekPolicy == .enable else { return }
+        // Get the proper time and packet offset for the seek operation
+        guard let frameOffset = frameOffset(forTime: time),
+            let packetOffset = packetOffset(forFrame: frameOffset) else {
+            return
+        }
+        currentTimeOffset = time
+        isFileSchedulingComplete = false
+
+        // We need to store whether or not the player node is currently playing to properly resume playback after
+        let isPlaying = _playerNode.isPlaying
+        let lastVolume = volumeRampTargetValue ?? volume
+
+        // Stop the player node to reset the time offset to 0
+        _playerNode.stop()
+        volume = 0
+
+        // Perform the seek to the proper packet offset
+        _packetManager.changeNextSchedulePacketId(to: Int(packetOffset))
+
+        // If the player node was previous playing then resume playback
+        if isPlaying {
+            _playerNode.play()
+        }
+        state = .playing
+        // Update the current time
+//               delegate?.streamer(self, updatedCurrentTime: time)
+        // After 250ms we restore the volume back to where it was
+        swellVolume(to: lastVolume)
+    }
+
+    func swellVolume(to newVolume: Float, duration: TimeInterval = 0.5, delayMS: Int = 0) {
+        volumeRampTargetValue = newVolume
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delayMS + Int(duration * 1000 / 2))) { [weak self] in
+            guard let sself = self else { return }
+            sself.volumeRampTimer?.invalidate()
+            let timer = Timer(timeInterval: Double(Float(duration / 2.0) / (newVolume * 10)), repeats: true) { [weak self] timer in
+                guard let sself = self else { return }
+                if sself.volume != newVolume {
+                    sself.volume = min(newVolume, sself.volume + 0.1)
+                } else {
+                    sself.volumeRampTimer = nil
+                    sself.volumeRampTargetValue = nil
+                    timer.invalidate()
+                }
+            }
+            RunLoop.current.add(timer, forMode: .common)
+            sself.volumeRampTimer = timer
+        }
+    }
+
+    func frameOffset(forTime time: TimeInterval) -> AVAudioFramePosition? {
+        guard _dataParser.info.isUpdated,
+            let frameCount = totalFrameCount,
+            let duration = duration else {
+            return nil
+        }
+
+        let ratio = time / duration
+        return AVAudioFramePosition(Double(frameCount) * ratio)
+    }
+
+    func packetOffset(forFrame frame: AVAudioFramePosition) -> AVAudioPacketCount? {
+        guard _dataParser.info.isUpdated else { return nil }
+        let framesPerPacket = _dataParser.info.srcFormat.streamDescription.pointee.mFramesPerPacket
+
+        return AVAudioPacketCount(frame) / AVAudioPacketCount(framesPerPacket)
+    }
+
+    func timeOffset(forFrame frame: AVAudioFrameCount) -> TimeInterval? {
+        guard _dataParser.info.isUpdated,
+            let frameCount = totalFrameCount,
+            let duration = duration else {
+            return nil
+        }
+
+        return TimeInterval(frame) / TimeInterval(frameCount) * duration
     }
 }
 
@@ -212,7 +283,7 @@ private extension APlay {
 
     func addDataParserEventHandler() {
         _dataParserSubscriber?.cancel()
-        _dataParserSubscriber = _dataParser.eventPipeline.sink(receiveValue: {  [weak self] event in
+        _dataParserSubscriber = _dataParser.eventPipeline.sink(receiveValue: { [weak self] event in
             guard let sself = self else { return }
             switch event {
             case let .createConverter(info):
@@ -222,25 +293,9 @@ private extension APlay {
                         print(String(describing: result.check()))
                     }
                 }
-            case let .parseFailure(state):
-                if let str = state.check() {
-                    print(str)
-                }
-            case let .packet(val):
-                
-                for item in val {
-                    if sself.packetHead == nil {
-                        sself.packetHead = PacketPackage(index: sself._packetCreatedCount, data: item.0, packetDesc: item.1)
-                        sself.packetTail = sself.packetHead
-                    } else {
-                        let next = PacketPackage(index: sself._packetCreatedCount, data: item.0, packetDesc: item.1)
-                        if sself.packetTail?.next == nil {
-                            sself.packetTail?.next = next
-                        }
-                        sself.packetTail = next
-                    }
-                    sself._packetCreatedCount &+= 1
-                }
+            case let .parseFailure(state): if let str = state.check() { print(str) }
+
+            case let .packet(val): sself._packetManager.createPacket(val)
 
             default: break
             }
@@ -288,7 +343,6 @@ private extension APlay {
     }
 }
 
-
 // MARK: - Parse Data
 
 extension APlay {
@@ -314,7 +368,9 @@ extension APlay {
         }
     }
 }
+
 // MARK: - Converter
+
 private extension APlay {
     func read(_ frames: AVAudioFrameCount) throws -> AVAudioPCMBuffer {
         guard converter != nil else {
@@ -322,53 +378,53 @@ private extension APlay {
         }
         let framesPerPacket = readFormat.streamDescription.pointee.mFramesPerPacket
         var packets = frames / framesPerPacket
-        
+
         /// Allocate a buffer to hold the target audio data in the Read format
         guard let buffer = AVAudioPCMBuffer(pcmFormat: readFormat, frameCapacity: frames) else {
             throw ReaderError.failedToCreatePCMBuffer
         }
         buffer.frameLength = frames
-        
+
         // Try to read the frames from the parser
 //        try _queue.sync {
-            let context = unsafeBitCast(self, to: UnsafeMutableRawPointer.self)
-            let status = AudioConverterFillComplexBuffer(converter!, ReaderConverterCallback, context, &packets, buffer.mutableAudioBufferList, nil)
-            guard status == noErr else {
-                switch status {
-                case ReaderMissingSourceFormatError:
-                    throw ReaderError.parserMissingDataFormat
-                case ReaderReachedEndOfDataError:
-                    throw ReaderError.reachedEndOfFile
-                case ReaderNotEnoughDataError:
-                    throw ReaderError.notEnoughData
-                default:
-                    throw ReaderError.converterFailed(status)
-                }
+        let context = unsafeBitCast(self, to: UnsafeMutableRawPointer.self)
+        let status = AudioConverterFillComplexBuffer(converter!, ReaderConverterCallback, context, &packets, buffer.mutableAudioBufferList, nil)
+        guard status == noErr else {
+            switch status {
+            case ReaderMissingSourceFormatError:
+                throw ReaderError.parserMissingDataFormat
+            case ReaderReachedEndOfDataError:
+                throw ReaderError.reachedEndOfFile
+            case ReaderNotEnoughDataError:
+                throw ReaderError.notEnoughData
+            default:
+                throw ReaderError.converterFailed(status)
             }
+        }
 //        }
         return buffer
     }
 }
 
-func ReaderConverterCallback(_ converter: AudioConverterRef,
+func ReaderConverterCallback(_: AudioConverterRef,
                              _ packetCount: UnsafeMutablePointer<UInt32>,
                              _ ioData: UnsafeMutablePointer<AudioBufferList>,
                              _ outPacketDescriptions: UnsafeMutablePointer<UnsafeMutablePointer<AudioStreamPacketDescription>?>?,
                              _ context: UnsafeMutableRawPointer?) -> OSStatus {
     let reader = Unmanaged<APlay>.fromOpaque(context!).takeUnretainedValue()
-    
+
     //
     // Make sure we have a valid source format so we know the data format of the parser's audio packets
     //
     let sourceFormat = reader._dataParser.info.srcFormat
-    
+
     //
     // Check if we've reached the end of the packets. We have two scenarios:
     //     1. We've reached the end of the packet data and the file has been completely parsed
     //     2. We've reached the end of the data we currently have downloaded, but not the file
     //
-    let packetIndex = Int(reader.currentPacket)
-    let packetsCreatedCount = reader._packetCreatedCount
+    let packetIndex = reader._packetManager.toSchedulePacketId
+    let packetsCreatedCount = reader._packetManager.packetCount
     let isEndOfData = packetIndex >= packetsCreatedCount
     if isEndOfData {
         if reader._isParsingComplete {
@@ -378,26 +434,26 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
             return ReaderNotEnoughDataError
         }
     }
-    
+
     //
     // Copy data over (note we've only processing a single packet of data at a time)
     //
-//    let packet = packets[packetIndex]
-    guard let packet = reader.packetHead else {
+
+    guard let packet = reader._packetManager.nextPacket() else {
         return ReaderNOPlayHEAD
     }
     let data = packet.data
     let dataCount = data.count
     ioData.pointee.mNumberBuffers = 1
     ioData.pointee.mBuffers.mData = UnsafeMutableRawPointer.allocate(byteCount: dataCount, alignment: 0)
-    
+
 //    _ = data.withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) in
 //        memcpy((ioData.pointee.mBuffers.mData?.assumingMemoryBound(to: UInt8.self))!, bytes, dataCount)
 //    }
-    var ptr: [UInt8] = data.compactMap({ $0 })
+    var ptr: [UInt8] = data.compactMap { $0 }
     memcpy((ioData.pointee.mBuffers.mData?.assumingMemoryBound(to: UInt8.self))!, &ptr, dataCount)
     ioData.pointee.mBuffers.mDataByteSize = UInt32(dataCount)
-    
+
     //
     // Handle packet descriptions for compressed formats (MP3, AAC, etc)
     //
@@ -411,10 +467,10 @@ func ReaderConverterCallback(_ converter: AudioConverterRef,
         outPacketDescriptions?.pointee?.pointee.mVariableFramesInPacket = 0
     }
     packetCount.pointee = 1
-    reader.currentPacket &+= 1
-    reader.packetHead = reader.packetHead?.next
+    reader._packetManager.increaseScheduledPacketId()
     return noErr
 }
+
 // MARK: - Player
 
 private extension APlay {
@@ -426,13 +482,31 @@ private extension APlay {
 
         let interval = 1 / (readFormat.sampleRate / Double(_readBufferSize))
         _playerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000 / 2)), callback: { [weak self] _ in
-            guard let self = self else { return }
-            self.readLoop()
-            self.scheduleNextBuffer()
+            guard let sself = self else { return }
+            sself.readLoop()
+            sself.scheduleNextBuffer()
 //            self.handleTimeUpdate()
 //            self.notifyTimeUpdated()
-//            print(self.currentTime)
-//            print(self.duration)
+            let delta = sself._duration - sself._currentTime
+            if delta <= 0.01, sself._duration != 0 {
+                print("play complete, delta:\(delta)")
+                sself._playerTimer?.pause()
+                sself._packetManager.reset()
+                return
+            }
+
+            let t = floor(sself.currentTime)
+            if t != floor(sself._currentTime) {
+                sself._currentTime = sself.currentTime
+                if sself._currentTime > sself._duration, sself._duration != 0 {
+                    sself._currentTime = sself._duration
+                }
+                print(sself._currentTime)
+            }
+            if let d = sself.duration, d != sself._duration {
+                sself._duration = d
+                print("duration: \(d)")
+            }
         })
         _playerTimer?.pause()
     }
@@ -465,7 +539,7 @@ private extension APlay {
             _engine.connect(_playerNode, to: _engine.mainMixerNode, format: readFormat)
         }
     }
-    
+
     var currentTime: TimeInterval {
         guard let nodeTime = _playerNode.lastRenderTime,
             let playerTime = _playerNode.playerTime(forNodeTime: nodeTime) else {
@@ -474,7 +548,7 @@ private extension APlay {
         let currentTime = TimeInterval(playerTime.sampleTime) / playerTime.sampleRate
         return currentTime + currentTimeOffset
     }
-    
+
     // MARK: - Scheduling Buffers
 
     func scheduleNextBuffer() {
@@ -499,10 +573,13 @@ private extension APlay {
     }
 }
 
-let ReaderReachedEndOfDataError: OSStatus = 932332581
-let ReaderNotEnoughDataError: OSStatus = 932332582
-let ReaderMissingSourceFormatError: OSStatus = 932332583
-let ReaderNOPlayHEAD: OSStatus = 932332584
+
+
+let ReaderReachedEndOfDataError: OSStatus = 932_332_581
+let ReaderNotEnoughDataError: OSStatus = 932_332_582
+let ReaderMissingSourceFormatError: OSStatus = 932_332_583
+let ReaderNOPlayHEAD: OSStatus = 932_332_584
+
 // MARK: - ReaderError
 
 public enum ReaderError: LocalizedError {
@@ -515,12 +592,12 @@ public enum ReaderError: LocalizedError {
     case parserMissingDataFormat
     case reachedEndOfFile
     case unableToCreateConverter(OSStatus)
-    
+
     public var errorDescription: String? {
         switch self {
         case .cannotLockQueue:
             return "Failed to lock queue"
-        case .converterFailed(let status):
+        case let .converterFailed(status):
             return localizedDescriptionFromConverterError(status)
         case .failedToCreateDestinationFormat:
             return "Failed to create a destination (processing) format"
@@ -532,13 +609,13 @@ public enum ReaderError: LocalizedError {
             return "Parser is missing a valid data format"
         case .reachedEndOfFile:
             return "Reached the end of the file"
-        case .unableToCreateConverter(let status):
+        case let .unableToCreateConverter(status):
             return localizedDescriptionFromConverterError(status)
         case .waitForConverter:
             return "Wait for converter"
         }
     }
-    
+
     func localizedDescriptionFromConverterError(_ status: OSStatus) -> String {
         switch status {
         case kAudioConverterErr_FormatNotSupported:
@@ -559,12 +636,12 @@ public enum ReaderError: LocalizedError {
             return "Input sample rate out of range"
         case kAudioConverterErr_OutputSampleRateOutOfRange:
             return "Output sample rate out of range"
-#if os(iOS)
-        case kAudioConverterErr_HardwareInUse:
-            return "Hardware is in use"
-        case kAudioConverterErr_NoHardwarePermission:
-            return "No hardware permission"
-#endif
+        #if os(iOS)
+            case kAudioConverterErr_HardwareInUse:
+                return "Hardware is in use"
+            case kAudioConverterErr_NoHardwarePermission:
+                return "No hardware permission"
+        #endif
         default:
             return "Unspecified error"
         }

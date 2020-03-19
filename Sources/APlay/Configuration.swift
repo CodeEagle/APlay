@@ -42,16 +42,18 @@ extension APlay {
         public let isAutoFillID3InfoToNowPlayingCenter: Bool
         /** 自动处理中断事件 */
         public let isAutoHandlingInterruptEvent: Bool
-        /// If YES then volume control will be enabled on iOS
-        public let isEnabledVolumeMixer: Bool
-        /// A pointer to a 0 terminated array of band frequencies (iOS 5.0 and later, OSX 10.9 and later)
-        public let equalizerBandFrequencies: [Float]
         /// logger
         public let logger: LoggerCompatible
         /// Retry Policy
         public let retryPolicy: RetryPolicy
         /// Remote Data Verify Policy
         public let remoteDataVerifyPolicy: RemoteDataVerifyPolicy
+        /**
+         Seek Policy, default enable
+ 
+         If playing a big file, like 100MB or bigger(flac or other lossless file), is better to **disable** seek to reduce memory usage
+         */
+        public let seekPolicy: SeekPolicy
 
         /// streamer factory
 //        public private(set) var streamerBuilder: StreamerBuilder = { Streamer(config: $0) }
@@ -93,13 +95,12 @@ extension APlay {
                     networkPolicy: NetworkPolicy = .noRestrict,
                     retryPolicy: RetryPolicy = .retry { _ -> RetryPolicy.Config in .init() },
                     remoteDataVerifyPolicy: RemoteDataVerifyPolicy = .md5Verifier,
+                    seekPolicy: SeekPolicy = .enable,
                     predefinedHttpHeaderValues: [String: String] = [:],
                     automaticAudioSessionHandlingEnabled: Bool = true,
                     maxRemoteStreamOpenRetry: UInt = 5,
-                    equalizerBandFrequencies: [Float] = [50, 100, 200, 400, 800, 1600, 2600, 16000],
                     autoFillID3InfoToNowPlayingCenter: Bool = true,
                     autoHandlingInterruptEvent: Bool = true,
-                    enableVolumeMixer: Bool = true,
                     sessionBuilder: SessionBuilder? = nil,
                     sessionDelegateBuilder: SessionDelegateBuilder? = nil,
                     loggerBuilder: LoggerBuilder? = nil,
@@ -121,11 +122,10 @@ extension APlay {
             self.networkPolicy = networkPolicy
             self.retryPolicy = retryPolicy
             self.remoteDataVerifyPolicy = remoteDataVerifyPolicy
+            self.seekPolicy = seekPolicy
             self.predefinedHttpHeaderValues = predefinedHttpHeaderValues
             isEnabledAutomaticAudioSessionHandling = automaticAudioSessionHandlingEnabled
             self.maxRemoteStreamOpenRetry = maxRemoteStreamOpenRetry
-            self.equalizerBandFrequencies = equalizerBandFrequencies
-            isEnabledVolumeMixer = enableVolumeMixer
             isAutoFillID3InfoToNowPlayingCenter = autoFillID3InfoToNowPlayingCenter
             isAutoHandlingInterruptEvent = autoHandlingInterruptEvent
 
@@ -167,7 +167,7 @@ extension APlay {
                 if isEnabledAutomaticAudioSessionHandling {
                     do {
                         let instance = AVAudioSession.sharedInstance()
-                        try instance.setCategory(.playback, mode: .default, policy: .longFormAudio)
+                        try instance.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [.allowBluetoothA2DP, .allowBluetooth, .allowAirPlay, .defaultToSpeaker])
                         try instance.setActive(true)
                     } catch {
                         debug_log("error: \(error)")
@@ -283,6 +283,8 @@ extension APlay.Configuration {
             }
         }
     }
+
+    public enum SeekPolicy { case disable, enable }
 
     public enum RemoteDataVerifyPolicy {
         case none

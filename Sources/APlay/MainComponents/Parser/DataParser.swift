@@ -11,7 +11,7 @@ public final class DataParser {
     private(set) var info = Info()
 
     @Published private var _event: Event = .idle
-    
+
     public var eventPipeline: AnyPublisher<Event, Never> { $_event.eraseToAnyPublisher() }
 
     init(configuration: ConfigurationCompatible, info: Info?) {
@@ -212,7 +212,7 @@ extension DataParser {
                 list.append((packetData, nil))
             }
         }
-        self._event = .packet(list)
+        _event = .packet(list)
     }
 
     /// Decoder Info
@@ -266,7 +266,7 @@ extension DataParser {
         func update(metadata size: UInt) {
             metadataSize = size
         }
-        
+
         func update(from info: Info) {
             srcFormat = info.srcFormat
             dstFormat = info.dstFormat

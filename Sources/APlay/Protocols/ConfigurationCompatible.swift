@@ -20,10 +20,9 @@ public protocol ConfigurationCompatible: AnyObject {
     var networkPolicy: APlay.Configuration.NetworkPolicy { get }
     var retryPolicy: APlay.Configuration.RetryPolicy { get }
     var remoteDataVerifyPolicy: APlay.Configuration.RemoteDataVerifyPolicy { get }
+    var seekPolicy: APlay.Configuration.SeekPolicy { get }
     var predefinedHttpHeaderValues: [String: String] { get }
     var isEnabledAutomaticAudioSessionHandling: Bool { get }
-    var isEnabledVolumeMixer: Bool { get }
-    var equalizerBandFrequencies: [Float] { get }
     var logger: LoggerCompatible { get }
     var isAutoFillID3InfoToNowPlayingCenter: Bool { get }
     var isAutoHandlingInterruptEvent: Bool { get }

@@ -27,7 +27,7 @@ public final class ReadWritePipe {
         do {
             _writePipe = try .init(forWritingTo: url)
             _writePipe?.seekToEndOfFile()
-        } catch { }
+        } catch {}
     }
 
     var storePath: String { _storePath }

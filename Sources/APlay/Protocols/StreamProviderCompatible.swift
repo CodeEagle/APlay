@@ -97,7 +97,7 @@ public struct StreamProvider {
             guard cachedURL.canReuseLocalData else { return nil }
             return try? Data(contentsOf: cachedURL)
         }
-        
+
         func cleanLocalCache() {
             if FileManager.default.fileExists(atPath: cachedURL.absoluteString) {
                 do {

@@ -54,6 +54,7 @@ public struct StreamProvider {
         public var contentLength: UInt64 {
             return isRemote ? remoteContentLength : localContentLength()
         }
+
         private init() {
             startPosition = 0
             originalURL = .URLInfoNone

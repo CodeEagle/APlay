@@ -38,13 +38,16 @@ public final class APlay {
         get { return _queue.sync { self._renderProgress } }
         set { _queue.asyncWrite { self._renderProgress = newValue } }
     }
+
     private var _duration: TimeInterval = 0
     private var _currentTime: TimeInterval = 0
     public private(set) var playlist: PlayList = .init()
+
     // MARK: Event
+
     private var _eventSubject: CurrentValueSubject<Event, Never> = .init(.state(.idle))
     public var eventPublisher: AnyPublisher<Event, Never> { _eventSubject.eraseToAnyPublisher() }
-    
+
     // MARK: Progress
 
     public var progressPublisher: AnyPublisher<URLSessionDelegator.Info, Never> { _progressSubject.eraseToAnyPublisher() }
@@ -125,6 +128,7 @@ public final class APlay {
         }
         return 0
     }
+
 //    public var duration: TimeInterval? {
 //        guard _dataParser.info.isUpdated else { return nil }
 //        let sampleRate = _dataParser.info.srcFormat.sampleRate
@@ -220,7 +224,7 @@ public extension APlay {
         }
         _play(url)
     }
-    
+
     /// play next song in list
     func next() {
         guard let url = playlist.nextURL() else { return }
@@ -234,12 +238,12 @@ public extension APlay {
         _play(url)
         indexChanged()
     }
-    
+
     private func indexChanged() {
         let index = playlist.playingIndex
         _eventSubject.send(.playingIndexChanged(index))
     }
-    
+
     private func resetConverter() {
         currentTimeOffset = 0
         isFileSchedulingComplete = false
@@ -252,7 +256,7 @@ public extension APlay {
             converter = nil
         }
     }
-    
+
     private func _play(_ url: URL) {
         do {
             resetConverter()
@@ -272,7 +276,7 @@ public extension APlay {
             // start parse and convert
             _readerTimer?.resume()
             _playerTimer?.resume()
-            if _engine.isRunning  == false {
+            if _engine.isRunning == false {
                 do { try _engine.start() }
                 catch { print(error) }
             }
@@ -286,7 +290,7 @@ public extension APlay {
             _eventSubject.send(.state(state))
         }
     }
-    
+
     func changeList(to value: [URL], at index: Int) {
         playlist.changeList(to: value, at: index)
         let list = playlist.list
@@ -594,35 +598,33 @@ private extension APlay {
             sself.readLoop()
         })
         _readerTimer?.pause()
-        
-        _playerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000)), callback: { [weak self] _ in
-                    guard let sself = self else { return }
-                    sself.scheduleNextBuffer()
-        //            self.handleTimeUpdate()
-        //            self.notifyTimeUpdated()
-                    let delta = sself._duration - sself.currentTime
-                    if delta <= 0.9, sself._duration != 0 {
-                        print("play complete, delta:\(delta)")
-                        sself._playerTimer?.pause()
-                        sself._packetManager.reset()
-                        sself.next()
-                        return
-                    }
 
-                    let t = floor(sself.currentTime)
-                    if t != floor(sself._currentTime) {
-                        sself._currentTime = sself.currentTime
-                        if sself._currentTime > sself._duration, sself._duration != 0 {
-                            sself._currentTime = sself._duration
-                        }
-                        print(sself._currentTime)
-                    }
+        _playerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000)), callback: { [weak self] _ in
+            guard let sself = self else { return }
+            sself.scheduleNextBuffer()
+            let delta = sself._duration - sself.currentTime
+            if delta <= 0.9, sself._duration != 0 {
+                print("play complete, delta:\(delta)")
+                sself._playerTimer?.pause()
+                sself._packetManager.reset()
+                sself.next()
+                return
+            }
+
+            let t = floor(sself.currentTime)
+            if t != floor(sself._currentTime) {
+                sself._currentTime = sself.currentTime
+                if sself._currentTime > sself._duration, sself._duration != 0 {
+                    sself._currentTime = sself._duration
+                }
+                print(sself._currentTime)
+            }
             let d = TimeInterval(sself.duration)
-            if  d != sself._duration {
-                        sself._duration = d
-                        print("duration: \(d)")
-                    }
-                })
+            if d != sself._duration {
+                sself._duration = d
+                print("duration: \(d)")
+            }
+        })
         _playerTimer?.pause()
     }
 
@@ -656,19 +658,12 @@ private extension APlay {
     }
 
     var currentTime: TimeInterval {
-//        guard let nodeTime = _playerNode.lastRenderTime,
-//            let playerTime = _playerNode.playerTime(forNodeTime: nodeTime) else {
-//            return currentTimeOffset
-//        }
-//        let currentTime = TimeInterval(playerTime.sampleTime) / playerTime.sampleRate
         return Double(renderProgress / Float(_dataParser.info.dstFormat.mSampleRate)) + currentTimeOffset
-//        return currentTime + currentTimeOffset
     }
 
     // MARK: - Scheduling Buffers
 
     func scheduleNextBuffer() {
-
         guard isFileSchedulingComplete == false else { return }
 
         do {

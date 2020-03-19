@@ -140,7 +140,7 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
     }
 
     public func urlSession(_: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        os_log("%@ - %d: receive response: %@", log: Downloader.logger, type: .debug, #function, #line, response)
+//        os_log("%@ - %d: receive response: %@", log: Downloader.logger, type: .debug, #function, #line, response)
         guard response.expectedContentLength > 0 else {
             event = .onResponse(response)
             event = .completed(NSError(domain: "", code: -1, userInfo: ["msg": "response.expectedContentLength < 0"]))
@@ -165,7 +165,7 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
     }
 
     public func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive data: Data) {
-        os_log("%@ - %d: didReceive data: %d", log: Downloader.logger, type: .debug, #function, #line, data.count)
+//        os_log("%@ - %d: didReceive data: %d", log: Downloader.logger, type: .debug, #function, #line, data.count)
         let dataCount = UInt64(data.count)
         currentTaskReceivedTotalBytes += dataCount
         let info: Info = _queue.sync { .init(_totalBytes, _startPosition, _currentTaskReceivedTotalBytes) }
@@ -173,7 +173,7 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
     }
 
     public func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Swift.Error?) {
-        os_log("%@ - %d: didCompleteWithError: %@", log: Downloader.logger, type: .debug, #function, #line, String(describing: error))
+//        os_log("%@ - %d: didCompleteWithError: %@", log: Downloader.logger, type: .debug, #function, #line, String(describing: error))
         event = .completed(error)
     }
 }

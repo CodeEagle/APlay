@@ -12,6 +12,7 @@ import UIKit
 class ViewController: UIViewController {
     let player = APlay(configuration: APlay.Configuration(seekPolicy: .enable))
     let mp3s: [URL] = [
+        URL(string: "https://raw.githubusercontent.com/CodeEagle/FreePlayer/master/FPDemo/%E4%B9%85%E8%BF%9C-%E5%85%89%E3%81%A8%E6%B3%A2%E3%81%AE%E8%AE%B0%E5%BF%86.mp3")!,
         URL(string: "https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_700KB.mp3")!,
         URL(string: "https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_1MG.mp3")!,
         URL(string: "https://file-examples.com/wp-content/uploads/2017/11/file_example_MP3_2MG.mp3")!,
@@ -31,7 +32,7 @@ class ViewController: UIViewController {
         ]
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [.allowBluetoothA2DP, .allowBluetooth, .allowAirPlay, .defaultToSpeaker])
+            try session.setCategory(.playback, mode: .default, policy: .default, options: [.allowBluetoothA2DP, .allowBluetooth, .allowAirPlay, .defaultToSpeaker])
             try session.setActive(true)
         } catch {
 //            os_log("Failed to activate audio session: %@", log: ViewController.logger, type: .default, #function, #line, error.localizedDescription)
@@ -40,10 +41,10 @@ class ViewController: UIViewController {
         let url = Bundle.main.url(forResource: "testAudio", withExtension: nil)!
 //        let url = Bundle.main.url(forResource: "nameless", withExtension: "m4a")!
 //        let url = wavs[0]
-        player.play(url)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            self.player.seek(at: 30)
-        }
+        player.play(mp3s[0], url)
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+//            self.player.seek(at: 30)
+//        }
         let routePickerView = AVRoutePickerView()
         view.addSubview(routePickerView)
         routePickerView.translatesAutoresizingMaskIntoConstraints = false

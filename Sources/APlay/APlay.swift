@@ -28,13 +28,23 @@ public final class APlay {
         set { _engine.mainMixerNode.outputVolume = newValue }
     }
 
-    var volumeRampTimer: Timer?
-    var volumeRampTargetValue: Float?
+    private var volumeRampTimer: GCDTimer?
+    private var volumeRampTargetValue: Float?
 
+    private var _readerTimer: GCDTimer?
     private var _playerTimer: GCDTimer?
-    private var _currentTime: TimeInterval = 0
+    private lazy var _renderProgress: Float = 0
+    private var renderProgress: Float {
+        get { return _queue.sync { self._renderProgress } }
+        set { _queue.asyncWrite { self._renderProgress = newValue } }
+    }
     private var _duration: TimeInterval = 0
-
+    private var _currentTime: TimeInterval = 0
+    public private(set) var playlist: PlayList = .init()
+    // MARK: Event
+    private var _eventSubject: CurrentValueSubject<Event, Never> = .init(.state(.idle))
+    public var eventPublisher: AnyPublisher<Event, Never> { _eventSubject.eraseToAnyPublisher() }
+    
     // MARK: Progress
 
     public var progressPublisher: AnyPublisher<URLSessionDelegator.Info, Never> { _progressSubject.eraseToAnyPublisher() }
@@ -82,26 +92,52 @@ public final class APlay {
         return _packetManager.packetCount == totalPacketCount
     }
 
-    public var duration: TimeInterval? {
-        guard _dataParser.info.isUpdated else {
-            return nil
+    var duration: Float {
+        let _srcFormat = _dataParser.info.srcFormat.streamDescription.pointee
+        let framesPerPacket = _srcFormat.mFramesPerPacket
+        let rate = _srcFormat.mSampleRate
+        if _dataParser.info.audioDataPacketCount > 0, framesPerPacket > 0 {
+            return Float(_dataParser.info.audioDataPacketCount) * Float(framesPerPacket) / Float(rate)
         }
-        let sampleRate = _dataParser.info.srcFormat.sampleRate
-
-        guard let totalFrameCount = totalFrameCount else {
-            return nil
+        // Not enough data provided by the format, use bit rate based estimation
+        var audioFileLength: UInt64 = 0
+        let _audioDataByteCount = UInt64(_dataParser.info.audioDataByteCount)
+        let _metaDataSizeInBytes = UInt64(_dataParser.info.metadataSize)
+        let contentLength = urlInfo.contentLength
+        if _audioDataByteCount > 0 {
+            audioFileLength = _audioDataByteCount
+        } else {
+            // FIXME: May minus more bytes
+            /// http://www.beaglebuddy.com/content/pages/javadocs/index.html
+            if contentLength > _metaDataSizeInBytes {
+                audioFileLength = contentLength - _metaDataSizeInBytes
+            }
         }
-
-        return TimeInterval(totalFrameCount) / TimeInterval(sampleRate)
+        if audioFileLength > 0 {
+            let bitrate = Float(_dataParser.info.bitrate)
+            // 总播放时间 = 文件大小 * 8 / 比特率
+            let rate = ceil(bitrate / 1000) * 1000 * 0.125
+            if rate > 0 {
+                let length = Float(audioFileLength)
+                let dur = floor(length / rate)
+                return dur
+            }
+        }
+        return 0
     }
+//    public var duration: TimeInterval? {
+//        guard _dataParser.info.isUpdated else { return nil }
+//        let sampleRate = _dataParser.info.srcFormat.sampleRate
+//
+//        guard let totalFrameCount = totalFrameCount else { return nil }
+//
+//        return TimeInterval(totalFrameCount) / TimeInterval(sampleRate)
+//    }
 
     public var totalFrameCount: AVAudioFrameCount? {
-        let framesPerPacket =
-            _dataParser.info.srcFormat.streamDescription.pointee.mFramesPerPacket
+        let framesPerPacket = _dataParser.info.srcFormat.streamDescription.pointee.mFramesPerPacket
 
-        guard let totalPacketCount = _totalPacketCount else {
-            return nil
-        }
+        guard let totalPacketCount = _totalPacketCount else { return nil }
 
         return AVAudioFrameCount(totalPacketCount) * AVAudioFrameCount(framesPerPacket)
     }
@@ -147,8 +183,79 @@ public final class APlay {
 // MARK: - Public API
 
 public extension APlay {
-    func play(_ url: URL) {
+    /// play with a autoclosure
+    ///
+    /// - Parameter url: a autoclosure to produce URL
+    func play(_ url: @autoclosure () -> URL) {
+        let u = url()
+        let urls = [u]
+        changeList(to: urls, at: 0)
+        _play(u)
+    }
+
+    /// play whit variable parametric
+    ///
+    /// - Parameter urls: variable parametric URL input
+    @inline(__always)
+    func play(_ urls: URL..., at index: Int = 0) { play(urls, at: index) }
+
+    /// play whit URL array
+    ///
+    /// - Parameter urls: URL array
+    func play(_ urls: [URL], at index: Int = 0) {
+        changeList(to: urls, at: index)
+        guard let url = playlist.currentList[safe: index] else {
+            let msg = "Can not found item at \(index) in list \(urls)"
+            _eventSubject.send(.error(.playItemNotFound(msg)))
+            return
+        }
+        _play(url)
+    }
+
+    func play(at index: Int) {
+        guard let url = playlist.play(at: index) else {
+            let msg = "Can not found item at \(index) in list \(playlist.list)"
+            _eventSubject.send(.error(.playItemNotFound(msg)))
+            return
+        }
+        _play(url)
+    }
+    
+    /// play next song in list
+    func next() {
+        guard let url = playlist.nextURL() else { return }
+        _play(url)
+        indexChanged()
+    }
+
+    /// play previous song in list
+    func previous() {
+        guard let url = playlist.previousURL() else { return }
+        _play(url)
+        indexChanged()
+    }
+    
+    private func indexChanged() {
+        let index = playlist.playingIndex
+        _eventSubject.send(.playingIndexChanged(index))
+    }
+    
+    private func resetConverter() {
+        currentTimeOffset = 0
+        isFileSchedulingComplete = false
+        _duration = 0
+        renderProgress = 0
+        _currentTime = 0
+        _downloader.cancel()
+        if let c = converter {
+            AudioConverterDispose(c)
+            converter = nil
+        }
+    }
+    
+    private func _play(_ url: URL) {
         do {
+            resetConverter()
             urlInfo = try _resourceManager.updateResource(for: url, at: 0)
             _dataParser = .init(configuration: configuration, info: nil)
             _dataParser.info.fileHint = urlInfo.fileHint
@@ -162,16 +269,12 @@ public extension APlay {
                 let total = UInt64(urlInfo.localContentLength())
                 _resourceManager.readWritePipeline.targetFileLength = total
             }
-            if let c = converter { AudioConverterReset(c) }
             // start parse and convert
+            _readerTimer?.resume()
             _playerTimer?.resume()
-            if !_engine.isRunning {
-                do {
-                    try _engine.start()
-                } catch {
-                    print(error)
-                    //                    os_log("Failed to start engine: %@", log: Streamer.logger, type: .error, error.localizedDescription)
-                }
+            if _engine.isRunning  == false {
+                do { try _engine.start() }
+                catch { print(error) }
             }
             let lastVolume = volumeRampTargetValue ?? volume
             volume = 0
@@ -180,8 +283,15 @@ public extension APlay {
             state = .playing
         } catch {
             state = .unknown(error)
-            print(error)
+            _eventSubject.send(.state(state))
         }
+    }
+    
+    func changeList(to value: [URL], at index: Int) {
+        playlist.changeList(to: value, at: index)
+        let list = playlist.list
+        _eventSubject.send(.playlistChanged(list))
+        _eventSubject.send(.playingIndexChanged(.some(UInt(index))))
     }
 
     func seek(at time: TimeInterval = 0) {
@@ -215,35 +325,33 @@ public extension APlay {
         // After 250ms we restore the volume back to where it was
         swellVolume(to: lastVolume)
     }
+}
 
-    func swellVolume(to newVolume: Float, duration: TimeInterval = 0.5, delayMS: Int = 0) {
+private extension APlay {
+    func swellVolume(to newVolume: Float, duration: TimeInterval = 0.8, delayMS _: Int = 0) {
         volumeRampTargetValue = newVolume
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delayMS + Int(duration * 1000 / 2))) { [weak self] in
+        volumeRampTimer?.invalidate()
+        volumeRampTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(duration * 1000 / 5)), callback: { [weak self] _ in
             guard let sself = self else { return }
-            sself.volumeRampTimer?.invalidate()
-            let timer = Timer(timeInterval: Double(Float(duration / 2.0) / (newVolume * 10)), repeats: true) { [weak self] timer in
-                guard let sself = self else { return }
-                if sself.volume != newVolume {
-                    sself.volume = min(newVolume, sself.volume + 0.1)
-                } else {
-                    sself.volumeRampTimer = nil
-                    sself.volumeRampTargetValue = nil
-                    timer.invalidate()
-                }
+            if sself.volume != newVolume {
+                sself.volume = min(newVolume, sself.volume + 0.1)
+            } else {
+                sself.volumeRampTimer = nil
+                sself.volumeRampTargetValue = nil
+                sself.volumeRampTimer?.invalidate()
             }
-            RunLoop.current.add(timer, forMode: .common)
-            sself.volumeRampTimer = timer
-        }
+        })
+        volumeRampTimer?.resume()
     }
 
     func frameOffset(forTime time: TimeInterval) -> AVAudioFramePosition? {
         guard _dataParser.info.isUpdated,
             let frameCount = totalFrameCount,
-            let duration = duration else {
+            duration > 0 else {
             return nil
         }
 
-        let ratio = time / duration
+        let ratio = time / TimeInterval(duration)
         return AVAudioFramePosition(Double(frameCount) * ratio)
     }
 
@@ -257,11 +365,10 @@ public extension APlay {
     func timeOffset(forFrame frame: AVAudioFrameCount) -> TimeInterval? {
         guard _dataParser.info.isUpdated,
             let frameCount = totalFrameCount,
-            let duration = duration else {
+            duration > 0 else {
             return nil
         }
-
-        return TimeInterval(frame) / TimeInterval(frameCount) * duration
+        return TimeInterval(frame) / TimeInterval(frameCount) * TimeInterval(duration)
     }
 }
 
@@ -401,6 +508,7 @@ private extension APlay {
                 throw ReaderError.converterFailed(status)
             }
         }
+        renderProgress += Float(frames)
 //        }
         return buffer
     }
@@ -481,33 +589,40 @@ private extension APlay {
         _engine.prepare()
 
         let interval = 1 / (readFormat.sampleRate / Double(_readBufferSize))
-        _playerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000 / 2)), callback: { [weak self] _ in
+        _readerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000 / 2)), callback: { [weak self] _ in
             guard let sself = self else { return }
             sself.readLoop()
-            sself.scheduleNextBuffer()
-//            self.handleTimeUpdate()
-//            self.notifyTimeUpdated()
-            let delta = sself._duration - sself._currentTime
-            if delta <= 0.01, sself._duration != 0 {
-                print("play complete, delta:\(delta)")
-                sself._playerTimer?.pause()
-                sself._packetManager.reset()
-                return
-            }
-
-            let t = floor(sself.currentTime)
-            if t != floor(sself._currentTime) {
-                sself._currentTime = sself.currentTime
-                if sself._currentTime > sself._duration, sself._duration != 0 {
-                    sself._currentTime = sself._duration
-                }
-                print(sself._currentTime)
-            }
-            if let d = sself.duration, d != sself._duration {
-                sself._duration = d
-                print("duration: \(d)")
-            }
         })
+        _readerTimer?.pause()
+        
+        _playerTimer = GCDTimer(interval: DispatchTimeInterval.milliseconds(Int(interval * 1000)), callback: { [weak self] _ in
+                    guard let sself = self else { return }
+                    sself.scheduleNextBuffer()
+        //            self.handleTimeUpdate()
+        //            self.notifyTimeUpdated()
+                    let delta = sself._duration - sself.currentTime
+                    if delta <= 0.9, sself._duration != 0 {
+                        print("play complete, delta:\(delta)")
+                        sself._playerTimer?.pause()
+                        sself._packetManager.reset()
+                        sself.next()
+                        return
+                    }
+
+                    let t = floor(sself.currentTime)
+                    if t != floor(sself._currentTime) {
+                        sself._currentTime = sself.currentTime
+                        if sself._currentTime > sself._duration, sself._duration != 0 {
+                            sself._currentTime = sself._duration
+                        }
+                        print(sself._currentTime)
+                    }
+            let d = TimeInterval(sself.duration)
+            if  d != sself._duration {
+                        sself._duration = d
+                        print("duration: \(d)")
+                    }
+                })
         _playerTimer?.pause()
     }
 
@@ -541,21 +656,18 @@ private extension APlay {
     }
 
     var currentTime: TimeInterval {
-        guard let nodeTime = _playerNode.lastRenderTime,
-            let playerTime = _playerNode.playerTime(forNodeTime: nodeTime) else {
-            return currentTimeOffset
-        }
-        let currentTime = TimeInterval(playerTime.sampleTime) / playerTime.sampleRate
-        return currentTime + currentTimeOffset
+//        guard let nodeTime = _playerNode.lastRenderTime,
+//            let playerTime = _playerNode.playerTime(forNodeTime: nodeTime) else {
+//            return currentTimeOffset
+//        }
+//        let currentTime = TimeInterval(playerTime.sampleTime) / playerTime.sampleRate
+        return Double(renderProgress / Float(_dataParser.info.dstFormat.mSampleRate)) + currentTimeOffset
+//        return currentTime + currentTimeOffset
     }
 
     // MARK: - Scheduling Buffers
 
     func scheduleNextBuffer() {
-//        guard let reader = reader else {
-//            os_log("No reader yet...", log: Streamer.logger, type: .debug)
-//            return
-//        }
 
         guard isFileSchedulingComplete == false else { return }
 
@@ -572,8 +684,6 @@ private extension APlay {
         }
     }
 }
-
-
 
 let ReaderReachedEndOfDataError: OSStatus = 932_332_581
 let ReaderNotEnoughDataError: OSStatus = 932_332_582

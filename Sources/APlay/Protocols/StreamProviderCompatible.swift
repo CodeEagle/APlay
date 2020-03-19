@@ -51,6 +51,9 @@ public struct StreamProvider {
             return coms.joined(separator: ".")
         }
 
+        public var contentLength: UInt64 {
+            return isRemote ? remoteContentLength : localContentLength()
+        }
         private init() {
             startPosition = 0
             originalURL = .URLInfoNone
@@ -108,13 +111,13 @@ public struct StreamProvider {
             }
         }
 
-        func localContentLength() -> UInt {
+        func localContentLength() -> UInt64 {
             guard resourceLocation == .local else { return 0 }
             let name = originalURL.asCFunctionString()
             var buff = stat()
             if stat(name, &buff) != 0 { return 0 }
             let size = buff.st_size
-            return UInt(size)
+            return UInt64(size)
         }
 
         func tagParser(with config: ConfigurationCompatible) -> MetadataParserCompatible? {

@@ -107,9 +107,11 @@ public extension PlayList {
         }
     }
 
-    func changeList(to value: [URL], at index: UInt) {
+    func changeList(to value: [URL], at index: Int) {
+        var idx = index
+        if index < 0 { idx = 0 }
         _queue.async(flags: .barrier) {
-            self.syncChange(to: value, at: index)
+            self.syncChange(to: value, at: UInt(idx))
         }
     }
 
@@ -120,7 +122,9 @@ public extension PlayList {
         _playingIndex = .some(index)
     }
 
-    internal func play(at index: UInt) -> URL? {
+    internal func play(at index: Int) -> URL? {
+        var idx = index
+        if index < 0 { idx = 0 }
         return _queue.sync {
             guard let url = _list[ap_safe: index] else { return nil }
             if _loopPattern == .random {
@@ -129,7 +133,7 @@ public extension PlayList {
                     return url
                 }
             }
-            _playingIndex = .some(index)
+            _playingIndex = .some(UInt(idx))
             return url
         }
     }

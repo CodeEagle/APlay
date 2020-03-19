@@ -50,7 +50,7 @@ extension APlay {
         public let remoteDataVerifyPolicy: RemoteDataVerifyPolicy
         /**
          Seek Policy, default enable
- 
+
          If playing a big file, like 100MB or bigger(flac or other lossless file), is better to **disable** seek to reduce memory usage
          */
         public let seekPolicy: SeekPolicy

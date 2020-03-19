@@ -361,6 +361,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				106421D923D7DFBA0083D7B4 /* Import.swift in Sources */,
+				106421B923D7DFBA0083D7B4 /* GCDTimer.swift in Sources */,
 				106421B323D7DFBA0083D7B4 /* InternalLogger.swift in Sources */,
 				106421C323D7DFBA0083D7B4 /* APlay.swift in Sources */,
 				106421BE23D7DFBA0083D7B4 /* APlay+Extensions.swift in Sources */,
@@ -391,7 +392,6 @@
 				106421D623D7DFBA0083D7B4 /* PlayingIndex.swift in Sources */,
 				1064216D23D7DF8A0083D7B4 /* SceneDelegate.swift in Sources */,
 				106421BA23D7DFBA0083D7B4 /* APlay+DispatchQueue.swift in Sources */,
-				106421B923D7DFBA0083D7B4 /* GCDTimer.swift in Sources */,
 				106421C623D7DFBA0083D7B4 /* ConfigurationCompatible.swift in Sources */,
 				106421C523D7DFBA0083D7B4 /* MetadataPaserCompatible.swift in Sources */,
 				106421C723D7DFBA0083D7B4 /* StreamProviderCompatible.swift in Sources */,

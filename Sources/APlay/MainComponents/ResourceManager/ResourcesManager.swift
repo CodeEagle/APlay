@@ -14,7 +14,7 @@ public final class ResourcesManager {
 
     public func remoteResourceName(for url: URL, at position: StreamProvider.Position) -> String {
         let suffix = position == 0 ? ".tmp" : ".incomplete"
-        let name = _configuration.cacheNaming.name(for: url)
+        let name = _configuration.cacheNaming.name(for: url).replacingOccurrences(of: "/", with: "")
         return name + suffix
     }
 

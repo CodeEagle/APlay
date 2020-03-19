@@ -34,12 +34,12 @@ class PacketManager {
     init(policy: APlay.Configuration.SeekPolicy) {
         self.policy = policy
     }
-    
+
     private(set) var packetCount: Int {
         get { return _queue.sync { self._packetCount } }
         set { _queue.asyncWrite { self._packetCount = newValue } }
     }
-    
+
     private(set) var toSchedulePacketId: Int {
         get { return _queue.sync { self._toSchedulePacketId } }
         set { _queue.asyncWrite { self._toSchedulePacketId = newValue } }
@@ -59,7 +59,7 @@ class PacketManager {
         get { return _queue.sync { self._list } }
         set { _queue.asyncWrite { self._list = newValue } }
     }
-    
+
     func createPacket(_ val: [(Data, AudioStreamPacketDescription?)]) {
         for item in val {
             autoreleasepool {

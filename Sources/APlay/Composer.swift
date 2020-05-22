@@ -200,7 +200,11 @@ public final class Composer {
                     sself._ringBuffer.write(data: d, amount: bytes)
                 }
             } catch {
-                print(error)
+                if let e = error as? APlay.Error {
+                    sself._eventSubject.send(.error(e))
+                } else {
+                    sself._eventSubject.send(.unknown(error))
+                }
             }
         })
         _playerTimer?.pause()

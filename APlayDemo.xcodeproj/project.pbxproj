@@ -57,6 +57,9 @@
 		106421DB23D7DFBA0083D7B4 /* APlay+Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106421B123D7DFBA0083D7B4 /* APlay+Debug.swift */; };
 		106421DC23D7DFBA0083D7B4 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106421B223D7DFBA0083D7B4 /* Configuration.swift */; };
 		106421DE23D7E0570083D7B4 /* testAudio in Resources */ = {isa = PBXBuildFile; fileRef = 106421DD23D7E0570083D7B4 /* testAudio */; };
+		10BFADA32477ABFB0085EC9C /* Uroboros.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10BFADA22477ABFB0085EC9C /* Uroboros.swift */; };
+		10C311C624776B0400795A49 /* APlay2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10C311C524776B0400795A49 /* APlay2.swift */; };
+		10C311C8247771CC00795A49 /* Composer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10C311C7247771CC00795A49 /* Composer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -112,6 +115,9 @@
 		106421B123D7DFBA0083D7B4 /* APlay+Debug.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "APlay+Debug.swift"; sourceTree = "<group>"; };
 		106421B223D7DFBA0083D7B4 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		106421DD23D7E0570083D7B4 /* testAudio */ = {isa = PBXFileReference; lastKnownFileType = file; path = testAudio; sourceTree = "<group>"; };
+		10BFADA22477ABFB0085EC9C /* Uroboros.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Uroboros.swift; sourceTree = "<group>"; };
+		10C311C524776B0400795A49 /* APlay2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APlay2.swift; sourceTree = "<group>"; };
+		10C311C7247771CC00795A49 /* Composer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +170,9 @@
 				1064218C23D7DFBA0083D7B4 /* Extensions */,
 				1064219523D7DFBA0083D7B4 /* APlay+Version.swift */,
 				1064219623D7DFBA0083D7B4 /* APlay.swift */,
+				10C311C524776B0400795A49 /* APlay2.swift */,
+				10C311C7247771CC00795A49 /* Composer.swift */,
+				10BFADA22477ABFB0085EC9C /* Uroboros.swift */,
 				1064219723D7DFBA0083D7B4 /* Protocols */,
 				1064219F23D7DFBA0083D7B4 /* Vendor */,
 				106421B023D7DFBA0083D7B4 /* Debug */,
@@ -364,6 +373,7 @@
 				106421B923D7DFBA0083D7B4 /* GCDTimer.swift in Sources */,
 				106421B323D7DFBA0083D7B4 /* InternalLogger.swift in Sources */,
 				106421C323D7DFBA0083D7B4 /* APlay.swift in Sources */,
+				10BFADA32477ABFB0085EC9C /* Uroboros.swift in Sources */,
 				106421BE23D7DFBA0083D7B4 /* APlay+Extensions.swift in Sources */,
 				106421CD23D7DFBA0083D7B4 /* UnfairLock.swift in Sources */,
 				106421CA23D7DFBA0083D7B4 /* DownloaderCompatible.swift in Sources */,
@@ -377,6 +387,7 @@
 				1064216F23D7DF8A0083D7B4 /* ViewController.swift in Sources */,
 				106421DB23D7DFBA0083D7B4 /* APlay+Debug.swift in Sources */,
 				1064216B23D7DF8A0083D7B4 /* AppDelegate.swift in Sources */,
+				10C311C8247771CC00795A49 /* Composer.swift in Sources */,
 				106421DA23D7DFBA0083D7B4 /* LateInit.swift in Sources */,
 				106421B623D7DFBA0083D7B4 /* ID3Parser.swift in Sources */,
 				106421B723D7DFBA0083D7B4 /* FlacParser.swift in Sources */,
@@ -389,6 +400,7 @@
 				106421BC23D7DFBA0083D7B4 /* APlay+FileManager.swift in Sources */,
 				106421CF23D7DFBA0083D7B4 /* Error.swift in Sources */,
 				106421C423D7DFBA0083D7B4 /* PlayerCompatible.swift in Sources */,
+				10C311C624776B0400795A49 /* APlay2.swift in Sources */,
 				106421D623D7DFBA0083D7B4 /* PlayingIndex.swift in Sources */,
 				1064216D23D7DF8A0083D7B4 /* SceneDelegate.swift in Sources */,
 				106421BA23D7DFBA0083D7B4 /* APlay+DispatchQueue.swift in Sources */,
@@ -551,6 +563,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 8YXEE39MJF;
+				GCC_OPTIMIZATION_LEVEL = s;
 				INFOPLIST_FILE = APlayDemo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

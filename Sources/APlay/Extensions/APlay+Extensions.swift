@@ -59,7 +59,7 @@ extension UnsafeMutablePointer where Pointee == UInt8 {
 }
 
 extension AudioFileStreamParseFlags {
-    static let continuity = AudioFileStreamParseFlags(rawValue: 0)
+    static let continuity = AudioFileStreamParseFlags([])
 }
 
 extension OSStatus {

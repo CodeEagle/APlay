@@ -28,4 +28,5 @@ public enum Event {
     case error(APlay.Error)
     case metadata([MetadataParser.Item])
     case flac(FlacMetadata)
+    case unknown(Error)
 }

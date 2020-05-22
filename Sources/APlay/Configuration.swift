@@ -1,3 +1,4 @@
+import UIKit
 
 extension APlay {
     /// Configuration for APlay
@@ -55,6 +56,9 @@ extension APlay {
          */
         public let seekPolicy: SeekPolicy
 
+        #if os(iOS)
+        private var ob: NSObjectProtocol?
+        #endif
         /// streamer factory
 //        public private(set) var streamerBuilder: StreamerBuilder = { Streamer(config: $0) }
 
@@ -73,11 +77,9 @@ extension APlay {
             private lazy var _backgroundTask = UIBackgroundTaskIdentifier.invalid
         #endif
 
-        #if DEBUG
-            deinit {
-                debug_log("\(self) \(#function)")
-            }
-        #endif
+        deinit {
+            if let v = ob { NotificationCenter.default.removeObserver(v) }
+        }
 
         public init(defaultCoverImage: APlayImage? = nil,
                     proxyPolicy: ProxyPolicy = .system,
@@ -154,6 +156,12 @@ extension APlay {
                 session = URLSession(configuration: URLSessionConfiguration.default)
             }
             self.decodeBufferSize = decodeBufferSize
+            #if os(iOS)
+                ob = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                    print("active")
+                    self?.endBackgroundTask(isToDownloadImage: false)
+                }
+            #endif
         }
 
         /// Start background task
@@ -173,10 +181,13 @@ extension APlay {
                         debug_log("error: \(error)")
                     }
                 }
-                endBackgroundTask(isToDownloadImage: isToDownloadImage)
-                _backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
-                    self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
-                })
+                if UIApplication.shared.applicationState == .background {
+                    print("start")
+                    endBackgroundTask(isToDownloadImage: isToDownloadImage)
+                    _backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
+                        self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
+                    })
+                }
             #elseif os(macOS)
                 print("tbd")
 //            do {

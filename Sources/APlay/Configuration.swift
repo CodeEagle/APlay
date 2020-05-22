@@ -158,7 +158,6 @@ extension APlay {
             self.decodeBufferSize = decodeBufferSize
             #if os(iOS)
                 ob = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                    print("active")
                     self?.endBackgroundTask(isToDownloadImage: false)
                 }
             #endif
@@ -182,7 +181,6 @@ extension APlay {
                     }
                 }
                 if UIApplication.shared.applicationState == .background {
-                    print("start")
                     endBackgroundTask(isToDownloadImage: isToDownloadImage)
                     _backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
                         self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)

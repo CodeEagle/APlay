@@ -200,7 +200,9 @@ public final class Composer {
                     sself._ringBuffer.write(data: d, amount: bytes)
                 }
             } catch {
-                if let e = error as? APlay.Error {
+                if case ReaderError.reachedEndOfFile = error {
+                    sself.isFileSchedulingComplete = true
+                } else if let e = error as? APlay.Error {
                     sself._eventSubject.send(.error(e))
                 } else {
                     sself._eventSubject.send(.unknown(error))

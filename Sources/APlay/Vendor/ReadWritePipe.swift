@@ -15,7 +15,7 @@ public final class ReadWritePipe {
         set { _queue.asyncWrite { self._readOffset = newValue } }
     }
 
-    public init(localPath: String) throws {
+    public init(localPath: String, position: UInt64) throws {
         let path = localPath.replacingOccurrences(of: "file://", with: "")
         // fixed empty space in filename's bug
         let p = path.removingPercentEncoding ?? path
@@ -23,6 +23,8 @@ public final class ReadWritePipe {
         _storePath = p
         FileManager.createFileIfNeeded(at: p)
         _readPipe = try .init(forReadingFrom: url)
+        _readPipe.seek(toFileOffset: position)
+        readOffset = position
         // local resource dont need to init write Pipe
         do {
             _writePipe = try .init(forWritingTo: url)

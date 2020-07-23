@@ -484,9 +484,7 @@ extension APlay {
 
 private extension APlay {
     func read(_ frames: AVAudioFrameCount) throws -> AVAudioPCMBuffer {
-        guard converter != nil else {
-            throw ReaderError.waitForConverter
-        }
+        guard converter != nil else { throw ReaderError.waitForConverter }
         let framesPerPacket = readFormat.streamDescription.pointee.mFramesPerPacket
         var packets = frames / framesPerPacket
 

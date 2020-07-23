@@ -118,10 +118,10 @@ public final class Uroboros {
     /// - Returns: size for this time read
     @discardableResult public func readInQueue(amount: UInt32, into data: UnsafeMutableRawPointer, commitRead: Bool = true) -> (UInt32, Bool) {
         return _readQueue.sync {
-            return self.read(amount: amount, into: data, commitRead: commitRead)
+            self.read(amount: amount, into: data, commitRead: commitRead)
         }
     }
-    
+
     /// Get data form uroboros
     ///
     /// - Parameters:
@@ -132,7 +132,7 @@ public final class Uroboros {
     @discardableResult public func read(amount: UInt32, into data: UnsafeMutableRawPointer, commitRead: Bool = true) -> (UInt32, Bool) {
         if amount == 0 || availableData == 0 { return (0, false) }
         let read = _propertiesQueue.sync {
-            return _availableData < amount ? _availableData : amount
+            _availableData < amount ? _availableData : amount
         }
         let intCount = Int(read)
         let targetLocation = Int(_start) + intCount
@@ -194,7 +194,7 @@ extension Uroboros {
 
         /// Pointer to our allocated memory
         private(set) var storagePointer: UnsafeMutableRawPointer!
-        
+
         /// Base address of the storage, as mapped to UInt8
         private(set) var baseAddress: UnsafeMutablePointer<Byte>?
 

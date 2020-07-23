@@ -116,7 +116,7 @@ extension Downloader {
 // MARK: - URLSessionDelegator
 
 public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
-    @Published private var _event: Event = .initialize
+    private var _event: CurrentValueSubject<Event, Never> = .init(.initialize)
     public var passthrougthDelegate: URLSessionDataDelegate?
     private var _startPosition: UInt64 = 0
     private var _totalBytes: UInt64 = 0
@@ -125,7 +125,7 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
     private var _queue: DispatchQueue = DispatchQueue(concurrentName: "URLSessionDelegator")
 
     private func reset() {
-        event = .initialize
+        event.send(.initialize)
         startPosition = 0
         totalBytes = 0
         currentTaskTotalBytes = 0
@@ -136,14 +136,14 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
         reset()
         let p = info.startPosition
         startPosition = p
-        event = .onStartPostition(p)
+        event.send(.onStartPostition(p))
     }
 
     public func urlSession(_: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
 //        os_log("%@ - %d: receive response: %@", log: Downloader.logger, type: .debug, #function, #line, response)
         guard response.expectedContentLength > 0 else {
-            event = .onResponse(response)
-            event = .completed(NSError(domain: "", code: -1, userInfo: ["msg": "response.expectedContentLength < 0"]))
+            event.send(.onResponse(response))
+            event.send(.completed(NSError(domain: "", code: -1, userInfo: ["msg": "response.expectedContentLength < 0"])))
             dataTask.cancel()
             return
         }
@@ -159,9 +159,9 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
             }
         }
         let total = totalBytes
-        event = .onTotalByte(total)
+        event.send(.onTotalByte(total))
         completionHandler(.allow)
-        event = .onResponse(response)
+        event.send(.onResponse(response))
     }
 
     public func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive data: Data) {
@@ -169,19 +169,19 @@ public final class URLSessionDelegator: NSObject, URLSessionDataDelegate, URLSes
         let dataCount = UInt64(data.count)
         currentTaskReceivedTotalBytes += dataCount
         let info: Info = _queue.sync { .init(_totalBytes, _startPosition, _currentTaskReceivedTotalBytes) }
-        event = .onData(data, info)
+        event.send(.onData(data, info))
     }
 
     public func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Swift.Error?) {
 //        os_log("%@ - %d: didCompleteWithError: %@", log: Downloader.logger, type: .debug, #function, #line, String(describing: error))
-        event = .completed(error)
+        event.send(.completed(error))
     }
 }
 
 // MARK: - Public API
 
 extension URLSessionDelegator {
-    public private(set) var event: Event {
+    public private(set) var event: CurrentValueSubject<Event, Never> {
         get { return _queue.sync { _event } }
         set { _queue.asyncWrite { self._event = newValue } }
     }
@@ -207,7 +207,7 @@ extension URLSessionDelegator {
     }
 
     public var eventPublisher: AnyPublisher<Event, Never> {
-        return _queue.sync { $_event.eraseToAnyPublisher() }
+        return _queue.sync { _event.eraseToAnyPublisher() }
     }
 }
 

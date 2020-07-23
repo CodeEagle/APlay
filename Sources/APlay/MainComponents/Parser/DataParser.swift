@@ -69,8 +69,8 @@ extension DataParser {
 extension DataParser {
     private func propertyValueCallback(inAudioFileStream: AudioFileStreamID, propertyId: AudioFileStreamPropertyID, ioFlags _: UnsafeMutablePointer<AudioFileStreamPropertyFlags>) {
         if info.isUpdated {
-            _event = .createConverter(info)
-            return
+//            _event = .createConverter(info)
+//            return
         }
 
         func bitrate() {
@@ -184,7 +184,7 @@ extension DataParser {
 }
 
 extension DataParser {
-    func handleAudioPackets(bytes _: UInt32, packets packetCount: UInt32, data: UnsafeRawPointer, packetDescriptions: UnsafeMutablePointer<AudioStreamPacketDescription>) {
+    func handleAudioPackets(bytes _: UInt32, packets packetCount: UInt32, data: UnsafeRawPointer, packetDescriptions: UnsafeMutablePointer<AudioStreamPacketDescription>?) {
         let packetDescriptionsOrNil: UnsafeMutablePointer<AudioStreamPacketDescription>? = packetDescriptions
         let isCompressed = packetDescriptionsOrNil != nil
 //        os_log("%@ - %d [bytes: %i, packets: %i, compressed: %@]", log: Parser.loggerPacketCallback, type: .debug, #function, #line, byteCount, packetCount, "\(isCompressed)")
@@ -196,7 +196,7 @@ extension DataParser {
         var list: [(Data, AudioStreamPacketDescription?)] = []
         if isCompressed {
             for i in 0 ..< Int(packetCount) {
-                let packetDescription = packetDescriptions[i]
+                guard let packetDescription = packetDescriptions?[i] else { continue }
                 let packetStart = Int(packetDescription.mStartOffset)
                 let packetSize = Int(packetDescription.mDataByteSize)
                 let packetData = Data(bytes: data.advanced(by: packetStart), count: packetSize)
@@ -235,6 +235,8 @@ extension DataParser {
         public lazy var parseFlags: AudioFileStreamParseFlags = .discontinuity
         public lazy var metadataSize: UInt = 0
         public lazy var waveSubchunk1Size: UInt32 = 0
+        public lazy var waveHeader: Data = .init()
+        public lazy var isApplyWaveHeaderOnce: Bool = false
         public var flacMetadata: FlacMetadata?
         var isUpdated: Bool { return isUpdatedOnce }
         private lazy var bitrateIndexArray: [Double] = []

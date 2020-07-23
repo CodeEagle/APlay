@@ -37,6 +37,7 @@ struct Player {
     static let minimumBufferSize: Int = maxReadPerSlice * minimumBufferCount
 
     static var canonical: AudioStreamBasicDescription = {
+//        return AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: 2, interleaved: false)!.streamDescription.pointee
         var bytesPerSample = UInt32(MemoryLayout<Int32>.size)
         if #available(iOS 8.0, *) {
             bytesPerSample = UInt32(MemoryLayout<Int16>.size)

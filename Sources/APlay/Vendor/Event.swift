@@ -15,7 +15,7 @@
 /// - flac: flac metadata
 public enum Event {
     case state(State)
-    case buffering(Float)
+    case buffering(URLSessionDelegator.Info)
     case waitForStreaming
     case streamerEndEncountered
     case playEnded

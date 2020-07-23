@@ -57,7 +57,7 @@ extension APlay {
         public let seekPolicy: SeekPolicy
 
         #if os(iOS)
-        private var ob: NSObjectProtocol?
+            private var ob: NSObjectProtocol?
         #endif
         /// streamer factory
 //        public private(set) var streamerBuilder: StreamerBuilder = { Streamer(config: $0) }
@@ -180,11 +180,14 @@ extension APlay {
                         debug_log("error: \(error)")
                     }
                 }
-                if UIApplication.shared.applicationState == .background {
-                    endBackgroundTask(isToDownloadImage: isToDownloadImage)
-                    _backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
-                        self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
-                    })
+                DispatchQueue.main.async { [weak self] in
+                    guard let sself = self else { return }
+                    if UIApplication.shared.applicationState == .background {
+                        sself.endBackgroundTask(isToDownloadImage: isToDownloadImage)
+                        sself._backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
+                            self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
+                        })
+                    }
                 }
             #elseif os(macOS)
                 print("tbd")

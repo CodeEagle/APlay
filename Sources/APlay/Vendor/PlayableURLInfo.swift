@@ -53,7 +53,7 @@ public extension PlayableURLInfo {
         let tagSize = 4
         guard let fd = fopen(name, "r") else { return .mp3 }
         defer { fclose(fd) }
-        var buffer = UnsafeMutablePointer.uint8Pointer(of: tagSize)
+        let buffer = UnsafeMutablePointer.uint8Pointer(of: tagSize)
         defer { free(buffer) }
         fseek(fd, 8, SEEK_SET)
         fread(buffer, 1, tagSize, fd)

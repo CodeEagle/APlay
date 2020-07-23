@@ -2,22 +2,17 @@ import AVFoundation
 
 @available(iOS 11.0, *)
 final class APlayer {
-    
-    var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) = { _, _ in (0, false) }
+    var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> UInt32 = { _, _ in 0 }
 
     private var _eventSubject: CurrentValueSubject<Event, Never> = .init(.state(.idle))
     public var eventPipeline: AnyPublisher<Event, Never> { _eventSubject.eraseToAnyPublisher() }
 
-    var startTime: Float = 0 {
-        didSet {
-            _stateQueue.async(flags: .barrier) { self._progress = 0 }
-        }
-    }
+    var startTime: Float = 0 { didSet { _stateQueue.async(flags: .barrier) { self._progress = 0 } } }
 
     fileprivate lazy var _progress: Float = 0
     private lazy var _volume: Float = 1
 
-    private(set) lazy var asbd = Player.canonical
+    private(set) lazy var outputASBD = Player.canonical
 
     private(set) var state: State {
         get { return _stateQueue.sync { _state } }
@@ -30,14 +25,12 @@ final class APlayer {
     }
 
     private lazy var _state: State = .idle
-    private lazy var _stateQueue = DispatchQueue(concurrentName: "AUPlayer.state")
+    private lazy var _stateQueue = DispatchQueue(concurrentName: "APlayer.state")
 
-    private lazy var _playbackTimer: GCDTimer = {
-        GCDTimer(interval: .seconds(1), callback: { [weak self] _ in
-            guard let sself = self else { return }
-            sself._eventSubject.send(.playback(sself.currentTime()))
-        })
-    }()
+    private lazy var _playbackTimer: GCDTimer = .init(interval: .seconds(1), callback: { [weak self] _ in
+        guard let sself = self else { return }
+        sself._eventSubject.send(.playback(sself.currentTime()))
+    })
 
     private lazy var _buffers: UnsafeMutablePointer<UInt8> = {
         let size = Player.minimumBufferSize
@@ -64,24 +57,33 @@ final class APlayer {
     }()
 
     private let _engine = AVAudioEngine()
-    
+
     public var pluginNodes: [AVAudioNode] = [] {
         didSet {
             oldValue.forEach { _engine.detach($0) }
             updateNodes()
         }
     }
-    
+
     fileprivate var _renderBlock: AVAudioEngineManualRenderingBlock?
 
     private unowned let _config: ConfigurationCompatible
 
     deinit {
+        destroy()
         debug_log("\(self) \(#function)")
     }
 
     init(config: ConfigurationCompatible) {
         _config = config
+        setup()
+    }
+    
+    func update(_ asbd: AudioStreamBasicDescription) {
+        if outputASBD == asbd {
+            return
+        }
+        outputASBD = asbd
         setup()
     }
 }
@@ -90,28 +92,25 @@ final class APlayer {
 
 @available(iOS 11.0, *)
 private extension APlayer {
-    private func updatePlayerConfig() throws {
-        guard let unit = _player else { return }
-        let s = MemoryLayout.size(ofValue: asbd)
+    func updatePlayerConfig() throws {
+        guard let unit = _player else { throw APlay.Error.player("player is nil") }
+        let s = MemoryLayout.size(ofValue: outputASBD)
         // set stream format for input bus
-        try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, Player.Bus.output, &asbd, UInt32(s)).throwCheck()
-
+        try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, Player.Bus.output, &outputASBD, UInt32(s)).throwCheck()
         let fSize = MemoryLayout.size(ofValue: Player.maxFramesPerSlice)
         try AudioUnitSetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &Player.maxFramesPerSlice, UInt32(fSize)).throwCheck()
         // render callback
         let pointer = UnsafeMutableRawPointer.from(object: self)
         var callbackStruct = AURenderCallbackStruct(inputProc: renderCallback, inputProcRefCon: pointer)
         let callbackSize = MemoryLayout.size(ofValue: callbackStruct)
-        try AudioUnitSetProperty(unit, kAudioUnitProperty_SetRenderCallback,
-                                 kAudioUnitScope_Output, Player.Bus.output, &callbackStruct,
-                                 UInt32(callbackSize)).throwCheck()
+        try AudioUnitSetProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Output, Player.Bus.output, &callbackStruct, UInt32(callbackSize)).throwCheck()
     }
-    
+
     func updateNodes() {
         reAttachNodes()
         reConnectNodes()
     }
-    
+
     func reAttachNodes() {
         for node in pluginNodes {
             _engine.attach(node)
@@ -120,12 +119,8 @@ private extension APlayer {
 
     func reConnectNodes() {
         // Avoid requesting microphone permission, set rendering mode first before connect
-//        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
-//        _engine.stop()
-//        try? _engine.enableManualRenderingMode(.realtime, format: format, maximumFrameCount: Player.maxFramesPerSlice)
-//        _engine.connect(_engine.inputNode, to: _eq, format: nil)
-//        _engine.connect(_eq, to: _engine.mainMixerNode, format: nil)
-        let readFormat = AVAudioFormat(streamDescription: &asbd)!
+        let readFormat = AVAudioFormat(streamDescription: &outputASBD)!
+//        let readFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: 2, interleaved: false)!
         let startNode: AVAudioNode? = pluginNodes.first
         let endNode: AVAudioNode? = pluginNodes.last
 
@@ -144,7 +139,6 @@ private extension APlayer {
             _engine.connect(_engine.inputNode, to: _engine.mainMixerNode, format: readFormat)
         }
     }
-
 }
 
 // MARK: - PlayerCompatible
@@ -154,9 +148,13 @@ extension APlayer {
     func destroy() {
         _engine.stop()
         _playbackTimer.invalidate()
-        pause()
-        readClosure = { _, _ in (0, false) }
+//        pause()
+        readClosure = { _, _ in 0 }
         _eventSubject.send(completion: .finished)
+        guard let unit = _player else { return }
+        var callbackStruct = AURenderCallbackStruct(inputProc: nil, inputProcRefCon: nil)
+        let callbackSize = MemoryLayout.size(ofValue: callbackStruct)
+        AudioUnitSetProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Output, Player.Bus.output, &callbackStruct, UInt32(callbackSize))
     }
 
     func pause() {
@@ -179,13 +177,9 @@ extension APlayer {
         }
     }
 
-    func toggle() {
-        state.isPlaying ? pause() : resume()
-    }
+    func toggle() { state.isPlaying ? pause() : resume() }
 
-    func currentTime() -> Float {
-        return _stateQueue.sync { _progress / Float(asbd.mSampleRate) + startTime }
-    }
+    func currentTime() -> Float { return _stateQueue.sync { _progress / Float(outputASBD.mSampleRate) + startTime } }
 
     var volume: Float {
         get { return _volume }
@@ -205,33 +199,33 @@ extension APlayer {
 
     func setup() {
         do {
-            updateNodes()
-            try updatePlayerConfig()
-            let format = AVAudioFormat(streamDescription: &asbd)!
+            // must before updateNodes, or it will required microphone usage that lead to crash
+            let format = AVAudioFormat(streamDescription: &outputASBD)!
             _engine.stop()
             try _engine.enableManualRenderingMode(.realtime, format: format, maximumFrameCount: Player.maxFramesPerSlice)
-            _renderBlock = _engine.manualRenderingBlock
 
+            updateNodes()
+            try updatePlayerConfig()
+            _renderBlock = _engine.manualRenderingBlock
             _engine.inputNode.setManualRenderingInputPCMFormat(format) { [weak self] (frameCount) -> UnsafePointer<AudioBufferList>? in
                 guard let sself = self else { return nil }
-                let bytesPerFrame = sself.asbd.mBytesPerFrame
+                let bytesPerFrame = sself.outputASBD.mBytesPerFrame
                 let size = bytesPerFrame * frameCount
 
-                let (readSize, _) = sself.readClosure(size, sself._buffers)
-                
+                let readSize = sself.readClosure(size, sself._buffers)
+
                 var totalReadFrame: UInt32 = frameCount
                 if readSize < size {
                     totalReadFrame = readSize / bytesPerFrame
                     memset(sself._buffers.advanced(by: Int(readSize)), 0, Int(size - readSize))
                 }
                 sself.audioBufferList.mBuffers.mData = UnsafeMutableRawPointer(sself._buffers)
-                sself.audioBufferList.mBuffers.mNumberChannels = sself.asbd.mChannelsPerFrame
+                sself.audioBufferList.mBuffers.mNumberChannels = sself.outputASBD.mChannelsPerFrame
                 sself.audioBufferList.mBuffers.mDataByteSize = max(readSize, size)
 
                 sself._stateQueue.async(flags: .barrier) { sself._progress += Float(totalReadFrame) }
-                return withUnsafePointer(to: &sself.audioBufferList, { $0 })
+                return withUnsafePointer(to: &sself.audioBufferList) { $0 }
             }
-
             _engine.prepare()
             try _engine.start()
         } catch {

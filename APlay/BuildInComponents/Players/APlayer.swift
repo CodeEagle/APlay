@@ -112,6 +112,11 @@ private extension APlayer {
         try AudioUnitSetProperty(unit, kAudioUnitProperty_SetRenderCallback,
                                  kAudioUnitScope_Output, Player.Bus.output, &callbackStruct,
                                  UInt32(callbackSize)).throwCheck()
+        // setup() can be called more than once (canonical format, then the decoded
+        // format); re-initializing requires uninitializing first or the AU keeps its
+        // previous render configuration and refuses to start (-10867).
+        AudioUnitUninitialize(unit)
+        try AudioUnitInitialize(unit).throwCheck()
     }
 }
 

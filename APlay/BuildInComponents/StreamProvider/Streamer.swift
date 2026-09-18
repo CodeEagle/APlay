@@ -90,6 +90,14 @@ extension Streamer {
             _config.logger.log("open at \(position)", to: .streamProvider)
             let stream = try createStream(at: position, httpInfo: _httpInfo)
             try addReadCallBack(for: stream)
+            if info.isRemote == false {
+                // Local files become readable the instant CFReadStreamOpen returns,
+                // so the runloop can deliver chunks before this method finishes and
+                // posts .readyForRead. Those chunks hit a decoder with no parser yet
+                // and are dropped, after which the parser starts mid-file and fails
+                // with "unsupported file type". Open the parser first.
+                outputPipeline.call(.readyForRead)
+            }
             setScheduledInRunLoop(run: true, for: stream)
             _canOutputData = true
             guard CFReadStreamOpen(stream) == true else {
@@ -102,8 +110,6 @@ extension Streamer {
             if info.isRemote {
                 _watchDogInfo.reopenTimes += 1
                 _watchDogInfo.isReadedData = false
-            } else {
-                outputPipeline.call(.readyForRead)
             }
             _isFirstPacket = true
             _readStream = stream

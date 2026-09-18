@@ -12,6 +12,8 @@ v1.3.0
 5. Demo: `@UIApplicationMain` → `@main`
 6. Expose built-in `NBandEQ` band gains at runtime via `APlay.setEqualizerBandGain(_:at:)`
    (band frequencies were already configurable via `Configuration.equalizerBandFrequencies`)
+7. Decode loop: skip the per-tick converter allocation and fill when no packets are queued —
+   reports the same `.empty` event while keeping the idle/buffering loop cheap (lower CPU)
 
 v0.0.5
 ---

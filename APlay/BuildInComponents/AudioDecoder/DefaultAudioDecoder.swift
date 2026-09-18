@@ -384,13 +384,20 @@ private extension DefaultAudioDecoder {
         var ioOutputDataPackets = _outputBufferSize / _dstFormat.mBytesPerPacket
 
         guard let converter = _audioConverter else { return }
-
-        let bufferConverter = AudioBufferConverter(ring: self)
-        let userinfo = UnsafeMutableRawPointer.from(object: bufferConverter)
         guard _isRequestClose == false else {
             debug_log("Decodeloop return at 1")
             return
         }
+        // Nothing queued to decode: report empty directly instead of allocating a converter
+        // context and running the fill every timer tick (keeps the idle/buffering loop cheap).
+        // The fill path produces the same `.empty` event in this situation.
+        guard _packetsManager.availableData > 0 else {
+            outputStream.call(.empty)
+            return
+        }
+
+        let bufferConverter = AudioBufferConverter(ring: self)
+        let userinfo = UnsafeMutableRawPointer.from(object: bufferConverter)
         // The converter fills mData with decoded bytes and we read them back afterwards, so the
         // pointer has to stay valid for the whole fill call. Scoping it here keeps the array
         // storage from being reclaimed or moved underneath us (a former Release-only pitfall).

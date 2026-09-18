@@ -42,8 +42,6 @@
 		10F83ACD20F342C400AF8222 /* PlayList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AB120F342C400AF8222 /* PlayList.swift */; };
 		10F83ACE20F342C400AF8222 /* Uroboros.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AB220F342C400AF8222 /* Uroboros.swift */; };
 		10F83ACF20F342C400AF8222 /* Composer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AB320F342C400AF8222 /* Composer.swift */; };
-		10F83AD320F344A600AF8222 /* AVAudioSession+Workaround.m in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AD120F344A600AF8222 /* AVAudioSession+Workaround.m */; };
-		10F83AD420F344A600AF8222 /* AVAudioSession+Workaround.h in Headers */ = {isa = PBXBuildFile; fileRef = 10F83AD220F344A600AF8222 /* AVAudioSession+Workaround.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,8 +106,6 @@
 		10F83AB120F342C400AF8222 /* PlayList.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlayList.swift; sourceTree = "<group>"; };
 		10F83AB220F342C400AF8222 /* Uroboros.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Uroboros.swift; sourceTree = "<group>"; };
 		10F83AB320F342C400AF8222 /* Composer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Composer.swift; sourceTree = "<group>"; };
-		10F83AD120F344A600AF8222 /* AVAudioSession+Workaround.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "AVAudioSession+Workaround.m"; sourceTree = "<group>"; };
-		10F83AD220F344A600AF8222 /* AVAudioSession+Workaround.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "AVAudioSession+Workaround.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,7 +177,6 @@
 		10F83A8C20F342C400AF8222 /* BuildInComponents */ = {
 			isa = PBXGroup;
 			children = (
-				10F83AD020F344A600AF8222 /* AVAduioSessionWorkaround */,
 				10F83A8D20F342C400AF8222 /* Configuration */,
 				10F83A8F20F342C400AF8222 /* Logger */,
 				10F83A9120F342C400AF8222 /* Players */,
@@ -287,15 +282,6 @@
 			path = Vendor;
 			sourceTree = "<group>";
 		};
-		10F83AD020F344A600AF8222 /* AVAduioSessionWorkaround */ = {
-			isa = PBXGroup;
-			children = (
-				10F83AD120F344A600AF8222 /* AVAudioSession+Workaround.m */,
-				10F83AD220F344A600AF8222 /* AVAudioSession+Workaround.h */,
-			);
-			path = AVAduioSessionWorkaround;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -304,7 +290,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				10F83A8620F3427E00AF8222 /* APlay.h in Headers */,
-				10F83AD420F344A600AF8222 /* AVAudioSession+Workaround.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,7 +432,6 @@
 				10F83ACA20F342C400AF8222 /* RunloopQueue.swift in Sources */,
 				10F83AC420F342C400AF8222 /* PlayerCompatible.swift in Sources */,
 				10F83AB420F342C400AF8222 /* Configuration.swift in Sources */,
-				10F83AD320F344A600AF8222 /* AVAudioSession+Workaround.m in Sources */,
 				10F83ACB20F342C400AF8222 /* Delegated.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

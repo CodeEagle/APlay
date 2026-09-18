@@ -1,3 +1,23 @@
+v1.3.1
+---
+>2026.09.19
+
+1. Fix local-file playback: the decoder's audio file stream was opened only *after* the streamer
+   had already delivered and dropped the leading chunks, so the parser started mid-file and
+   failed with "unsupported file type". For local files `.readyForRead` is now posted before
+   the read stream is opened, so the parser exists when the first bytes arrive
+2. Fix `AudioOutputUnitStart` failing with `-10867` (`kAudioUnitErr_CannotDoInCurrentContext`)
+   in the iOS 11+ player: the output audio unit is now explicitly initialized after the render
+   callback and stream format are (re)configured
+3. Make `APlay.Event`, `APlay.State` and `APlay.Error` public. `eventPipeline` and `state` were
+   already public but referenced internal types, which made the primary delegate API unusable
+   from a binary framework
+4. Cross-platform hygiene: `APlayImage` typealias (`UIImage` on iOS / `NSImage` on macOS),
+   audio-session and background-task code guarded to iOS, and the pre-iOS-10 `AVAudioSession`
+   workaround dropped (deployment target is iOS 15)
+5. Swift Package Manager support, including an end-to-end macOS playback validation target
+   (`APlayMacPlayback`) and a non-audio smoke test
+
 v1.3.0
 ---
 >2026.09.18

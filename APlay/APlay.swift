@@ -15,7 +15,7 @@ import AVFoundation
 /// A public class for control audio playback
 public final class APlay: @unchecked Sendable {
     /// Current framework version
-    public static let version: String = "1.3.0"
+    public static let version: String = "1.3.1"
 
     /// Loop pattern for playback list
     public var loopPattern: PlayList.LoopPattern {
@@ -219,7 +219,7 @@ public extension APlay {
         return _currentComposer?.seekable() ?? false
     }
 
-    func metadataUpdate(title: String? = nil, album: String? = nil, artist: String? = nil, cover: UIImage? = nil) {
+    func metadataUpdate(title: String? = nil, album: String? = nil, artist: String? = nil, cover: APlayImage? = nil) {
         if let value = title { _nowPlayingInfo.name = value }
         if let value = artist { _nowPlayingInfo.artist = value }
         if let value = album { _nowPlayingInfo.album = value }
@@ -350,9 +350,7 @@ private extension APlay {
                     case let .album(text): obj._nowPlayingInfo.album = text
                     case let .artist(text): obj._nowPlayingInfo.artist = text
                     case let .title(text): obj._nowPlayingInfo.name = text
-                        #if canImport(UIKit)
-                            case let .cover(cov): obj._nowPlayingInfo.artwork = UIImage(data: cov)
-                        #endif
+                        case let .cover(cov): obj._nowPlayingInfo.artwork = APlayImage(data: cov)
                     default: break
                     }
                 }
@@ -365,35 +363,37 @@ private extension APlay {
     private func addInteruptOb() {
         config.logger.log("config.isAutoHandlingInterruptEvent: \(config.isAutoHandlingInterruptEvent)", to: .player)
         guard config.isAutoHandlingInterruptEvent else { return }
-        /// RouteChange
+        #if os(iOS)
+            /// RouteChange
 
-        let note1 = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) {[weak self] (note) in
-            let interuptionDict = note.userInfo
-            // "Headphone/Line was pulled. Stopping player...."
-            self?.config.logger.log("routeChange: \(interuptionDict ?? [:])", to: .player)
-            if let routeChangeReason = interuptionDict?[AVAudioSessionRouteChangeReasonKey] as? UInt, routeChangeReason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
-                self?.config.logger.log("routeChange pause", to: .player)
-                self?.pause()
+            let note1 = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) {[weak self] (note) in
+                let interuptionDict = note.userInfo
+                // "Headphone/Line was pulled. Stopping player...."
+                self?.config.logger.log("routeChange: \(interuptionDict ?? [:])", to: .player)
+                if let routeChangeReason = interuptionDict?[AVAudioSessionRouteChangeReasonKey] as? UInt, routeChangeReason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
+                    self?.config.logger.log("routeChange pause", to: .player)
+                    self?.pause()
+                }
             }
-        }
 
-        var playingStateBeforeInterrupte = state.isPlaying
-        let note2 = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self](note) -> Void in
-            guard let sself = self else { return }
-            let info = note.userInfo
-            sself.config.logger.log("interruption event \(info ?? [:])", to: .player)
-            guard let type = info?[AVAudioSessionInterruptionTypeKey] as? UInt else { return }
-            if type == AVAudioSession.InterruptionType.began.rawValue {
-                // 中断开始
-                playingStateBeforeInterrupte = sself.state.isPlaying
-                if playingStateBeforeInterrupte == true { sself.pause() }
-            } else {
-                // 中断结束
-                guard let options = info?[AVAudioSessionInterruptionOptionKey] as? UInt, options == AVAudioSession.InterruptionOptions.shouldResume.rawValue, playingStateBeforeInterrupte == true else { return }
-                sself.resume()
+            var playingStateBeforeInterrupte = state.isPlaying
+            let note2 = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self](note) -> Void in
+                guard let sself = self else { return }
+                let info = note.userInfo
+                sself.config.logger.log("interruption event \(info ?? [:])", to: .player)
+                guard let type = info?[AVAudioSessionInterruptionTypeKey] as? UInt else { return }
+                if type == AVAudioSession.InterruptionType.began.rawValue {
+                    // 中断开始
+                    playingStateBeforeInterrupte = sself.state.isPlaying
+                    if playingStateBeforeInterrupte == true { sself.pause() }
+                } else {
+                    // 中断结束
+                    guard let options = info?[AVAudioSessionInterruptionOptionKey] as? UInt, options == AVAudioSession.InterruptionOptions.shouldResume.rawValue, playingStateBeforeInterrupte == true else { return }
+                    sself.resume()
+                }
             }
-        }
-        _obs = [note1, note2]
+            _obs = [note1, note2]
+        #endif
     }
 
 }
@@ -472,7 +472,7 @@ public extension APlay {
     /// - error: error
     /// - metadata: song matadata
     /// - flac: flac metadata
-    enum Event {
+    public enum Event {
         case state(State)
         case buffering(Float)
         case waitForStreaming
@@ -496,7 +496,7 @@ public extension APlay {
     /// - paused: paused
     /// - error: error
     /// - unknown: exception
-    enum State {
+    public enum State {
         case idle
         case playing
         case paused
@@ -523,7 +523,7 @@ public extension APlay {
     /// - networkStatusCode: networ reponse with status code
     /// - parser: parser error with OSStatus
     /// - player: player error
-    enum Error: Swift.Error {
+    public enum Error: Swift.Error {
         case none, open(String), openedAlready(String), streamParse(String), network(String), networkPermission(String), reachMaxRetryTime, networkStatusCode(Int), parser(OSStatus), player(String), playItemNotFound(String)
     }
 }

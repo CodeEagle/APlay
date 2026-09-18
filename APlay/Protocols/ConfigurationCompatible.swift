@@ -7,11 +7,15 @@
 //
 
 import Foundation
-import UIKit
+#if os(macOS)
+    import AppKit
+#elseif os(iOS)
+    import UIKit
+#endif
 // Using __`unowned let`__ to avoid retain cycle
 /// Protocol for APlay Configuration
 public protocol ConfigurationCompatible: AnyObject {
-    var defaultCoverImage: UIImage? { get set }
+    var defaultCoverImage: APlayImage? { get set }
     var session: URLSession { get }
     var streamerBuilder: (ConfigurationCompatible) -> StreamProviderCompatible { get }
     var audioDecoderBuilder: (ConfigurationCompatible) -> AudioDecoderCompatible { get }

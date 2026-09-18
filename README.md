@@ -91,6 +91,8 @@ Installation
 
 [CocoaPods](https://cocoapods.org/) `pod 'APlay'`
 
+[Swift Package Manager](https://swift.org/package-manager/) `.package(url: "https://github.com/CodeEagle/APlay.git", from: "1.3.1")`
+
 Todo
 ---
 - [ ] AirPlay2 support (Maybe not — tracked separately, see the `airplay2` branch)

@@ -15,5 +15,4 @@ FOUNDATION_EXPORT double APlayVersionNumber;
 FOUNDATION_EXPORT const unsigned char APlayVersionString[];
 
 // In this header, you should import all the public headers of your framework using statements like #import <APlay/PublicHeader.h>
-#import "AVAudioSession+Workaround.h"
 

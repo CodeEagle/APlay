@@ -16,7 +16,7 @@ extension APlay {
     /// Configuration for APlay
     public final class Configuration: ConfigurationCompatible, @unchecked Sendable {
         /// 播放器歌曲默认图像
-        public var defaultCoverImage: UIImage?
+        public var defaultCoverImage: APlayImage?
         /** 缓存目录 */
         public let cacheDirectory: String
         /// 网络 session
@@ -85,7 +85,7 @@ extension APlay {
             }
         #endif
 
-        public init(defaultCoverImage: UIImage? = nil,
+        public init(defaultCoverImage: APlayImage? = nil,
                     proxyPolicy: ProxyPolicy = .system,
                     logPolicy: Logger.Policy = Logger.Policy.defaultPolicy,
                     httpFileCompletionValidator: HttpFileValidationPolicy = .notValidate,
@@ -171,15 +171,7 @@ extension APlay {
                 if isEnabledAutomaticAudioSessionHandling {
                     do {
                         let instance = AVAudioSession.sharedInstance()
-                        if #available(iOS 11.0, *) {
-                            try instance.setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longForm)
-                        } else if #available(iOS 10.0, *) {
-                            try instance.setCategory(.playback, mode: .default)
-                        } else {
-                            if let error = AVAduioSessionWorkaround.setPlaybackCategory() {
-                                throw error
-                            }
-                        }
+                        try instance.setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longForm)
                         try instance.setActive(true)
                     } catch {
                         debug_log("error: \(error)")
@@ -190,20 +182,8 @@ extension APlay {
                     self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
                 })
             #elseif os(macOS)
-                print("tbd")
-//            do {
-//                if #available(iOS 11.0, *) {
-//                    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longForm)
-//                } else if #available(iOS 10.0, *) {
-//                    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-//                } else {
-//                    if let error = AVAduioSessionWorkaround.setPlaybackCategory() {
-//                        throw error
-//                    }
-//                }
-//            } catch {
-//                debug_log("error: \(error)")
-//            }
+                // No background-task / audio-session concept needed on macOS; playback is foreground.
+                _ = isToDownloadImage
             #endif
         }
 

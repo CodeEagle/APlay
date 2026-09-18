@@ -11,11 +11,26 @@ import AVFoundation
 import CoreAudio
 import Foundation
 
+#if os(macOS)
+    import AppKit
+#elseif os(iOS)
+    import UIKit
+#endif
+
+/// Platform image type: `NSImage` on macOS, `UIImage` on iOS.
+#if os(macOS)
+    public typealias APlayImage = NSImage
+#elseif os(iOS)
+    public typealias APlayImage = UIImage
+#endif
+
 /// AVFoundation.AudioFileTypeID
 public typealias AudioFileTypeID = AVFoundation.AudioFileTypeID
 
-/// AVFoundation.AVAudioSession
-public typealias AVAudioSession = AVFoundation.AVAudioSession
+/// AVFoundation.AVAudioSession (iOS-family only; unavailable on macOS)
+#if os(iOS) || os(tvOS) || os(watchOS)
+    public typealias AVAudioSession = AVFoundation.AVAudioSession
+#endif
 
 /// AVFoundation.AVAudioEngine
 public typealias AVAudioEngine = AVFoundation.AVAudioEngine

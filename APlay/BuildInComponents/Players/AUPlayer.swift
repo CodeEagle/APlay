@@ -201,7 +201,7 @@ extension AUPlayer {
                 if let unit = _mixerUnit {
                     AudioUnitSetParameter(unit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, _volume, 0)
                 } else if let unit = _outputUnit {
-                    AudioUnitSetParameter(unit, kHALOutputParam_Volume, kAudioUnitScope_Output, AUPlayer.Bus.output, _volume, 0)
+                    AudioUnitSetParameter(unit, kHALOutputParam_Volume, kAudioUnitScope_Output, Player.Bus.output, _volume, 0)
                 }
             #endif
         }

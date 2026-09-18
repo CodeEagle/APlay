@@ -5,15 +5,18 @@
 //  Created by Lincoln Law on 2017/3/1.
 //  Copyright © 2017年 Lincoln Law. All rights reserved.
 //
-#if os(iOS)
-    import MediaPlayer
+#if os(macOS)
+    import AppKit
+#elseif os(iOS)
+    import UIKit
 #endif
+import MediaPlayer
 extension APlay {
     final class NowPlayingInfo: @unchecked Sendable {
         var name = ""
         var artist = ""
         var album = ""
-        var artwork: UIImage?
+        var artwork: APlayImage?
         var duration = 0
         var playbackRate: Float = 0
         var playbackTime: Float = 0
@@ -66,7 +69,7 @@ extension APlay {
             _coverTask?.cancel()
             DispatchQueue.global(qos: .utility).async {
                 let request = URLRequest(url: r, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 20)
-                if let d = URLCache.shared.cachedResponse(for: request)?.data, let image = UIImage(data: d) {
+                if let d = URLCache.shared.cachedResponse(for: request)?.data, let image = APlayImage(data: d) {
                     self._queue.sync { self.artwork = image }
                     self.update()
                     return
@@ -111,7 +114,7 @@ extension APlay {
                     let cre = CachedURLResponse(response: r, data: d)
                     URLCache.shared.storeCachedResponse(cre, for: request)
                 }
-                guard let sself = self, let d = data, let image = UIImage(data: d) else { return }
+                guard let sself = self, let d = data, let image = APlayImage(data: d) else { return }
                 sself._queue.sync { sself.artwork = image }
                 sself.update()
             })

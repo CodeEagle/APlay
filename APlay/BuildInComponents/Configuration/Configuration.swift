@@ -14,7 +14,7 @@ import AVFoundation
 
 extension APlay {
     /// Configuration for APlay
-    public final class Configuration: ConfigurationCompatible {
+    public final class Configuration: ConfigurationCompatible, @unchecked Sendable {
         /// 播放器歌曲默认图像
         public var defaultCoverImage: UIImage?
         /** 缓存目录 */

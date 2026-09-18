@@ -9,7 +9,7 @@
     import MediaPlayer
 #endif
 extension APlay {
-    final class NowPlayingInfo {
+    final class NowPlayingInfo: @unchecked Sendable {
         var name = ""
         var artist = ""
         var album = ""

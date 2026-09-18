@@ -1,3 +1,16 @@
+v1.3.0
+---
+>2026.09.18
+
+1. Upgrade to Swift 6 language mode with strict concurrency checking enabled
+2. Raise the deployment target to iOS 15.0 (Xcode 26+ toolchain)
+3. Fix dangling pointers around `AudioConverter` (packet description pointed at a stack local,
+   buffers passed via unscoped `inout`) — this was the root cause of the "can only run in DEBUG"
+   optimization-mode stall, so `Release` builds now optimize normally
+4. Mark internally-synchronized types `@unchecked Sendable`; constants that were `static var` are
+   now `static let`
+5. Demo: `@UIApplicationMain` → `@main`
+
 v0.0.5
 ---
 >2019.01.14

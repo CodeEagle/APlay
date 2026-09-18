@@ -11,7 +11,7 @@ import Foundation
     import UIKit
 #endif
 
-final class Composer {
+final class Composer: @unchecked Sendable {
     lazy var eventPipeline: Delegated<Event, Void> = Delegated<Event, Void>()
     private(set) var isRunning: Bool {
         get { return _queue.sync { _isRuning } }
@@ -33,7 +33,7 @@ final class Composer {
 
     private unowned let _config: ConfigurationCompatible
     #if DEBUG
-        private static var count = 0
+        private nonisolated(unsafe) static var count = 0
         private let _id: Int
         deinit {
             debug_log("\(self) \(#function)")

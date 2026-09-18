@@ -2,6 +2,11 @@ APlay
 ---
 A Better(Maybe) iOS Audio Stream & Play Swift Framework
 
+Requirements
+---
+- iOS 15.0+
+- Swift 6.0+ (Xcode 16+ toolchain)
+
 
 Usage
 ---
@@ -17,23 +22,16 @@ player.play(url)
 ...
 ```
 
-⚠️⚠️⚠️ Known issue
+✅ Known issue (fixed)
 ---
-This project can only run in `DEBUG` mode，cause optimization mode will pause the decode loop.
+Earlier releases could only run in `DEBUG` mode: with optimization enabled (`-O`) the decode
+loop would stall. The root cause was a set of dangling pointers around the audio converter —
+`outDataPacketDescription` pointed at a stack-local `AudioStreamPacketDescription` that the
+converter dereferences *after* the input callback returns, and the decode/output buffers were
+handed to Core Audio through unscoped `inout` references. These are now backed by stable,
+object-owned storage and scoped pointer access, so optimized `Release` builds work correctly.
 
-if install with CocoaPods, add this block of code in your podfile
-```ruby
-post_install do |installer|
- installer.pods_project.targets.each do |target|
-        target.build_configurations.each do |config|
-            swiftPods = ['APlay']
-            if swiftPods.include?(target.name)
-                config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] =  '-Onone'
-            end
-        end
-    end
-end
-```
+No CocoaPods `post_install` workaround is needed anymore — `pod 'APlay'` works out of the box.
 
 Docs
 ---
@@ -61,9 +59,14 @@ Features
 
 - [x] Support cached the stream contents to a file
 
+- [x] Built-in `NBandEQ` equalizer wired into the `AUPlayer` audio graph (band frequencies
+      configurable via `Configuration.equalizerBandFrequencies`)
+
 - [x] Custom logging module and logging into file supported
 
 - [x] Open protocols to support customizing. `AudioDecoderCompatible`, `ConfigurationCompatible`, `LoggerCompatible`...
+
+- [x] Swift 6 language mode with strict concurrency checking enabled
 
 Installation
 ---
@@ -73,8 +76,13 @@ Installation
 
 Todo
 ---
-- [ ] Airplay2 support(Maybe not)
-- [ ] AudioEffectUint support
+- [ ] AirPlay2 support (Maybe not — tracked separately, see the `airplay2` branch)
+- [ ] AudioEffectUnit support: an `NBandEQ` is already wired into the `AUPlayer` graph,
+      but band **gains** are fixed at build time. Remaining work is to expose the EQ node
+      so gains can be changed at runtime.
+- [ ] Network layer still relies on the deprecated (since iOS 9) `CFReadStreamCreateForHTTPRequest`.
+      Migrating `Streamer` to `URLSession` is the recommended follow-up — it is the root cause
+      behind HTTP-stream issues and would also let the framework drop the `RunloopQueue` shims.
 
 Sponsor 
 ---

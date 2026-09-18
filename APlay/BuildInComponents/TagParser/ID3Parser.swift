@@ -396,7 +396,7 @@ private extension ID3Parser {
         }
 
         init(_ bytes: Data) {
-            var data = bytes
+            let data = bytes
             let rawVersion = data[0]
             reversion = data[1]
             let bit7HasData = (data[2] & 0b1000_0000) != 0

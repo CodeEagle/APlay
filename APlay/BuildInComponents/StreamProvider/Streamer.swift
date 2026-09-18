@@ -825,8 +825,10 @@ private extension Streamer {
                     }
                     offset += 1
                 }
-                if var buffer = buffer, i > 0 {
-                    streamer.outputPipeline.call(.hasBytesAvailable(&buffer, UInt32(i), streamer._isFirstPacket))
+                if let buffer = buffer, i > 0 {
+                    buffer.withUnsafeBufferPointer { bufferPtr in
+                        streamer.outputPipeline.call(.hasBytesAvailable(bufferPtr.baseAddress!, UInt32(i), streamer._isFirstPacket))
+                    }
                     if streamer._isFirstPacket { streamer._isFirstPacket = false }
                 }
             }

@@ -141,7 +141,9 @@ private extension DefaultAudioDecoder {
             _isFlacHeaderParsed = true
             let count = UInt32(headerData.count)
             let pointer: [UInt8] = headerData.compactMap({ $0 })
-            inputAvailable((UnsafePointer<UInt8>(pointer), count, true))
+            pointer.withUnsafeBufferPointer { bufferPtr in
+                inputAvailable((bufferPtr.baseAddress!, count, true))
+            }
             inputAvailable(data)
             return
         }
@@ -379,8 +381,6 @@ private extension DefaultAudioDecoder {
     private func decodeloopHandler() {
         let _dstFormat = info.dstFormat
         let _outputBufferSize = UInt32(_config.decodeBufferSize)
-        let listItem = AudioBuffer(mNumberChannels: info.dstFormat.mChannelsPerFrame, mDataByteSize: _outputBufferSize, mData: &_outputBuffer)
-        var outputBufferList = AudioBufferList(mNumberBuffers: 1, mBuffers: listItem)
         var ioOutputDataPackets = _outputBufferSize / _dstFormat.mBytesPerPacket
 
         guard let converter = _audioConverter else { return }
@@ -391,26 +391,34 @@ private extension DefaultAudioDecoder {
             debug_log("Decodeloop return at 1")
             return
         }
-        let err = AudioConverterFillComplexBuffer(converter, AudioBufferConverter.callback(), userinfo, &ioOutputDataPackets, &outputBufferList, nil)
-        if err == .empty {
-            outputStream.call(.empty)
-            return
-        }
-        guard err == noErr else {
-            err.check()
-            outputStream.call(.error(APlay.Error.parser(err)))
-            return
-        }
-        guard _isRequestClose == false else {
-            debug_log("Decodeloop return at 2")
-            return
-        }
-        let bytes = outputBufferList.mBuffers.mDataByteSize
-        if let inInputData = outputBufferList.mBuffers.mData, bytes > 0 {
-            let out: AudioDecoder.AudioOutput = (UnsafeRawPointer(inInputData), bytes)
-            outputStream.call(.output(out))
-        } else {
-            debug_log("wtf decode \(bytes) bytes")
+        // The converter fills mData with decoded bytes and we read them back afterwards, so the
+        // pointer has to stay valid for the whole fill call. Scoping it here keeps the array
+        // storage from being reclaimed or moved underneath us (a former Release-only pitfall).
+        _outputBuffer.withUnsafeMutableBufferPointer { bufferPtr in
+            guard let baseAddress = bufferPtr.baseAddress else { return }
+            let listItem = AudioBuffer(mNumberChannels: _dstFormat.mChannelsPerFrame, mDataByteSize: _outputBufferSize, mData: UnsafeMutableRawPointer(baseAddress))
+            var outputBufferList = AudioBufferList(mNumberBuffers: 1, mBuffers: listItem)
+            let err = AudioConverterFillComplexBuffer(converter, AudioBufferConverter.callback(), userinfo, &ioOutputDataPackets, &outputBufferList, nil)
+            if err == .empty {
+                outputStream.call(.empty)
+                return
+            }
+            guard err == noErr else {
+                err.check()
+                outputStream.call(.error(APlay.Error.parser(err)))
+                return
+            }
+            guard _isRequestClose == false else {
+                debug_log("Decodeloop return at 2")
+                return
+            }
+            let bytes = outputBufferList.mBuffers.mDataByteSize
+            if let inInputData = outputBufferList.mBuffers.mData, bytes > 0 {
+                let out: AudioDecoder.AudioOutput = (UnsafeRawPointer(inInputData), bytes)
+                outputStream.call(.output(out))
+            } else {
+                debug_log("wtf decode \(bytes) bytes")
+            }
         }
     }
 }
@@ -517,7 +525,9 @@ private extension DefaultAudioDecoder {
         _packetsManager.commitRead(count: count)
         // read the rest of struct
         var desc = AudioStreamPacketDescription()
-        _packetsManager.read(amount: asbdSize, into: UnsafeMutableRawPointer(&desc))
+        _ = withUnsafeMutablePointer(to: &desc) { descPtr in
+            _packetsManager.read(amount: asbdSize, into: UnsafeMutableRawPointer(descPtr))
+        }
         let expectSize = Int(desc.mDataByteSize)
         guard expectSize > 0 else { return nil }
         handler.reserveCapacity(expectSize)
@@ -634,41 +644,41 @@ extension DefaultAudioDecoder {
 extension DefaultAudioDecoder {
     private final class AudioBufferConverter {
         private weak var _ring: DefaultAudioDecoder?
-        private var _buffer: [UInt8] = []
+        // The converter dereferences ioData / outDataPacketDescription after the callback returns,
+        // so the backing storage must outlive the call. A stack-local struct or an Array's COW
+        // storage cannot promise that; keep both on stable, object-owned storage instead.
+        private var _packetDescription = UnsafeMutablePointer<AudioStreamPacketDescription>.allocate(capacity: 1)
+        private var _packetBytes: UnsafeMutablePointer<UInt8> = UnsafeMutablePointer<UInt8>.allocate(capacity: 4096)
+        private var _packetBytesCapacity: Int = 4096
+        private var _readBuffer: [UInt8] = []
 
         init(ring: DefaultAudioDecoder) { _ring = ring }
 
+        deinit { _packetBytes.deallocate(); _packetDescription.deallocate() }
+
+        private func ensurePacketBytesCapacity(_ needed: Int) {
+            guard needed > _packetBytesCapacity else { return }
+            let grown = max(needed, _packetBytesCapacity * 2)
+            let newBytes = UnsafeMutablePointer<UInt8>.allocate(capacity: grown)
+            _packetBytes.deallocate()
+            _packetBytes = newBytes
+            _packetBytesCapacity = grown
+        }
+
         private func audioConverterCallback(packetsCount: UnsafeMutablePointer<UInt32>, ioData: UnsafeMutablePointer<AudioBufferList>, outDataPacketDescription: UnsafeMutablePointer<UnsafeMutablePointer<AudioStreamPacketDescription>?>?) -> OSStatus {
-            
-            
-//            guard let packet = _ring?.readPacket() else {
-//                packetsCount.pointee = 0
-//                outDataPacketDescription?.pointee = nil
-//                return OSStatus.empty
-//            }
-//            var desc = packet.desc
-//            var p: [UInt8] = packet.data.compactMap({$0})
-//            ioData.pointee.mNumberBuffers = 1
-//            ioData.pointee.mBuffers.mData =
-//                UnsafeMutableRawPointer(&p)
-//            ioData.pointee.mBuffers.mDataByteSize = packet.desc.mDataByteSize
-//
-//
-//            outDataPacketDescription?.pointee = UnsafeMutablePointer(&desc)
-//            packetsCount.pointee = 1
-//            return noErr
-//
-//
-            
-            guard var desc = _ring?.readPacket(into: &_buffer) else {
+            guard let desc = _ring?.readPacket(into: &_readBuffer) else {
                 packetsCount.pointee = 0
                 outDataPacketDescription?.pointee = nil
                 return OSStatus.empty
             }
-            let buf = AudioBuffer(mNumberChannels: 2, mDataByteSize: desc.mDataByteSize, mData: &_buffer)
+            ensurePacketBytesCapacity(Int(desc.mDataByteSize))
+            _packetBytes.update(from: _readBuffer, count: Int(desc.mDataByteSize))
+            _packetDescription.pointee = desc
+
+            let buf = AudioBuffer(mNumberChannels: 2, mDataByteSize: desc.mDataByteSize, mData: _packetBytes)
             ioData.pointee.mNumberBuffers = 1
             ioData.pointee.mBuffers = buf
-            outDataPacketDescription?.pointee = UnsafeMutablePointer(&desc)
+            outDataPacketDescription?.pointee = _packetDescription
             packetsCount.pointee = 1
             return noErr
         }

@@ -102,8 +102,9 @@ private extension APlayer {
         // set stream format for input bus
         try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, Player.Bus.output, &asbd, UInt32(s)).throwCheck()
 
-        let fSize = MemoryLayout.size(ofValue: Player.maxFramesPerSlice)
-        try AudioUnitSetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &Player.maxFramesPerSlice, UInt32(fSize)).throwCheck()
+        var maxFramesPerSlice = Player.maxFramesPerSlice
+        let fSize = MemoryLayout.size(ofValue: maxFramesPerSlice)
+        try AudioUnitSetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFramesPerSlice, UInt32(fSize)).throwCheck()
         // render callback
         let pointer = UnsafeMutableRawPointer.from(object: self)
         var callbackStruct = AURenderCallbackStruct(inputProc: renderCallback, inputProcRefCon: pointer)

@@ -9,7 +9,7 @@
 import Foundation
 
 /// Add Equatable support for AudioStreamBasicDescription
-extension AudioStreamBasicDescription: Equatable {
+extension AudioStreamBasicDescription: @retroactive Equatable {
     /// whether current mFormatID equal to kAudioFormatLinearPCM
     public var isLinearPCM: Bool {
         return mFormatID == kAudioFormatLinearPCM

@@ -1,8 +1,8 @@
 Pod::Spec.new do |s|
   s.name             = 'APlay'
-  s.version          = '1.2.1'
+  s.version          = '1.3.0'
   s.summary          = 'A Better(Maybe) iOS Audio Stream & Play Swift Framework.'
-  s.swift_version    = '5.0'
+  s.swift_version    = '6.0'
   s.description      = <<-DESC
 A Better(Maybe) iOS Audio Stream & Play Swift Framework
                        DESC
@@ -13,7 +13,7 @@ A Better(Maybe) iOS Audio Stream & Play Swift Framework
   s.source           = { :git => 'https://github.com/CodeEagle/APlay.git', :tag => s.version.to_s }
 
   s.platform = :ios
-  s.ios.deployment_target = '8.0'
+  s.ios.deployment_target = '15.0'
 
   s.exclude_files = 'APlay/Info.plist'
   s.source_files = 'APlay/**/*'

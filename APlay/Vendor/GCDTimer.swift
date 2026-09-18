@@ -9,7 +9,7 @@
 import Foundation
 
 final class GCDTimer {
-    private static var count = 0
+    private nonisolated(unsafe) static var count = 0
     private(set) var index = 0
     private lazy var _timerQueue = DispatchQueue(label: "GCDTimer", qos: .userInitiated)
     private lazy var _timer: DispatchSourceTimer? = nil

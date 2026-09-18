@@ -143,7 +143,7 @@ public struct AudioDecoder {
     // MARK: - AudioFileType
 
     /// A wrap for AudioFileTypeID
-    public struct AudioFileType: RawRepresentable, Hashable {
+    public struct AudioFileType: RawRepresentable, Hashable, Sendable {
         public typealias RawValue = String
         public var rawValue: String
 
@@ -177,7 +177,7 @@ public struct AudioDecoder {
         public static let flac = AudioFileType("flac")
         public static let opus = AudioFileType("opus")
 
-        private static var map: [AudioFileType: AudioFileTypeID] = [:]
+        private nonisolated(unsafe) static var map: [AudioFileType: AudioFileTypeID] = [:]
 
         public var audioFileTypeID: AudioFileTypeID {
             let value: AudioFileTypeID

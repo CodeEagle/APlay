@@ -28,15 +28,15 @@ protocol PlayerCompatible: AnyObject {
 }
 
 struct Player {
-    static var maxFramesPerSlice: UInt32 = 4096
+    static let maxFramesPerSlice: UInt32 = 4096
 
-    static var ringBufferSize: UInt32 = 1024 * 1024 * 2
+    static let ringBufferSize: UInt32 = 1024 * 1024 * 2
 
     static let maxReadPerSlice: Int = Int(maxFramesPerSlice * canonical.mBytesPerPacket)
     static let minimumBufferCount: Int = 1
     static let minimumBufferSize: Int = maxReadPerSlice * minimumBufferCount
 
-    static var canonical: AudioStreamBasicDescription = {
+    static let canonical: AudioStreamBasicDescription = {
         var bytesPerSample = UInt32(MemoryLayout<Int32>.size)
         if #available(iOS 8.0, *) {
             bytesPerSample = UInt32(MemoryLayout<Int16>.size)

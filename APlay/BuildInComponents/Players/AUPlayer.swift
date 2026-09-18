@@ -248,11 +248,13 @@ private extension AUPlayer {
         let _options = _config
         guard let value = _options.equalizerBandFrequencies[ap_safe: 0], value != 0, let audioGraph = _audioGraph else { return }
         do {
-            try AUGraphAddNode(audioGraph, &AUPlayer.nbandUnit, &_eqNode).throwCheck()
+            var nbandUnit = AUPlayer.nbandUnit
+            try AUGraphAddNode(audioGraph, &nbandUnit, &_eqNode).throwCheck()
             try AUGraphNodeInfo(audioGraph, _eqNode, nil, &_eqUnit).throwCheck()
             guard let eqUnit = _eqUnit else { return }
-            let size = MemoryLayout.size(ofValue: Player.maxFramesPerSlice)
-            try AudioUnitSetProperty(eqUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &Player.maxFramesPerSlice, UInt32(size)).throwCheck()
+            var maxFramesPerSlice = Player.maxFramesPerSlice
+            let size = MemoryLayout.size(ofValue: maxFramesPerSlice)
+            try AudioUnitSetProperty(eqUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFramesPerSlice, UInt32(size)).throwCheck()
             _eqBandCount = UInt32(_options.equalizerBandFrequencies.count)
             let eqBandSize = UInt32(MemoryLayout.size(ofValue: _eqBandCount))
             try AudioUnitSetProperty(eqUnit, kAUNBandEQProperty_NumberOfBands, kAudioUnitScope_Global, 0, &_eqBandCount, eqBandSize).throwCheck()
@@ -276,11 +278,13 @@ private extension AUPlayer {
         let _options = _config
         guard _options.isEnabledVolumeMixer, let graph = _audioGraph else { return }
         do {
-            try AUGraphAddNode(graph, &AUPlayer.mixer, &_mixerNode).throwCheck()
-            try AUGraphNodeInfo(graph, _mixerNode, &AUPlayer.mixer, &_mixerUnit).throwCheck()
+            var mixer = AUPlayer.mixer
+            try AUGraphAddNode(graph, &mixer, &_mixerNode).throwCheck()
+            try AUGraphNodeInfo(graph, _mixerNode, &mixer, &_mixerUnit).throwCheck()
             guard let mixerUnit = _mixerUnit else { return }
-            let size = UInt32(MemoryLayout.size(ofValue: Player.maxFramesPerSlice))
-            try AudioUnitSetProperty(mixerUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &Player.maxFramesPerSlice, size).throwCheck()
+            var maxFramesPerSlice = Player.maxFramesPerSlice
+            let size = UInt32(MemoryLayout.size(ofValue: maxFramesPerSlice))
+            try AudioUnitSetProperty(mixerUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFramesPerSlice, size).throwCheck()
             var busCount: UInt32 = 1
             let busCountSize = UInt32(MemoryLayout.size(ofValue: busCount))
             try AudioUnitSetProperty(mixerUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, busCountSize).throwCheck()
@@ -298,11 +302,13 @@ private extension AUPlayer {
     private func createOutputUnit() {
         guard let audioGraph = _audioGraph else { return }
         do {
-            try AUGraphAddNode(audioGraph, &AUPlayer.outputUnit, &_outputNode).throwCheck()
-            try AUGraphNodeInfo(audioGraph, _outputNode, &AUPlayer.outputUnit, &_outputUnit).throwCheck()
+            var outputUnit = AUPlayer.outputUnit
+            try AUGraphAddNode(audioGraph, &outputUnit, &_outputNode).throwCheck()
+            try AUGraphNodeInfo(audioGraph, _outputNode, &outputUnit, &_outputUnit).throwCheck()
             guard let unit = _outputUnit else { return }
-            let s = MemoryLayout.size(ofValue: Player.canonical)
-            try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, Player.Bus.output, &Player.canonical, UInt32(s)).throwCheck()
+            var canonical = Player.canonical
+            let s = MemoryLayout.size(ofValue: canonical)
+            try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, Player.Bus.output, &canonical, UInt32(s)).throwCheck()
         } catch let APlay.Error.player(err) {
             eventPipeline.call(.error(.player(err)))
         } catch {
@@ -431,14 +437,17 @@ private extension AUPlayer {
         var convertNode = AUNode()
         var convertUnit: AudioUnit?
         do {
-            try AUGraphAddNode(audioGraph, &AUPlayer.convertUnit, &convertNode).throwCheck()
-            try AUGraphNodeInfo(audioGraph, convertNode, &AUPlayer.mixer, &convertUnit).throwCheck()
+            var convertUnitDesc = AUPlayer.convertUnit
+            var mixerDesc = AUPlayer.mixer
+            try AUGraphAddNode(audioGraph, &convertUnitDesc, &convertNode).throwCheck()
+            try AUGraphNodeInfo(audioGraph, convertNode, &mixerDesc, &convertUnit).throwCheck()
             guard let unit = convertUnit else { return nil }
             var srcFormat = format
             try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &srcFormat, UInt32(MemoryLayout.size(ofValue: format))).throwCheck()
             var desFormat = destFormat
             try AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &desFormat, UInt32(MemoryLayout.size(ofValue: destFormat))).throwCheck()
-            try AudioUnitSetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &Player.maxFramesPerSlice, UInt32(MemoryLayout.size(ofValue: Player.maxFramesPerSlice))).throwCheck()
+            var maxFramesPerSlice = Player.maxFramesPerSlice
+            try AudioUnitSetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFramesPerSlice, UInt32(MemoryLayout.size(ofValue: maxFramesPerSlice))).throwCheck()
             _converterNodes.append(convertNode)
             return convertNode
         } catch let APlay.Error.player(err) {
@@ -461,7 +470,7 @@ private extension AUPlayer {
 // MARK: - Model
 
 extension AUPlayer {
-    static var outputUnit: AudioComponentDescription = {
+    static let outputUnit: AudioComponentDescription = {
         #if os(OSX)
             let subType = kAudioUnitSubType_DefaultOutput
         #else
@@ -471,16 +480,16 @@ extension AUPlayer {
         return component
     }()
 
-    static var canonicalSize: UInt32 = {
+    static let canonicalSize: UInt32 = {
         UInt32(MemoryLayout.size(ofValue: Player.canonical))
     }()
 
-    static var convertUnit: AudioComponentDescription = {
+    static let convertUnit: AudioComponentDescription = {
         let component = AudioComponentDescription(componentType: kAudioUnitType_FormatConverter, componentSubType: kAudioUnitSubType_AUConverter, componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
         return component
     }()
 
-    static var mixer: AudioComponentDescription = {
+    static let mixer: AudioComponentDescription = {
         let component = AudioComponentDescription(componentType: kAudioUnitType_Mixer, componentSubType: kAudioUnitSubType_MultiChannelMixer, componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
         return component
     }()
@@ -494,7 +503,7 @@ extension AUPlayer {
         return component
     }
 
-    static var nbandUnit: AudioComponentDescription = {
+    static let nbandUnit: AudioComponentDescription = {
         let component = AudioComponentDescription(componentType: kAudioUnitType_Effect, componentSubType: kAudioUnitSubType_NBandEQ, componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
         return component
     }()

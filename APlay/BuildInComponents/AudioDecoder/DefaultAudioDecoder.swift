@@ -33,7 +33,12 @@ final class DefaultAudioDecoder: @unchecked Sendable {
     private lazy var __audioConverter: AudioConverterRef? = nil
     private var _audioConverter: AudioConverterRef? {
         get { return _propertiesQueue.sync { __audioConverter } }
-        set { _propertiesQueue.async(flags: .barrier) { self.__audioConverter = newValue } }
+        set {
+            // OpaquePointer cannot be Sendable; ownership is handed off through a
+            // barrier so the capture is explicitly unchecked.
+            nonisolated(unsafe) let captured = newValue
+            _propertiesQueue.async(flags: .barrier) { self.__audioConverter = captured }
+        }
     }
 
     private var _packetsManager: Uroboros
@@ -433,7 +438,7 @@ private extension DefaultAudioDecoder {
 // MARK: - Packet io v2
 
 private extension DefaultAudioDecoder {
-    final class Packet {
+    final class Packet: @unchecked Sendable {
         let desc: AudioStreamPacketDescription
         let data: Data
         var next: Packet?

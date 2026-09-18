@@ -47,6 +47,7 @@ public final class APlay: @unchecked Sendable {
     private lazy var __lastDelta: Float = -1
     private lazy var __lastDeltaHitCount: Int = 0
     private var __currentComposer: Composer?
+    private lazy var __isPlayingBeforeInterrupt = false
     private let _maxOpenRestry = 5
     private lazy var _currentOpenRestry = 0
 
@@ -372,7 +373,6 @@ private extension APlay {
                 }
             }
 
-            var playingStateBeforeInterrupte = state.isPlaying
             let note2 = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self](note) -> Void in
                 guard let sself = self else { return }
                 let info = note.userInfo
@@ -380,11 +380,12 @@ private extension APlay {
                 guard let type = info?[AVAudioSessionInterruptionTypeKey] as? UInt else { return }
                 if type == AVAudioSession.InterruptionType.began.rawValue {
                     // 中断开始
-                    playingStateBeforeInterrupte = sself.state.isPlaying
-                    if playingStateBeforeInterrupte == true { sself.pause() }
+                    let playing = sself.state.isPlaying
+                    sself._isPlayingBeforeInterrupt = playing
+                    if playing { sself.pause() }
                 } else {
                     // 中断结束
-                    guard let options = info?[AVAudioSessionInterruptionOptionKey] as? UInt, options == AVAudioSession.InterruptionOptions.shouldResume.rawValue, playingStateBeforeInterrupte == true else { return }
+                    guard let options = info?[AVAudioSessionInterruptionOptionKey] as? UInt, options == AVAudioSession.InterruptionOptions.shouldResume.rawValue, sself._isPlayingBeforeInterrupt else { return }
                     sself.resume()
                 }
             }
@@ -448,6 +449,11 @@ extension APlay {
         get { return _propertiesQueue.sync { __currentComposer } }
         set { _propertiesQueue.async(flags: .barrier) { self.__currentComposer = newValue } }
     }
+
+    private var _isPlayingBeforeInterrupt: Bool {
+        get { return _propertiesQueue.sync { __isPlayingBeforeInterrupt } }
+        set { _propertiesQueue.async(flags: .barrier) { self.__isPlayingBeforeInterrupt = newValue } }
+    }
 }
 
 // MARK: - Enums
@@ -492,7 +498,7 @@ public extension APlay {
     /// - paused: paused
     /// - error: error
     /// - unknown: exception
-    enum State {
+    enum State: @unchecked Sendable {
         case idle
         case playing
         case paused

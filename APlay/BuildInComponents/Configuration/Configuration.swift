@@ -163,24 +163,29 @@ extension APlay {
         /// Start background task
         ///
         /// - Parameter isToDownloadImage: Bool
+        ///
+        /// - Note: Touches main-actor-isolated APIs (`AVAudioSession`, `UIApplication`); callers are
+        ///   expected to be on the main thread (the playback entry points are).
         public func startBackgroundTask(isToDownloadImage: Bool = false) {
             #if os(iOS)
-                if isToDownloadImage {
-                    guard _backgroundTask != UIBackgroundTaskIdentifier.invalid else { return }
-                }
-                if isEnabledAutomaticAudioSessionHandling {
-                    do {
-                        let instance = AVAudioSession.sharedInstance()
-                        try instance.setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longForm)
-                        try instance.setActive(true)
-                    } catch {
-                        debug_log("error: \(error)")
+                MainActor.assumeIsolated {
+                    if isToDownloadImage {
+                        guard _backgroundTask != UIBackgroundTaskIdentifier.invalid else { return }
                     }
+                    if isEnabledAutomaticAudioSessionHandling {
+                        do {
+                            let instance = AVAudioSession.sharedInstance()
+                            try instance.setCategory(.playback, mode: .default, policy: AVAudioSession.RouteSharingPolicy.longFormAudio)
+                            try instance.setActive(true)
+                        } catch {
+                            debug_log("error: \(error)")
+                        }
+                    }
+                    endBackgroundTask(isToDownloadImage: isToDownloadImage)
+                    _backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
+                        self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
+                    })
                 }
-                endBackgroundTask(isToDownloadImage: isToDownloadImage)
-                _backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
-                    self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
-                })
             #elseif os(macOS)
                 // No background-task / audio-session concept needed on macOS; playback is foreground.
                 _ = isToDownloadImage
@@ -192,10 +197,12 @@ extension APlay {
         /// - Parameter isToDownloadImage: Bool
         public func endBackgroundTask(isToDownloadImage: Bool) {
             #if os(iOS)
-                if isToDownloadImage { return }
-                guard _backgroundTask != UIBackgroundTaskIdentifier.invalid else { return }
-                UIApplication.shared.endBackgroundTask(_backgroundTask)
-                _backgroundTask = UIBackgroundTaskIdentifier.invalid
+                MainActor.assumeIsolated {
+                    if isToDownloadImage { return }
+                    guard _backgroundTask != UIBackgroundTaskIdentifier.invalid else { return }
+                    UIApplication.shared.endBackgroundTask(_backgroundTask)
+                    _backgroundTask = UIBackgroundTaskIdentifier.invalid
+                }
             #endif
         }
     }
@@ -218,8 +225,7 @@ extension APlay.Configuration {
     public static var defaultUA: String {
         var osStr = ""
         #if os(iOS)
-            let rversion = UIDevice.current.systemVersion
-            osStr = "iOS \(rversion)"
+            osStr = "iOS \(MainActor.assumeIsolated { UIDevice.current.systemVersion })"
         #elseif os(OSX)
             // No need to be so concervative with the cache sizes
             osStr = "macOS"

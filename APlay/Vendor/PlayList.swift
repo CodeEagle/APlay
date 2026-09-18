@@ -9,7 +9,7 @@
 import Foundation
 
 /// A List for APlay
-public final class PlayList {
+public final class PlayList: @unchecked Sendable {
     public private(set) lazy var playingIndex: Int? = nil
     public private(set) lazy var list: [URL] = []
 

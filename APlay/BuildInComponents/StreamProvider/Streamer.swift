@@ -351,9 +351,12 @@ private extension Streamer {
     }
 
     func _enqueue(_ block: @escaping (Streamer) -> Void) {
+        // The URLSession completion handlers we forward are not Sendable on every
+        // SDK; the block is queued onto a serial queue and invoked exactly once.
+        nonisolated(unsafe) let captured = block
         _stateQueue.async { [weak self] in
             guard let self = self else { return }
-            block(self)
+            captured(self)
         }
     }
 }

@@ -45,7 +45,7 @@ extension APlay {
                 map[MPMediaItemPropertyPlaybackDuration] = duration
                 #if os(iOS)
                     if let image = artwork {
-                        map[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(image: image)
+                        map[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                     }
                 #endif
                 return map
@@ -67,7 +67,8 @@ extension APlay {
         func image(with url: String?) {
             guard let u = url, let r = URL(string: u) else { return }
             _coverTask?.cancel()
-            DispatchQueue.global(qos: .utility).async {
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                guard let self = self else { return }
                 let request = URLRequest(url: r, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 20)
                 if let d = URLCache.shared.cachedResponse(for: request)?.data, let image = APlayImage(data: d) {
                     self._queue.sync { self.artwork = image }

@@ -10,6 +10,8 @@ v1.3.0
 4. Mark internally-synchronized types `@unchecked Sendable`; constants that were `static var` are
    now `static let`
 5. Demo: `@UIApplicationMain` → `@main`
+6. Expose built-in `NBandEQ` band gains at runtime via `APlay.setEqualizerBandGain(_:at:)`
+   (band frequencies were already configurable via `Configuration.equalizerBandFrequencies`)
 
 v0.0.5
 ---

@@ -226,6 +226,17 @@ public extension APlay {
         if let value = cover { _nowPlayingInfo.artwork = value }
         _nowPlayingInfo.update()
     }
+
+    /// Set the gain of an equalizer band at runtime.
+    ///
+    /// - Parameters:
+    ///   - gain: Band gain in dB.
+    ///   - index: Band index, in the same order as `Configuration.equalizerBandFrequencies`.
+    /// - Note: Has no effect when the built-in equalizer is unavailable (e.g. players that
+    ///   don't build an audio graph) or when `index` is out of range.
+    func setEqualizerBandGain(_ gain: Float, at index: Int) {
+        _player.setEqualizerBandGain(index: index, gain: gain)
+    }
 }
 
 // MARK: - Private Utils

@@ -22,6 +22,17 @@ player.play(url)
 ...
 ```
 
+Equalizer
+---
+The built-in player wires an `NBandEQ` into its audio graph when `equalizerBandFrequencies` is
+configured (the default is `[50, 100, 200, 400, 800, 1600, 2600, 16000]`). Band gains can be
+adjusted at any time:
+
+```Swift
+// boost the low band by 6 dB (index order matches Configuration.equalizerBandFrequencies)
+player.setEqualizerBandGain(6, at: 0)
+```
+
 ✅ Known issue (fixed)
 ---
 Earlier releases could only run in `DEBUG` mode: with optimization enabled (`-O`) the decode
@@ -32,6 +43,11 @@ handed to Core Audio through unscoped `inout` references. These are now backed b
 object-owned storage and scoped pointer access, so optimized `Release` builds work correctly.
 
 No CocoaPods `post_install` workaround is needed anymore — `pod 'APlay'` works out of the box.
+
+> ℹ️ Plain `http://` streams: iOS blocks non-HTTPS URLs via App Transport Security by default.
+> If your stream URL is `http://...`, add an `NSAllowsArbitraryLoads` (or a per-domain) exception
+> to your app's `Info.plist`, otherwise the open will fail with a permission error. This is the
+> most common cause of "cannot play HTTP stream".
 
 Docs
 ---
@@ -60,7 +76,8 @@ Features
 - [x] Support cached the stream contents to a file
 
 - [x] Built-in `NBandEQ` equalizer wired into the `AUPlayer` audio graph (band frequencies
-      configurable via `Configuration.equalizerBandFrequencies`)
+      configurable via `Configuration.equalizerBandFrequencies`; band gains adjustable at runtime
+      via `setEqualizerBandGain(_:at:)`)
 
 - [x] Custom logging module and logging into file supported
 
@@ -77,9 +94,10 @@ Installation
 Todo
 ---
 - [ ] AirPlay2 support (Maybe not — tracked separately, see the `airplay2` branch)
-- [ ] AudioEffectUnit support: an `NBandEQ` is already wired into the `AUPlayer` graph,
-      but band **gains** are fixed at build time. Remaining work is to expose the EQ node
-      so gains can be changed at runtime.
+- [ ] AudioEffectUnit support: band **frequencies** and **gains** are now configurable, but gains
+      can only be set per-band — preset management (save/apply an EQ curve) is the remaining gap.
+- [ ] Pre-loading a track before playback (see issue #14): needs a `prepare(_:)` entry point that
+      buffers without starting the output audio unit.
 - [ ] Network layer still relies on the deprecated (since iOS 9) `CFReadStreamCreateForHTTPRequest`.
       Migrating `Streamer` to `URLSession` is the recommended follow-up — it is the root cause
       behind HTTP-stream issues and would also let the framework drop the `RunloopQueue` shims.

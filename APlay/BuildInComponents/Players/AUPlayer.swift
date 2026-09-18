@@ -206,6 +206,18 @@ extension AUPlayer {
             #endif
         }
     }
+    /// Adjust a band gain at runtime. Safe to call while the graph is running.
+    /// Silently ignores out-of-range indices or a graph without the equalizer node.
+    func setEqualizerBandGain(index: Int, gain: Float) {
+        guard let eqUnit = _eqUnit, index >= 0, index < Int(_eqBandCount) else { return }
+        do {
+            try AudioUnitSetParameter(eqUnit, kAUNBandEQParam_Gain + UInt32(index), kAudioUnitScope_Global, 0, gain, 0).throwCheck()
+        } catch let APlay.Error.player(err) {
+            eventPipeline.call(.error(.player(err)))
+        } catch {
+            eventPipeline.call(.unknown(error))
+        }
+    }
 }
 
 // MARK: - Create

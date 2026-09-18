@@ -17,6 +17,13 @@ v1.3.1
    workaround dropped (deployment target is iOS 15)
 5. Swift Package Manager support, including an end-to-end macOS playback validation target
    (`APlayMacPlayback`) and a non-audio smoke test
+6. Network layer: `Streamer` now streams through `URLSession` (inheriting
+   `Configuration.session`'s configuration and challenge policy) instead of the deprecated
+   `CFReadStreamCreateForHTTPRequest` / `CFHTTPMessage` stack. HTTPS streaming now works
+   (it previously failed with `-9824`), reconnect watchdogs run on `DispatchSourceTimer`,
+   local files are read through `FileHandle` so seeking works without HTTP range semantics,
+   and the `RunloopQueue` shim is gone. Legacy pure-`ICY 200 OK` Shoutcast streams remain
+   unsupported (non-standard status line); standard HTTP with `icy-metaint` still parses metadata
 
 v1.3.0
 ---

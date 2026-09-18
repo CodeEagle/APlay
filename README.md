@@ -100,9 +100,6 @@ Todo
       can only be set per-band — preset management (save/apply an EQ curve) is the remaining gap.
 - [ ] Pre-loading a track before playback (see issue #14): needs a `prepare(_:)` entry point that
       buffers without starting the output audio unit.
-- [ ] Network layer still relies on the deprecated (since iOS 9) `CFReadStreamCreateForHTTPRequest`.
-      Migrating `Streamer` to `URLSession` is the recommended follow-up — it is the root cause
-      behind HTTP-stream issues and would also let the framework drop the `RunloopQueue` shims.
 
 Sponsor 
 ---

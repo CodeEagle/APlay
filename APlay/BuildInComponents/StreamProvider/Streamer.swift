@@ -20,34 +20,53 @@ final class Streamer: StreamProviderCompatible {
 
     var bufferingProgress: Float {
         guard contentLength > 0 else { return 0 }
-        let start = Float(position) + Float(_httpInfo.bytesRead)
+        let start = Float(position) + Float(_bytesRead)
         return start / Float(contentLength)
     }
 
     private unowned let _config: ConfigurationCompatible
-    private lazy var _readStream: CFReadStream? = nil
-    private lazy var _runloop = RunloopQueue(named: "Streamer")
-    private lazy var _isRuning = false
+
+    /// Owns the Streamer as its `URLSessionDataDelegate` through a weak bridge, so
+    /// that `Streamer.deinit` still runs (a session strongly retains its delegate).
+    private let _urlSession: URLSession
+    private var _task: URLSessionDataTask?
+    private var _isSuspended = false
+
+    /// Backing storage for local files. URLSession offers no seek for `file://`
+    /// URLs, so local playback reads through `FileHandle` instead.
+    private var _fileHandle: FileHandle?
+    private let _localLock = NSLock()
+    private var _isRunningLocal = false
+
+    /// Serializes every remote state mutation: URLSession delegate callbacks,
+    /// reconnect watchdog timers and task lifecycle (open/pause/resume/destroy).
+    private let _stateQueue = DispatchQueue(label: "com.SelfStudio.APlay.Streamer.state")
+    /// Runs the blocking local-file read loop.
+    private let _readQueue = DispatchQueue(label: "com.SelfStudio.APlay.Streamer.read", qos: .userInitiated)
 
     private lazy var _cacheInfo = CacheInfo(config: self._config)
     private lazy var _icyCastInfo = IcyCastInfo()
-    private lazy var _watchDogInfo = WatchDogInfo(maxRemoteStreamOpenRetry: UInt(self._config.maxRemoteStreamOpenRetry))
-    private lazy var _httpInfo = HttpInfo()
-
-    private lazy var _canOutputData = false
-    private lazy var _isFirstPacket = true
+    private lazy var _watchDogInfo = WatchDogInfo(maxRemoteStreamOpenRetry: UInt(self._config.maxRemoteStreamOpenRetry), queue: self._stateQueue)
+    private var _bytesRead: UInt = 0
     private var _tagParser: MetadataParserCompatible?
-
-    private lazy var _isRequestClose = false
-    private lazy var _isLooping = false
+    private var _isFirstPacket = true
 
     #if DEBUG
         deinit {
+            _urlSession.finishTasksAndInvalidate()
             debug_log("\(self) \(#function)")
         }
     #endif
 
-    init(config: ConfigurationCompatible) { _config = config }
+    init(config: ConfigurationCompatible) {
+        _config = config
+        let bridge = SessionDataDelegate(proxyPolicy: config.proxyPolicy)
+        // Inherit the caller's configuration (proxy dictionary, TLS policy, …)
+        // while keeping the data delegate to ourselves. The weak back-reference
+        // is wired after `self` is fully initialized.
+        _urlSession = URLSession(configuration: config.session.configuration, delegate: bridge, delegateQueue: nil)
+        bridge.streamer = self
+    }
 
     private func tagParser(for urlInfo: StreamProvider.URLInfo) -> MetadataParserCompatible? {
         var parser = _config.metadataParserBuilder(urlInfo.fileHint, _config)
@@ -62,126 +81,91 @@ final class Streamer: StreamProviderCompatible {
             }
         }
 
-        parser?.outputStream.delegate(to: self, with: { sself, value in
+        parser?.outputStream.delegate(to: self) { sself, value in
             switch value {
             case let .metadata(data): sself.outputPipeline.call(.metadata(data))
             case let .tagSize(size): sself.outputPipeline.call(.metadataSize(size))
             case let .flac(value): sself.outputPipeline.call(.flac(value))
             default: break
             }
-        })
+        }
         return parser
     }
 }
 
-// MARK: StreamDataSource
+// MARK: - StreamDataSource
 
 extension Streamer {
-    func _open(at position: StreamProvider.Position) {
-        do {
-            guard _readStream == nil else {
-                _config.logger.log("_readStream not nil", to: .streamProvider)
-                outputPipeline.call(.errorOccurred(.open("_readStream not nil")))
-                return
-            }
-            _isRequestClose = false
-            _cacheInfo.disposeIfNeeded(at: position)
-            self.position = position
-            _config.logger.log("open at \(position)", to: .streamProvider)
-            let stream = try createStream(at: position, httpInfo: _httpInfo)
-            try addReadCallBack(for: stream)
-            if info.isRemote == false {
-                // Local files become readable the instant CFReadStreamOpen returns,
-                // so the runloop can deliver chunks before this method finishes and
-                // posts .readyForRead. Those chunks hit a decoder with no parser yet
-                // and are dropped, after which the parser starts mid-file and fails
-                // with "unsupported file type". Open the parser first.
-                outputPipeline.call(.readyForRead)
-            }
-            setScheduledInRunLoop(run: true, for: stream)
-            _canOutputData = true
-            guard CFReadStreamOpen(stream) == true else {
-                _canOutputData = false
-                CFReadStreamSetClient(stream, 0, nil, nil)
-                setScheduledInRunLoop(run: false, for: stream)
-                throw APlay.Error.open("CFReadStreamOpen faile: \(position)")
-            }
-            if position == 0 { _tagParser?.parseID3V1Tag(at: info.url) }
-            if info.isRemote {
-                _watchDogInfo.reopenTimes += 1
-                _watchDogInfo.isReadedData = false
-            }
-            _isFirstPacket = true
-            _readStream = stream
-        } catch {
-            guard let e = error as? APlay.Error else {
-                outputPipeline.call(.unknown(error))
-                return
-            }
-            outputPipeline.call(.errorOccurred(e))
-        }
-    }
-
     func open(url: URL, at position: StreamProvider.Position) {
-        guard _readStream == nil else {
+        guard _task == nil, _fileHandle == nil else {
             outputPipeline.call(.errorOccurred(.openedAlready("stream already open")))
             return
         }
         reset(url: url)
         guard info.isRemote else {
-            _open(at: position)
+            _stateQueue.async { self._open(at: position) }
             return
         }
         _config.networkPolicy.requestPermission(for: info.url, handler: { [weak self] success in
+            guard let self = self else { return }
             guard success else {
                 let err = APlay.Error.networkPermission("No permission for accessing network")
-                self?.outputPipeline.call(.errorOccurred(err))
+                self.outputPipeline.call(.errorOccurred(err))
                 return
             }
-            self?._open(at: position)
+            self._stateQueue.async { self._open(at: position) }
         })
     }
 
     func destroy() {
-        if _isLooping {
-            debug_log("Streamer request destroy when looping")
-            pause()
-            _isRequestClose = true
-        } else {
-            debug_log("Streamer closed")
-            close(resetTimer: true)
+        _stateQueue.async { self.close(resetTimer: true) }
+    }
+
+    func pause() {
+        _stateQueue.async {
+            self.setLocalRunning(false)
+            guard self._isSuspended == false else { return }
+            self._isSuspended = true
+            self._task?.suspend()
         }
     }
 
-    func pause() { setScheduledInRunLoop(run: false, for: _readStream) }
-
-    func resume() { setScheduledInRunLoop(run: true, for: _readStream) }
-
-    private func setScheduledInRunLoop(run: Bool, for stream: CFReadStream?) {
-        guard let readStream = stream, _isRuning != run else { return }
-        if run == false {
-            CFReadStreamUnscheduleFromRunLoop(readStream, CFRunLoopGetCurrent(), .commonModes)
-        } else { _runloop.schedule(readStream) }
-        _isRuning = run
+    func resume() {
+        _stateQueue.async {
+            if self._isSuspended {
+                self._isSuspended = false
+                self._task?.resume()
+            }
+            self.startLocalReadLoopIfNeeded()
+        }
     }
 
+    /// Cancels the current task (if any) and closes the local file handle.
+    /// Must run on `_stateQueue`.
     private func close(resetTimer: Bool) {
-        guard let stream = _readStream else { return }
-        pause()
-        CFReadStreamSetClient(stream, 0, nil, nil)
-        CFReadStreamClose(stream)
-        _readStream = nil
+        if let task = _task {
+            _task = nil
+            _isSuspended = false
+            // Cancel before clearing the reference is racy the other way: the
+            // completion callback would find `task === _task` still true. Drop the
+            // reference first so the callback is ignored by identity.
+            task.cancel()
+        }
+        setLocalRunning(false)
+        if let handle = _fileHandle {
+            _fileHandle = nil
+            try? handle.close()
+        }
         guard info.isRemote else { return }
         if resetTimer { _watchDogInfo.reset() }
     }
 
     private func reset(url: URL) {
-        _canOutputData = false
-        close(resetTimer: true)
-        _httpInfo.reset()
+        _stateQueue.sync { self.close(resetTimer: true) }
         _icyCastInfo.reset()
         _watchDogInfo.reset()
         _cacheInfo.reset(url: url)
+        _bytesRead = 0
         info = StreamProvider.URLInfo(url: url)
         position = 0
         if let cachedInfo = asCachedFileInfo() { info = cachedInfo }
@@ -189,218 +173,306 @@ extension Streamer {
         _tagParser = tagParser(for: info)
         _config.logger.log("\(info)", to: .streamProvider)
     }
+
+    private func setLocalRunning(_ value: Bool) {
+        _localLock.lock()
+        _isRunningLocal = value
+        _localLock.unlock()
+    }
+
+    /// Resumes the local read loop if a file handle is still open.
+    /// Must run on `_stateQueue`.
+    @discardableResult
+    private func startLocalReadLoopIfNeeded() -> Bool {
+        _localLock.lock()
+        let handle = _fileHandle
+        if handle != nil { _isRunningLocal = true }
+        _localLock.unlock()
+        guard handle != nil else { return false }
+        _readQueue.async { [weak self] in
+            self?.localReadLoop()
+        }
+        return true
+    }
 }
 
-// MARK: - Stream Runloop Stuff
+// MARK: - Open
 
 private extension Streamer {
-
-    // MARK: Create Stream
-
-    func createStream(at position: StreamProvider.Position, httpInfo: HttpInfo) throws -> CFReadStream {
+    /// Entrypoint for both local and remote sources. Runs on `_stateQueue`.
+    func _open(at position: StreamProvider.Position) {
+        self.position = position
         switch info {
-        case let .local(url, _): return try createLocalStream(for: url, at: position)
-        case let .remote(url, _): return try createRemoteStream(for: url, at: position, httpInfo: httpInfo)
-        case let .unknown(url): throw APlay.Error.open("Unknown how to handle url: \(url.absoluteString)")
+        case .local:
+            do {
+                try openLocal(at: position)
+            } catch {
+                let e = error as? APlay.Error ?? APlay.Error.open("open local failed: \(error)")
+                outputPipeline.call(.errorOccurred(e))
+            }
+        case .remote:
+            openRemote(at: position)
+        case .unknown:
+            outputPipeline.call(.errorOccurred(.open("Unknown how to handle url: \(info.url.absoluteString)")))
         }
     }
 
-    func createLocalStream(for url: URL, at position: StreamProvider.Position) throws -> CFReadStream {
-        guard let stream = CFReadStreamCreateWithFile(kCFAllocatorDefault, url as CFURL) else {
-            throw APlay.Error.open("CFReadStreamCreateWithFile faile: \(url)")
+    func openLocal(at position: StreamProvider.Position) throws {
+        guard case let .local(url, _) = info else {
+            throw APlay.Error.open("not a local url")
         }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw APlay.Error.open("file not exists: \(url)")
+        }
+        let handle = try FileHandle(forReadingFrom: url)
         if position > 0 {
-            var position = position
-            let p = CFNumberCreate(kCFAllocatorDefault, .longLongType, &position)
-            CFReadStreamSetProperty(stream, CFStreamPropertyKey.fileCurrentOffset, p)
+            try handle.seek(toOffset: UInt64(position))
         }
-        return stream
+        _localLock.lock()
+        _fileHandle = handle
+        _isRunningLocal = true
+        _localLock.unlock()
+        if position == 0 { _tagParser?.parseID3V1Tag(at: info.url) }
+        _isFirstPacket = true
+        _readQueue.async { [weak self] in
+            self?.localReadLoop()
+        }
     }
 
-    func createRemoteStream(for url: URL, at position: StreamProvider.Position, httpInfo: HttpInfo) throws -> CFReadStream {
-        let config = _config
-        let request = CFHTTPMessageCreateRequest(kCFAllocatorDefault, Keys.get.cf, url as CFURL, kCFHTTPVersion1_1).takeRetainedValue()
-
-        CFHTTPMessageSetHeaderFieldValue(request, Keys.userAgent.cf, config.userAgent as CFString)
-
-        CFHTTPMessageSetHeaderFieldValue(request, Keys.icyMetadata.cf, Keys.icyMetaDataValue.cf)
-
-        if position > 0 {
-            let range = "bytes=\(position)-" as CFString
-            CFHTTPMessageSetHeaderFieldValue(request, Keys.range.cf, range)
+    func openRemote(at position: StreamProvider.Position) {
+        guard case let .remote(url, _) = info else {
+            outputPipeline.call(.errorOccurred(.open("not a remote url")))
+            return
         }
-
-        for (key, value) in config.predefinedHttpHeaderValues {
+        var request = URLRequest(url: url)
+        request.httpMethod = Keys.get.rawValue
+        request.setValue(_config.userAgent, forHTTPHeaderField: Keys.userAgent.rawValue)
+        request.setValue(Keys.icyMetaDataValue.rawValue, forHTTPHeaderField: Keys.icyMetadata.rawValue)
+        if position > 0 {
+            request.setValue("bytes=\(position)-", forHTTPHeaderField: Keys.range.rawValue)
+        }
+        for (key, value) in _config.predefinedHttpHeaderValues {
             debug_log("Setting predefined HTTP header[\(key) : \(value)]")
-            CFHTTPMessageSetHeaderFieldValue(request, key as CFString, value as CFString)
+            request.setValue(value, forHTTPHeaderField: key)
         }
 
-        if let authentication = httpInfo.auth, let info = httpInfo.credentials {
-            let credentials = info as CFDictionary
-            if CFHTTPMessageApplyCredentialDictionary(request, authentication, credentials, nil) == false {
-                throw APlay.Error.open("add authentication fail")
-            }
-            debug_log("Digest authentication add success")
-        }
-        let s = CFReadStreamCreateForHTTPRequest(kCFAllocatorDefault, request)
-        let stream = s.takeRetainedValue()
-        CFReadStreamSetProperty(stream, CFStreamPropertyKey(rawValue: kCFStreamNetworkServiceType), kCFStreamNetworkServiceTypeBackground)
-        CFReadStreamSetProperty(stream, CFStreamPropertyKey(rawValue: kCFStreamPropertyHTTPShouldAutoredirect), kCFBooleanTrue)
+        let task = _urlSession.dataTask(with: request)
+        _task = task
+        // A pause may have been queued before the task existed; carry it over.
+        if _isSuspended { task.suspend() }
+        if position == 0 { _tagParser?.parseID3V1Tag(at: info.url) }
+        _watchDogInfo.reopenTimes += 1
+        _watchDogInfo.isReadedData = false
+        _isFirstPacket = true
+        _config.logger.log("open at \(position)", to: .streamProvider)
+        task.resume()
+    }
+}
 
-        if case let APlay.Configuration.ProxyPolicy.custom(info) = config.proxyPolicy {
-            var dict: [String: Any] = [:]
-            dict[kCFNetworkProxiesHTTPPort as String] = info.port
-            dict[kCFNetworkProxiesHTTPProxy as String] = info.host
-            let proxy = dict as CFDictionary
-            if CFReadStreamSetProperty(stream, CFStreamPropertyKey(rawValue: kCFStreamPropertyHTTPProxy), proxy) == false {
-                debug_log("Setting custom proxy not success")
-            }
-        } else {
-            if let proxy = CFNetworkCopySystemProxySettings()?.takeRetainedValue() {
-                let dict = proxy as NSDictionary
-                debug_log("System proxy:\(dict)")
-                CFReadStreamSetProperty(stream, CFStreamPropertyKey(rawValue: kCFStreamPropertyHTTPProxy), proxy)
-            }
+// MARK: - Local file reading
+
+private extension Streamer {
+    /// Blocking read loop on `_readQueue`. `readyForRead` is posted first so the
+    /// downstream parser exists before the first chunk arrives — mirroring the
+    /// old CFReadStream ordering where local files became readable instantly.
+    func localReadLoop() {
+        outputPipeline.call(.readyForRead)
+        while true {
+            _localLock.lock()
+            let running = _isRunningLocal
+            let handle = _fileHandle
+            _localLock.unlock()
+            guard running, let handle else { return }
+            guard let chunk = try? handle.read(upToCount: 8192), chunk.isEmpty == false else { break }
+            deliverLocalData(chunk)
         }
-        // SSL Support
-        if url.scheme?.lowercased() == "https" {
-            let sslSettings: [String: Any] = [
-                kCFStreamSocketSecurityLevelNegotiatedSSL as String: false,
-                kCFStreamSSLLevel as String: kCFStreamSSLValidatesCertificateChain,
-                kCFStreamSSLPeerName as String: NSNull(),
-            ]
-            let key = CFStreamPropertyKey(rawValue: kCFStreamPropertySSLSettings)
-            CFReadStreamSetProperty(stream, key, sslSettings as CFTypeRef)
-        }
-        return stream
+        // EOF (not pause/destroy) is the only path that posts `.endEncountered`.
+        _localLock.lock()
+        let reachedEOF = _isRunningLocal
+        if reachedEOF { _isRunningLocal = false }
+        _localLock.unlock()
+        guard reachedEOF else { return }
+        outputPipeline.call(.endEncountered)
     }
 
-    // MARK: Add Stream Callback
-
-    func addReadCallBack(for stream: CFReadStream) throws {
-        let this = UnsafeMutableRawPointer.from(object: self)
-
-        var ctx = CFStreamClientContext(version: 0, info: this, retain: nil, release: nil, copyDescription: nil)
-        let flags: CFStreamEventType = [.hasBytesAvailable, .endEncountered, .errorOccurred]
-
-        let callback: CFReadStreamClientCallBack = { stream, type, userData in
-            guard let data = userData else { return }
-            let st = data.to(object: Streamer.self)
-            st.readCallBack(type: type, stream: stream)
+    private func deliverLocalData(_ data: Data) {
+        let count = UInt32(data.count)
+        data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+            let pointer = UnsafeMutablePointer(mutating: base)
+            if position == 0 { _tagParser?.acceptInput(data: pointer, count: count) }
+            outputPipeline.call(.hasBytesAvailable(pointer, count, _isFirstPacket))
         }
-        guard CFReadStreamSetClient(stream, flags.rawValue, callback, &ctx) == false else { return }
-        throw APlay.Error.open("CFReadStreamSetClient faile")
+        if _isFirstPacket { _isFirstPacket = false }
+        _bytesRead += UInt(count)
+    }
+}
+
+// MARK: - URLSession delegate bridging
+
+private extension Streamer {
+    /// Weak bridge so the session never outlives-captures the Streamer.
+    final class SessionDataDelegate: NSObject, URLSessionDataDelegate {
+        weak var streamer: Streamer?
+        let proxyPolicy: APlay.Configuration.ProxyPolicy
+
+        init(proxyPolicy: APlay.Configuration.ProxyPolicy) {
+            self.proxyPolicy = proxyPolicy
+        }
+
+        func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+            streamer?._enqueue { $0.handle(response: response, completionHandler: completionHandler) }
+        }
+
+        func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive data: Data) {
+            streamer?._enqueue { $0.handle(data: data) }
+        }
+
+        func urlSession(_: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+            streamer?._enqueue { $0.handle(task: task, error: error) }
+        }
+
+        func urlSession(_: URLSession, task _: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+            // Mirrors `Configuration.SessionDelegate`: custom proxy credentials,
+            // otherwise let the system handle trust and keychain challenges.
+            if case let APlay.Configuration.ProxyPolicy.custom(info) = proxyPolicy {
+                completionHandler(.useCredential, URLCredential(user: info.username, password: info.password, persistence: .forSession))
+            } else {
+                completionHandler(.performDefaultHandling, nil)
+            }
+        }
+
+        func urlSession(_: URLSession, didBecomeInvalidWithError _: Error?) {
+            streamer?._enqueue { streamer in
+                streamer._task = nil
+                streamer._isSuspended = false
+            }
+        }
     }
 
-    // MARK: Handle Stream CallBack
-
-    func readCallBack(type: CFStreamEventType, stream: CFReadStream?) {
-        switch type {
-        case CFStreamEventType.hasBytesAvailable: hasBytesAvailable(stream)
-        case CFStreamEventType.endEncountered: endEncountered(stream)
-        case CFStreamEventType.errorOccurred: handleStreamError(stream)
-        default: break
+    func _enqueue(_ block: @escaping (Streamer) -> Void) {
+        _stateQueue.async { [weak self] in
+            guard let self = self else { return }
+            block(self)
         }
     }
+}
 
-    func hasBytesAvailable(_ targetStream: CFReadStream?) {
+// MARK: - URLSession callbacks (run on _stateQueue)
+
+private extension Streamer {
+    func handle(response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let http = response as? HTTPURLResponse else {
+            // Not HTTP: nothing to parse, the caller may still stream bytes.
+            contentLength = max(contentLength, UInt(max(response.expectedContentLength, 0)))
+            outputPipeline.call(.readyForRead)
+            completionHandler(.allow)
+            return
+        }
+        let statusCode = http.statusCode
+        for key in _config.httpFileCompletionValidator.keys {
+            if let value = http.value(forHTTPHeaderField: key) {
+                registerHeader[key] = value
+            }
+        }
+        /*
+         * If the server responded with the icy-metaint header, the response
+         * body will be encoded in the ShoutCast protocol.
+         */
+        if let metaint = http.value(forHTTPHeaderField: Keys.icyMetaint.rawValue) {
+            _icyCastInfo.isIcyStream = true
+            _icyCastInfo.isHeadersParsed = true
+            _icyCastInfo.isHeadersRead = true
+            _icyCastInfo.metaDataInterval = Int(metaint) ?? 0
+            _config.logger.log("\(Keys.icyMetaint.rawValue): \(_icyCastInfo.metaDataInterval)", to: .streamProvider)
+        } else if let notice = http.value(forHTTPHeaderField: Keys.icyNotice1.rawValue) {
+            _icyCastInfo.isIcyStream = true
+            _icyCastInfo.isHeadersParsed = true
+            _icyCastInfo.isHeadersRead = true
+            _config.logger.log("\(Keys.icyNotice1.rawValue): \(notice)", to: .streamProvider)
+        }
+        if let name = http.value(forHTTPHeaderField: Keys.icyName.rawValue) {
+            _icyCastInfo.name = name
+            outputPipeline.call(.metadata([.title(name)]))
+        }
+        if let contentType = http.value(forHTTPHeaderField: Keys.contentType.rawValue) {
+            if case let .remote(url, hint) = info {
+                let newHint = StreamProvider.URLInfo.fileHint(from: contentType)
+                if newHint != .mp3, hint != newHint {
+                    info = .remote(url, newHint)
+                    _tagParser = tagParser(for: info)
+                }
+            }
+            _config.logger.log("\(Keys.contentType.rawValue): \(contentType)", to: .streamProvider)
+        }
+
+        switch statusCode {
+        case 200, 206:
+            if let len = http.value(forHTTPHeaderField: Keys.contentLength.rawValue).flatMap({ UInt($0) }) {
+                if statusCode == 206 {
+                    contentLength = len + position
+                } else {
+                    contentLength = len
+                }
+                _config.logger.log("\(statusCode) Content Length:\(contentLength)", to: .streamProvider)
+            }
+            outputPipeline.call(.readyForRead)
+        case 401, 407:
+            // The challenge is answered in the session delegate; if the server
+            // still answers with 401/407 the reconnect watchdog takes over.
+            _config.logger.log("Did receive authentication challenge (\(statusCode))", to: .streamProvider)
+            _watchDogInfo.reset()
+            startReconnectWatchDog()
+        case 500 ... 599:
+            _config.logger.log("Server error:\(statusCode)", to: .streamProvider)
+            _watchDogInfo.reset()
+            startReconnectWatchDog()
+        default:
+            outputPipeline.call(.errorOccurred(.networkStatusCode(statusCode)))
+        }
+        completionHandler(.allow)
+    }
+
+    func handle(data: Data) {
         if info.isRemote {
             _watchDogInfo.reset()
             _watchDogInfo.isReadedData = true
         }
-        guard let stream = targetStream, _canOutputData else { return }
-        let bufferSize = 8192 // balance cpu, slow streaming but low cpu usage
-        let buffer = UnsafeMutablePointer.uint8Pointer(of: bufferSize)
-        // 50kb/s limit read speed
-//        let speed = 50 * 1024 / 1000
-//        defer { free(buffer) }
-//        var begin: CFAbsoluteTime = 0
-//        var end: CFAbsoluteTime = 0
-        while CFReadStreamHasBytesAvailable(stream) {
-            _isLooping = true
-            if _isRequestClose == true {
-                defer { _isRequestClose = false }
-                close(resetTimer: true)
-                _config.logger.log("Streamer real closing stream", to: .streamProvider)
-                return
+        let count = UInt32(data.count)
+        if _icyCastInfo.isIcyStream {
+            data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+                _icyCastInfo.parseICYStream(streamer: self, buffers: UnsafeMutablePointer(mutating: base), bufSize: Int(count))
             }
-            if _isRuning == false {
-                _config.logger.log("read pending", to: .streamProvider)
-                _isLooping = false
-                return
+        } else {
+            data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+                let pointer = UnsafeMutablePointer(mutating: base)
+                _cacheInfo.write(bytes: pointer, count: Int(count))
+                if position == 0 { _tagParser?.acceptInput(data: pointer, count: count) }
+                outputPipeline.call(.hasBytesAvailable(pointer, count, _isFirstPacket))
             }
-//            begin = CFAbsoluteTimeGetCurrent()
-            // why it is not reading real data, sometime?
-            let bytesRead = CFReadStreamRead(stream, buffer, CFIndex(bufferSize))
-            // error, reading empty data back
-//            if _isFirstPacket == true, position == 0, buffer.advanced(by: 0).pointee == 0 {
-//                _watchDogInfo.isReadedData = false
-//                close(resetTimer: false)
-//                startReconnectWatchDog()
-//                debug_log("reading empty data back, try to reopen")
-//                break
-//            }
-            guard bytesRead > 0 else {
-                _isLooping = false
-                _config.logger.log("bytesRead(\(bytesRead)) <= 0", to: .streamProvider)
-                return
-            }
-
-            if info.isRemote {
-                if CFReadStreamGetStatus(stream) == CFStreamStatus.error {
-                    if contentLength > 0 {
-                        let p = StreamProvider.Position(position + _httpInfo.bytesRead)
-                        _watchDogInfo.reset()
-                        _open(at: p)
-                        _isLooping = false
-                        return
-                    }
-                    handleStreamError(stream)
-                    _isLooping = false
-                    return
-                }
-                _httpInfo.parseHttpHeaders(for: self, buffer: buffer, bufSize: bytesRead)
-                if _icyCastInfo.isIcyStream {
-                    _icyCastInfo.parseICYStream(streamer: self, buffers: buffer, bufSize: bytesRead)
-                } else {
-                    _cacheInfo.write(bytes: buffer, count: bytesRead)
-                }
-            }
-            _httpInfo.bytesRead += UInt(bytesRead)
-            guard _canOutputData else {
-                _isLooping = false
-                return
-            }
-            let count = UInt32(bytesRead)
-            if _icyCastInfo.isIcyStream == false, position == 0 {
-                _tagParser?.acceptInput(data: buffer, count: count)
-            }
-
-            let value = _isFirstPacket
-            outputPipeline.call(.hasBytesAvailable(buffer, count, value))
             if _isFirstPacket { _isFirstPacket = false }
+        }
+        _bytesRead += UInt(count)
+    }
 
-//            end = CFAbsoluteTimeGetCurrent()
-//            let timeCost = end - begin
-//            let expectTimeCost = Int(bytesRead) / speed
-//            let deltaTime = expectTimeCost - Int(timeCost)
-//            if deltaTime > 0 {
-//                usleep(useconds_t(deltaTime * 1000))
-//            }
+    func handle(task: URLSessionTask, error: Error?) {
+        // Ignore callbacks from tasks that were already replaced or cancelled.
+        guard task === _task else { return }
+        if let error {
+            handleStreamError(error)
+        } else {
+            handleEndEncountered()
         }
     }
 
-    func endEncountered(_ targetStream: CFReadStream?) {
-        guard info.isRemote == true else {
-            outputPipeline.call(.endEncountered)
-            return
-        }
-        if let stream = targetStream, let resp = CFReadStreamCopyProperty(stream, CFStreamPropertyKey(rawValue: kCFStreamPropertyHTTPResponseHeader)) {
-            let code = CFHTTPMessageGetResponseStatusCode(resp as! CFHTTPMessage)
-            if code == 401 { return }
-        }
-        let read = _httpInfo.bytesRead + position
-        if read < contentLength {
+    private func handleEndEncountered() {
+        guard info.isRemote == true else { return }
+        let statusCode = (_task?.response as? HTTPURLResponse)?.statusCode ?? 0
+        if statusCode == 401 { return }
+        let read = _bytesRead + position
+        if read < contentLength, contentLength > 0 {
             _config.logger.log("HTTP stream end encountered whithout streamimg all content[\(contentLength)] , restart at postion \(read)", to: .streamProvider)
             close(resetTimer: true)
             startReconnectWatchDog(notStreamingEnd: true)
@@ -412,23 +484,18 @@ private extension Streamer {
         }
     }
 
-    func handleStreamError(_ targetStream: CFReadStream?) {
-        let error: APlay.Error
-        if let stream = targetStream, let err = CFReadStreamCopyError(stream), let desc = CFErrorCopyDescription(err) {
-            error = APlay.Error.network(desc as String)
-        } else {
-            error = .none
-        }
-        guard info.isRemote else { return }
-        let read = _httpInfo.bytesRead + position
-        if read < contentLength {
-            _watchDogInfo.startWatchDog(with: 2, at: _runloop) { [weak self] reachMaxRetryTime in
+    private func handleStreamError(_ error: Error) {
+        let nsError = error as NSError
+        guard info.isRemote, nsError.domain == NSURLErrorDomain, nsError.code != NSURLErrorCancelled else { return }
+        let read = _bytesRead + position
+        if read < contentLength, contentLength > 0 {
+            _watchDogInfo.startWatchDog(with: 2) { [weak self] reachMaxRetryTime in
                 guard let sself = self else { return }
                 if reachMaxRetryTime {
                     sself.reachMaxRetryAndStopWatchDog()
                     return
                 }
-                let p = StreamProvider.Position(sself.position + sself._httpInfo.bytesRead)
+                let p = StreamProvider.Position(sself.position + sself._bytesRead)
                 sself.close(resetTimer: false)
                 guard p < sself.contentLength else {
                     sself._watchDogInfo.invalidateTimer()
@@ -440,155 +507,7 @@ private extension Streamer {
             }
         } else {
             _watchDogInfo.invalidateTimer()
-            if case APlay.Error.none = error {}
-            else {
-                outputPipeline.call(.errorOccurred(error))
-            }
-        }
-    }
-}
-
-// MARK: - Http Stuff
-
-private extension Streamer {
-    final class HttpInfo {
-        lazy var bytesRead: UInt = 0
-        lazy var isHeadersParsed = false
-        lazy var auth: CFHTTPAuthentication? = nil
-        lazy var credentials: [String: String]? = nil
-        init() {}
-
-        func reset() {
-            bytesRead = 0
-            isHeadersParsed = false
-            auth = nil
-            credentials = nil
-        }
-
-        func parseHttpHeaders(for streamer: Streamer, buffer: UnsafeMutablePointer<UInt8>, bufSize: Int) {
-            if isHeadersParsed { return }
-            guard let readStream = streamer._readStream else { return }
-            isHeadersParsed = true
-
-            if bufSize >= 10 {
-                var datas = [UInt8]()
-                // HTTP/1.x 200 OK
-                /* If the response has the "ICY 200 OK" string,
-                 * we are dealing with the ShoutCast protocol.
-                 * The HTTP headers won't be available.
-                 */
-                var icy = ""
-                for i in 0 ..< 4 {
-                    let buf = buffer.advanced(by: i).pointee
-                    datas.append(buf)
-                }
-                var data = Data(datas)
-                icy = String(data: data, encoding: .ascii) ?? ""
-                for i in 4 ..< 10 {
-                    let buf = buffer.advanced(by: i).pointee
-                    datas.append(buf)
-                }
-                data = Data(datas)
-                icy = String(data: data, encoding: .ascii) ?? ""
-                // This is an ICY stream, don't try to parse the HTTP headers
-                if icy.lowercased() == "icy 200 ok" { return }
-            }
-
-            streamer._config.logger.log("A regular HTTP stream", to: .streamProvider)
-
-            guard let resp = CFReadStreamCopyProperty(readStream, CFStreamPropertyKey(rawValue: kCFStreamPropertyHTTPResponseHeader)) else { return }
-            let response = resp as! CFHTTPMessage
-            var statusCode = 0
-
-            let keys = streamer._config.httpFileCompletionValidator.keys
-            for key in keys {
-                let cfKey = key as CFString
-                guard let cfValue = CFHTTPMessageCopyHeaderFieldValue(response, cfKey)?.takeRetainedValue() else { continue }
-                streamer.registerHeader[key] = cfValue as String
-            }
-            /*
-             * If the server responded with the icy-metaint header, the response
-             * body will be encoded in the ShoutCast protocol.
-             */
-            let icyMetaIntString = CFHTTPMessageCopyHeaderFieldValue(response, Keys.icyMetaint.cf)?.takeRetainedValue()
-            let icyNotice1String = CFHTTPMessageCopyHeaderFieldValue(response, Keys.icyNotice1.cf)?.takeRetainedValue()
-            if let meta = icyMetaIntString {
-                streamer._icyCastInfo.isIcyStream = true
-                streamer._icyCastInfo.isHeadersParsed = true
-                streamer._icyCastInfo.isHeadersRead = true
-                let interval = Int(CFStringGetIntValue(meta))
-                streamer._icyCastInfo.metaDataInterval = interval
-                streamer._config.logger.log("\(Keys.icyMetaint.rawValue): \(interval)", to: .streamProvider)
-            } else if let notice = icyNotice1String {
-                streamer._icyCastInfo.isIcyStream = true
-                streamer._icyCastInfo.isHeadersParsed = true
-                streamer._icyCastInfo.isHeadersRead = true
-                streamer._config.logger.log("\(Keys.icyNotice1.rawValue): \(notice)", to: .streamProvider)
-            }
-            statusCode = CFHTTPMessageGetResponseStatusCode(response)
-            streamer._config.logger.log("HTTP status code: \(statusCode)", to: .streamProvider)
-
-            let icyNameString = CFHTTPMessageCopyHeaderFieldValue(response, Keys.icyName.cf)?.takeRetainedValue()
-            if let name = icyNameString {
-                let n = name as String
-                streamer._icyCastInfo.name = n
-                streamer.outputPipeline.call(.metadata([.title(n)]))
-            }
-            let ctype = CFHTTPMessageCopyHeaderFieldValue(response, Keys.contentType.cf)?.takeRetainedValue()
-            if let contentType = ctype as String? {
-                if case let .remote(url, hint) = streamer.info {
-                    let newHint = StreamProvider.URLInfo.fileHint(from: contentType)
-                    if newHint != .mp3, hint != newHint {
-                        streamer.info = .remote(url, newHint)
-                        streamer._tagParser = streamer.tagParser(for: streamer.info)
-                    }
-                }
-                streamer._config.logger.log("\(Keys.contentType.rawValue): \(contentType)", to: .streamProvider)
-            }
-
-            let status200 = statusCode == 200
-            let status206 = statusCode == 206
-            let serverError = 500 ... 599
-            let clen = CFHTTPMessageCopyHeaderFieldValue(response, Keys.contentLength.cf)?.takeRetainedValue()
-            if let len = clen  {
-                let l = UInt(UInt64(CFStringGetIntValue(len)))
-                if status200 {
-                    streamer.contentLength = l
-                    streamer._config.logger.log("200 Content Length:\(streamer.contentLength)", to: .streamProvider)
-                } else if status206 {
-                    streamer.contentLength = l + streamer.position
-                    streamer._config.logger.log("206 Content Length:\(streamer.contentLength)", to: .streamProvider)
-                }
-                
-            }
-            if status200 || status206 {
-                streamer.outputPipeline.call(.readyForRead)
-            } else {
-                if [401, 407].contains(statusCode) {
-                    let responseHeader = CFReadStreamCopyProperty(readStream, CFStreamPropertyKey(rawValue: kCFStreamPropertyHTTPResponseHeader)) as! CFHTTPMessage
-                    // Get the authentication information from the response.
-                    let authentication = CFHTTPAuthenticationCreateFromResponse(nil, responseHeader).takeRetainedValue()
-                    if CFHTTPAuthenticationRequiresUserNameAndPassword(authentication) {
-                        if case let .custom(info) = streamer._config.proxyPolicy {
-                            var credentials: [String: String] = [:]
-                            credentials[kCFHTTPAuthenticationUsername as String] = info.username
-                            credentials[kCFHTTPAuthenticationPassword as String] = info.password
-                            self.credentials = credentials
-                            auth = authentication
-                        }
-                    }
-                    streamer._config.logger.log("Did recieve authentication challenge", to: .streamProvider)
-                    streamer._watchDogInfo.reset()
-                    streamer.startReconnectWatchDog()
-                } else if serverError.contains(statusCode) {
-                    streamer._config.logger.log("Server error:\(statusCode)", to: .streamProvider)
-                    streamer._watchDogInfo.reset()
-                    streamer.startReconnectWatchDog()
-                } else {
-                    let error = APlay.Error.networkStatusCode(statusCode)
-                    streamer.outputPipeline.call(.errorOccurred(error))
-                }
-            }
+            outputPipeline.call(.errorOccurred(.network(error.localizedDescription)))
         }
     }
 }
@@ -603,7 +522,7 @@ private extension Streamer {
 
     func startReconnectWatchDog(notStreamingEnd: Bool = false) {
         _config.logger.log("startReconnectWatchDog", to: Logger.Channel.streamProvider)
-        _watchDogInfo.startWatchDog(with: 0.5, at: _runloop) { [weak self] reachMaxRetryTime in
+        _watchDogInfo.startWatchDog(with: 0.5) { [weak self] reachMaxRetryTime in
             guard let sself = self else { return }
             if reachMaxRetryTime {
                 sself.reachMaxRetryAndStopWatchDog()
@@ -613,29 +532,34 @@ private extension Streamer {
             sself._watchDogInfo.invalidateTimer()
             if sself._watchDogInfo.isReadedData == false, notStreamingEnd == false { p = sself.position }
             else {
-                let totalReadLength = sself.position + sself._httpInfo.bytesRead
+                let totalReadLength = sself.position + sself._bytesRead
                 sself._config.logger.log("totalReadLength:\(totalReadLength) < contentLength:\(sself.contentLength): \(totalReadLength < sself.contentLength)", to: Logger.Channel.streamProvider)
-                if  totalReadLength < sself.contentLength,
-                    sself.contentLength > 0 {
+                if totalReadLength < sself.contentLength,
+                   sself.contentLength > 0 {
                     p = StreamProvider.Position(totalReadLength)
                 } else { p = 0 }
             }
-            sself._httpInfo.bytesRead = 0
+            sself._bytesRead = 0
             sself._open(at: p)
         }
     }
 
     final class WatchDogInfo {
-        private lazy var openTimer: CFRunLoopTimer? = nil
-        lazy var reopenTimes: UInt = 0
-        lazy var isReadedData = false
+        private var timer: DispatchSourceTimer?
+        var reopenTimes: UInt = 0
+        var isReadedData = false
         private var callback: (Bool) -> Void = { _ in }
         private var _maxRemoteStreamOpenRetry: UInt = 5
-        init(maxRemoteStreamOpenRetry: UInt) { _maxRemoteStreamOpenRetry = maxRemoteStreamOpenRetry }
+        private let _queue: DispatchQueue
+
+        init(maxRemoteStreamOpenRetry: UInt, queue: DispatchQueue) {
+            _maxRemoteStreamOpenRetry = maxRemoteStreamOpenRetry
+            _queue = queue
+        }
 
         func invalidateTimer() {
-            guard let timer = openTimer else { return }
-            CFRunLoopTimerInvalidate(timer)
+            timer?.cancel()
+            timer = nil
         }
 
         func reset() {
@@ -644,19 +568,17 @@ private extension Streamer {
             isReadedData = false
         }
 
-        func startWatchDog(with interval: TimeInterval, at queue: RunloopQueue, callback: @escaping (Bool) -> Void) {
+        func startWatchDog(with interval: TimeInterval, callback: @escaping (Bool) -> Void) {
             self.callback = callback
             invalidateTimer()
-            let this = UnsafeMutableRawPointer.from(object: self)
-            var ctx = CFRunLoopTimerContext(version: 0, info: this, retain: nil, release: nil, copyDescription: nil)
-            let callback: CFRunLoopTimerCallBack = { _, info in
-                guard let raw = info else { return }
-                let sself = raw.to(object: WatchDogInfo.self)
+            let timer = DispatchSource.makeTimerSource(queue: _queue)
+            timer.schedule(deadline: .now() + interval, repeating: interval)
+            timer.setEventHandler { [weak self] in
+                guard let sself = self else { return }
                 sself.callback(sself.reopenTimes > sself._maxRemoteStreamOpenRetry)
             }
-            guard let timer = CFRunLoopTimerCreate(nil, CFAbsoluteTimeGetCurrent() + interval, interval, 0, 0, callback, &ctx) else { return }
-            queue.addTimer(timer)
-            openTimer = timer
+            timer.activate()
+            self.timer = timer
         }
     }
 }
@@ -941,7 +863,7 @@ private extension Streamer {
     }
 }
 
-// MARK: - CFString Keys
+// MARK: - HTTP header keys
 
 private extension Streamer {
     enum Keys: String {
@@ -961,6 +883,5 @@ private extension Streamer {
         case icecastStationName = "IcecastStationName"
         case contentType = "Content-Type"
         case contentLength = "Content-Length"
-        var cf: CFString { return rawValue as CFString }
     }
 }

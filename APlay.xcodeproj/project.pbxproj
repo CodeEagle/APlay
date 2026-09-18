@@ -35,7 +35,6 @@
 		10F83AC720F342C400AF8222 /* StreamProviderCompatible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AAA20F342C400AF8222 /* StreamProviderCompatible.swift */; };
 		10F83AC820F342C400AF8222 /* AudioDecoderCompatible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AAB20F342C400AF8222 /* AudioDecoderCompatible.swift */; };
 		10F83AC920F342C400AF8222 /* LoggerCompatible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AAC20F342C400AF8222 /* LoggerCompatible.swift */; };
-		10F83ACA20F342C400AF8222 /* RunloopQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AAE20F342C400AF8222 /* RunloopQueue.swift */; };
 		10F83ACB20F342C400AF8222 /* Delegated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AAF20F342C400AF8222 /* Delegated.swift */; };
 		10F83ACC20F342C400AF8222 /* GCDTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AB020F342C400AF8222 /* GCDTimer.swift */; };
 		10F83ACD20F342C400AF8222 /* PlayList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83AB120F342C400AF8222 /* PlayList.swift */; };
@@ -98,7 +97,6 @@
 		10F83AAA20F342C400AF8222 /* StreamProviderCompatible.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StreamProviderCompatible.swift; sourceTree = "<group>"; };
 		10F83AAB20F342C400AF8222 /* AudioDecoderCompatible.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioDecoderCompatible.swift; sourceTree = "<group>"; };
 		10F83AAC20F342C400AF8222 /* LoggerCompatible.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoggerCompatible.swift; sourceTree = "<group>"; };
-		10F83AAE20F342C400AF8222 /* RunloopQueue.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RunloopQueue.swift; sourceTree = "<group>"; };
 		10F83AAF20F342C400AF8222 /* Delegated.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Delegated.swift; sourceTree = "<group>"; };
 		10F83AB020F342C400AF8222 /* GCDTimer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GCDTimer.swift; sourceTree = "<group>"; };
 		10F83AB120F342C400AF8222 /* PlayList.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlayList.swift; sourceTree = "<group>"; };
@@ -270,7 +268,6 @@
 		10F83AAD20F342C400AF8222 /* Vendor */ = {
 			isa = PBXGroup;
 			children = (
-				10F83AAE20F342C400AF8222 /* RunloopQueue.swift */,
 				10F83AAF20F342C400AF8222 /* Delegated.swift */,
 				10F83AB020F342C400AF8222 /* GCDTimer.swift */,
 				10F83AB120F342C400AF8222 /* PlayList.swift */,
@@ -425,7 +422,6 @@
 				10F83AC720F342C400AF8222 /* StreamProviderCompatible.swift in Sources */,
 				10F83AC520F342C400AF8222 /* MetadataPaserCompatible.swift in Sources */,
 				10F83AC920F342C400AF8222 /* LoggerCompatible.swift in Sources */,
-				10F83ACA20F342C400AF8222 /* RunloopQueue.swift in Sources */,
 				10F83AC420F342C400AF8222 /* PlayerCompatible.swift in Sources */,
 				10F83AB420F342C400AF8222 /* Configuration.swift in Sources */,
 				10F83ACB20F342C400AF8222 /* Delegated.swift in Sources */,

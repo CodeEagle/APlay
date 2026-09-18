@@ -17,9 +17,13 @@ import Foundation
 
 /// Resolves the sample asset: first CLI argument, else `<package-root>/APlayDemo/a.m4a`.
 private func assetURL() -> URL? {
-    if let path = CommandLine.arguments.dropFirst().first,
-       FileManager.default.fileExists(atPath: path) {
-        return URL(fileURLWithPath: path)
+    if let first = CommandLine.arguments.dropFirst().first {
+        if first.hasPrefix("http://") || first.hasPrefix("https://") {
+            return URL(string: first)
+        }
+        if FileManager.default.fileExists(atPath: first) {
+            return URL(fileURLWithPath: first)
+        }
     }
     let candidate = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()      // MacPlayback/

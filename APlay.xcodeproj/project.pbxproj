@@ -19,7 +19,6 @@
 		10F83AB420F342C400AF8222 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A8E20F342C400AF8222 /* Configuration.swift */; };
 		10F83AB520F342C400AF8222 /* InternalLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9020F342C400AF8222 /* InternalLogger.swift */; };
 		10F83AB620F342C400AF8222 /* APlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9220F342C400AF8222 /* APlayer.swift */; };
-		10F83AB720F342C400AF8222 /* AUPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9320F342C400AF8222 /* AUPlayer.swift */; };
 		10F83AB820F342C400AF8222 /* NowPlayingInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9520F342C400AF8222 /* NowPlayingInfo.swift */; };
 		10F83AB920F342C400AF8222 /* Streamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9720F342C400AF8222 /* Streamer.swift */; };
 		10F83ABA20F342C400AF8222 /* ID3Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9920F342C400AF8222 /* ID3Parser.swift */; };
@@ -83,7 +82,6 @@
 		10F83A8E20F342C400AF8222 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		10F83A9020F342C400AF8222 /* InternalLogger.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InternalLogger.swift; sourceTree = "<group>"; };
 		10F83A9220F342C400AF8222 /* APlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = APlayer.swift; sourceTree = "<group>"; };
-		10F83A9320F342C400AF8222 /* AUPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AUPlayer.swift; sourceTree = "<group>"; };
 		10F83A9520F342C400AF8222 /* NowPlayingInfo.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NowPlayingInfo.swift; sourceTree = "<group>"; };
 		10F83A9720F342C400AF8222 /* Streamer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Streamer.swift; sourceTree = "<group>"; };
 		10F83A9920F342C400AF8222 /* ID3Parser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ID3Parser.swift; sourceTree = "<group>"; };
@@ -208,7 +206,6 @@
 			isa = PBXGroup;
 			children = (
 				10F83A9220F342C400AF8222 /* APlayer.swift */,
-				10F83A9320F342C400AF8222 /* AUPlayer.swift */,
 			);
 			path = Players;
 			sourceTree = "<group>";
@@ -409,7 +406,6 @@
 			files = (
 				10F83ACD20F342C400AF8222 /* PlayList.swift in Sources */,
 				10F83AC320F342C400AF8222 /* APlay.swift in Sources */,
-				10F83AB720F342C400AF8222 /* AUPlayer.swift in Sources */,
 				10F83AC820F342C400AF8222 /* AudioDecoderCompatible.swift in Sources */,
 				10F83AC120F342C400AF8222 /* APlay+Debug.swift in Sources */,
 				10F83AC020F342C400AF8222 /* APlay+Typealias.swift in Sources */,

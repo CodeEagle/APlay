@@ -62,11 +62,7 @@ public final class APlay: @unchecked Sendable {
     public init(configuration: ConfigurationCompatible = Configuration()) {
         config = configuration
 
-        if #available(iOS 11.0, *) {
-            _player = APlayer(config: config)
-        } else {
-            _player = AUPlayer(config: config)
-        }
+        _player = APlayer(config: config)
 
         _playlist = PlayList(pipeline: eventPipeline)
 

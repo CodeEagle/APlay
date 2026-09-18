@@ -8,7 +8,6 @@
 
 import AVFoundation
 
-@available(iOS 11.0, *)
 final class APlayer: PlayerCompatible {
     var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) = { _, _ in (0, false) }
 
@@ -36,7 +35,7 @@ final class APlayer: PlayerCompatible {
     }
 
     private lazy var _state: Player.State = .idle
-    private lazy var _stateQueue = DispatchQueue(concurrentName: "AUPlayer.state")
+    private lazy var _stateQueue = DispatchQueue(concurrentName: "APlayer.state")
 
     private lazy var _playbackTimer: GCDTimer = {
         GCDTimer(interval: .seconds(1), callback: { [weak self] _ in
@@ -94,7 +93,6 @@ final class APlayer: PlayerCompatible {
 
 // MARK: - Create Player
 
-@available(iOS 11.0, *)
 private extension APlayer {
     private func updatePlayerConfig() throws {
         guard let unit = _player else { return }
@@ -122,7 +120,6 @@ private extension APlayer {
 
 // MARK: - PlayerCompatible
 
-@available(iOS 11.0, *)
 extension APlayer {
     func destroy() {
         _engine.stop()
@@ -223,7 +220,7 @@ extension APlayer {
 ///   - inNumberFrames: The number of frames to be rendered. Notice that this variable is prefixed as “in” instead of “io.”That indicates that this isn’t a case when you can render fewer frames and indicate that situation by passing back the number of frames actually rendered.Your callback must provide exactly the requested number of frames.
 ///   - ioData: An AudioBufferList struct to be filled with data.You write your sam- ples into the mData members of the AudioBuffers contained in this struct.The list has a count of how many AudioBuffers are present, and each AudioBuffer has members for its channel count and byte size. Combined with inNumberFrames, you can figure out how much data can be safely written to these data buffers.
 /// - Returns: OSStatus
-@available(iOS 11.0, *) private func renderCallback(userInfo: UnsafeMutableRawPointer, ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>, inTimeStamp _: UnsafePointer<AudioTimeStamp>, inBusNumber _: UInt32, inNumberFrames: UInt32, ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
+private func renderCallback(userInfo: UnsafeMutableRawPointer, ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>, inTimeStamp _: UnsafePointer<AudioTimeStamp>, inBusNumber _: UInt32, inNumberFrames: UInt32, ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
     let sself = userInfo.to(object: APlayer.self)
     var status = noErr
     _ = sself._renderBlock?(inNumberFrames, ioData!, &status)

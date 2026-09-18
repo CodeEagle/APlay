@@ -50,10 +50,7 @@ struct Player {
     static let minimumBufferSize: Int = maxReadPerSlice * minimumBufferCount
 
     static let canonical: AudioStreamBasicDescription = {
-        var bytesPerSample = UInt32(MemoryLayout<Int32>.size)
-        if #available(iOS 8.0, *) {
-            bytesPerSample = UInt32(MemoryLayout<Int16>.size)
-        }
+        let bytesPerSample = UInt32(MemoryLayout<Int16>.size)
         let flags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked
         let component = AudioStreamBasicDescription(mSampleRate: 44100, mFormatID: kAudioFormatLinearPCM, mFormatFlags: flags, mBytesPerPacket: bytesPerSample * 2, mFramesPerPacket: 1, mBytesPerFrame: bytesPerSample * 2, mChannelsPerFrame: 2, mBitsPerChannel: 8 * bytesPerSample, mReserved: 0)
         return component

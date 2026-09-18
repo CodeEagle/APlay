@@ -9,7 +9,7 @@
 import Foundation
 
 extension APlay {
-    final class InternalLogger {
+    final class InternalLogger: @unchecked Sendable {
         var currentFile: String { return _filePath }
         var isLoggedToConsole: Bool = true
         private let _policy: Logger.Policy
@@ -62,7 +62,9 @@ extension APlay {
 
 extension APlay.InternalLogger: LoggerCompatible {
     func reset() {
-        _openTime = dateTime().1
+        _logQueue.async(flags: .barrier) {
+            self._openTime = self.dateTime().1
+        }
         let msg = "🎹:APlay[\(APlay.version)]@\(_openTime)\(Logger.lineSeperator)"
         log(msg, to: .audioDecoder)
     }

@@ -74,8 +74,8 @@ extension APlay {
                     self.update()
                     return
                 }
-                self._config.networkPolicy.requestPermission(for: r, handler: { [unowned self] success in
-                    guard success else { return }
+                self._config.networkPolicy.requestPermission(for: r, handler: { [weak self] success in
+                    guard success, let self = self else { return }
                     self.doRequest(request)
                 })
             }

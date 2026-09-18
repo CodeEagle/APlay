@@ -468,7 +468,7 @@ public extension APlay {
     /// - error: error
     /// - metadata: song matadata
     /// - flac: flac metadata
-    public enum Event {
+    enum Event {
         case state(State)
         case buffering(Float)
         case waitForStreaming
@@ -492,7 +492,7 @@ public extension APlay {
     /// - paused: paused
     /// - error: error
     /// - unknown: exception
-    public enum State {
+    enum State {
         case idle
         case playing
         case paused
@@ -519,7 +519,7 @@ public extension APlay {
     /// - networkStatusCode: networ reponse with status code
     /// - parser: parser error with OSStatus
     /// - player: player error
-    public enum Error: Swift.Error {
+    enum Error: Swift.Error {
         case none, open(String), openedAlready(String), streamParse(String), network(String), networkPermission(String), reachMaxRetryTime, networkStatusCode(Int), parser(OSStatus), player(String), playItemNotFound(String)
     }
 }

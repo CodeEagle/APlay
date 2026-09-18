@@ -10,7 +10,7 @@ import Foundation
 
 // MARK: - Streamer
 
-final class Streamer: StreamProviderCompatible {
+final class Streamer: StreamProviderCompatible, @unchecked Sendable {
     var outputPipeline = Delegated<StreamProvider.Event, Void>()
 
     var position: StreamProvider.Position = 0
@@ -312,7 +312,7 @@ private extension Streamer {
 
 private extension Streamer {
     /// Weak bridge so the session never outlives-captures the Streamer.
-    final class SessionDataDelegate: NSObject, URLSessionDataDelegate {
+    final class SessionDataDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
         weak var streamer: Streamer?
         let proxyPolicy: APlay.Configuration.ProxyPolicy
 
@@ -797,7 +797,7 @@ private extension Streamer {
         }).first
     }
 
-    final class CacheInfo {
+    final class CacheInfo: @unchecked Sendable {
         private var _cacheName: String?
         private var _cacheWritePath: String?
         private var _cacheWriteTmpPath: String?
@@ -843,9 +843,12 @@ private extension Streamer {
 
         func writeFile(targetLength: UInt, url: URL, header: [String: Any]) {
             guard _fileWritten == targetLength, let tmp = _cacheWriteTmpPath, let target = _cacheWritePath else { return }
+            // Snapshot the header as a Sendable dictionary before crossing the
+            // async boundary; `Any` itself is not Sendable.
+            let headerSnapshot = header.compactMapValues { $0 as? String }
             DispatchQueue.global(qos: .utility).async {
                 if case let APlay.Configuration.HttpFileValidationPolicy.validateHeader(keys: _, closure) = self._config.httpFileCompletionValidator {
-                    guard closure(url, tmp, header) else { return }
+                    guard closure(url, tmp, headerSnapshot) else { return }
                 }
                 self.saveFile(tmp: tmp, target: target)
             }

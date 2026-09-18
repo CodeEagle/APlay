@@ -9,7 +9,7 @@
 import CoreGraphics
 import Foundation
 
-final class FlacParser {
+final class FlacParser: @unchecked Sendable {
     private lazy var _outputStream = Delegated<MetadataParser.Event, Void>()
     private lazy var _data = Data()
     private lazy var _backupHeaderData = Data()
@@ -27,7 +27,9 @@ extension FlacParser: MetadataParserCompatible {
 
     func acceptInput(data: UnsafeMutablePointer<UInt8>, count: UInt32) {
         guard _state.isNeedData else { return }
-        _queue.async(flags: .barrier) { self.appendTagData(data, count: count) }
+        // Copy synchronously so the raw pointer never crosses an async boundary.
+        let chunk = Data(bytes: data, count: Int(count))
+        _queue.async(flags: .barrier) { self.appendTagData(chunk) }
         _queue.sync {
             if _state == .initial, _data.count < 4 { return }
             parse()
@@ -38,14 +40,9 @@ extension FlacParser: MetadataParserCompatible {
 // MARK: - Private
 
 extension FlacParser {
-    private func appendTagData(_ data: UnsafeMutablePointer<UInt8>, count: UInt32) {
-        let bytesSize = Int(count)
-        let raw = UnsafeMutablePointer.uint8Pointer(of: bytesSize)
-        defer { free(raw) }
-        memcpy(raw, data, bytesSize)
-        let dat = Data(bytes: raw, count: bytesSize)
-        _data.append(dat)
-        _backupHeaderData.append(dat)
+    private func appendTagData(_ chunk: Data) {
+        _data.append(chunk)
+        _backupHeaderData.append(chunk)
     }
 
     private func parse() {

@@ -316,12 +316,12 @@ extension APlay.Configuration {
     ///
     /// - system: using system proxy
     /// - custom: using custom proxy with config
-    public enum ProxyPolicy {
+    public enum ProxyPolicy: Sendable {
         case system
         case custom(Info)
 
         /// Custom proxy info
-        public struct Info {
+        public struct Info: Sendable {
             /** 使用自定义代理 用户名 */
             public let username: String
             /** 使用自定义代理 密码 */
@@ -345,7 +345,7 @@ extension APlay.Configuration {
             }
 
             /// Authentication scheme
-            public enum AuthenticationScheme {
+            public enum AuthenticationScheme: Sendable {
                 case digest, basic
                 var name: CFString {
                     switch self {

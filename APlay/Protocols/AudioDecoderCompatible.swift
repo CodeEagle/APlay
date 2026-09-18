@@ -56,7 +56,7 @@ public struct AudioDecoder {
     // MARK: - Decoder Info
 
     /// Decoder Info
-    public final class Info {
+    public final class Info: @unchecked Sendable {
         private static let maxBitrateSample = 50
         public lazy var srcFormat = AudioStreamBasicDescription()
         public lazy var dstFormat = Player.canonical

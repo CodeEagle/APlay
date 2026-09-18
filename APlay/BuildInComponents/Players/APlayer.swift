@@ -8,7 +8,7 @@
 
 import AVFoundation
 
-final class APlayer: PlayerCompatible {
+final class APlayer: PlayerCompatible, @unchecked Sendable {
     var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) = { _, _ in (0, false) }
 
     var eventPipeline: Delegated<Player.Event, Void> = Delegated<Player.Event, Void>()
@@ -198,7 +198,8 @@ extension APlayer {
                 sself.audioBufferList.mBuffers.mNumberChannels = sself.asbd.mChannelsPerFrame
                 sself.audioBufferList.mBuffers.mDataByteSize = size
 
-                sself._stateQueue.async(flags: .barrier) { sself._progress += Float(totalReadFrame) }
+                let progress = sself._progress + Float(totalReadFrame)
+                sself._stateQueue.async(flags: .barrier) { sself._progress = progress }
                 return withUnsafePointer(to: &sself.audioBufferList, { $0 })
             }
 

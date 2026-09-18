@@ -9,7 +9,7 @@
 import AudioToolbox
 import AudioUnit
 
-final class DefaultAudioDecoder {
+final class DefaultAudioDecoder: @unchecked Sendable {
     private weak var _streamProvider: StreamProviderCompatible?
     private lazy var _info = AudioDecoder.Info()
     private lazy var _inputStream = Delegated<AudioDecoder.AudioInput, Void>()

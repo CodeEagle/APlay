@@ -7,7 +7,7 @@
 //
 
 import Foundation
-final class ID3Parser {
+final class ID3Parser: @unchecked Sendable {
     private lazy var _outputStream = Delegated<MetadataParser.Event, Void>()
     private lazy var _data = Data()
     private lazy var _queue = DispatchQueue(concurrentName: "ID3Parser")
@@ -60,7 +60,9 @@ extension ID3Parser: MetadataParserCompatible {
 
     func acceptInput(data: UnsafeMutablePointer<UInt8>, count: UInt32) {
         guard _v2State.isNeedData else { return }
-        _queue.async(flags: .barrier) { self.appendTagData(data, count: count) }
+        // Copy synchronously so the raw pointer never crosses an async boundary.
+        let chunk = Data(bytes: data, count: Int(count))
+        _queue.async(flags: .barrier) { self.appendTagData(chunk) }
         _queue.sync {
             if _v2State == .initial, _data.count < 10 { return }
             parse()
@@ -80,14 +82,9 @@ extension ID3Parser: MetadataParserCompatible {
 // MARK: - ID3v2 Parse
 
 extension ID3Parser {
-    private func appendTagData(_ data: UnsafeMutablePointer<UInt8>, count: UInt32) {
+    private func appendTagData(_ chunk: Data) {
         if let size = _v2Info?.size, _data.count >= size, _v2State != .initial { return }
-        let bytesSize = Int(count)
-        let raw = UnsafeMutablePointer.uint8Pointer(of: bytesSize)
-        defer { free(raw) }
-        memcpy(raw, data, bytesSize)
-        let dat = Data(bytes: raw, count: bytesSize)
-        _data.append(dat)
+        _data.append(chunk)
     }
 
     /// <http://id3.org/id3v2-00>, <http://id3.org/id3v2.3.0>, <http://id3.org/id3v2.4.0-structure>

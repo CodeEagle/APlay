@@ -351,6 +351,33 @@ final class APlayOrchestrationTests: XCTestCase {
         XCTAssertEqual(h.streamers.count, 3, "no second preload while one is already buffering")
     }
 
+    /// A stream that reports no usable duration (opus in an ogg container)
+    /// also stops emitting decoder-`.empty` once the streamer is done. The only
+    /// end-of-track signal left is playback time that stops advancing, which
+    /// the player reports on every tick.
+    func testFrozenPlaybackTimeEndsTrackWithoutDuration() {
+        let h = Harness(gapless: true)
+        harness = h
+        h.aplay.play([url1, url2], at: 0)
+        h.streamers.first?.emit(.endEncountered)
+        h.feed(1)
+
+        h.player.currentTimeValue = 2
+        // The first sample anchors the time, the following identical ones are
+        // the stall that the end-of-track detection keys on.
+        h.player.eventPipeline.call(.playback(2))
+        h.player.eventPipeline.call(.playback(2))
+        h.player.eventPipeline.call(.playback(2))
+
+        let advanced = waitUntil {
+            h.collector.events.contains(where: { if case .playEnded = $0 { return true }; return false })
+        }
+        XCTAssertTrue(advanced, "a stalled clock must end the track")
+        XCTAssertEqual(h.player.pauseCount, 0, "the gapless handoff must not pause")
+        XCTAssertTrue(h.collector.events.contains(where: { if case .playingIndexChanged = $0 { return true }; return false }),
+                      "the playlist must advance")
+    }
+
     /// Playing a URL that is not the buffered one drops the preload.
     func testPlayingAnotherUrlDropsThePreload() {
         let h = Harness(gapless: true)

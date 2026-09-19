@@ -97,6 +97,9 @@ final class FakePlayer: PlayerCompatible {
     var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) = { _, _ in (0, false) }
     let eventPipeline = Delegated<Player.Event, Void>()
     var startTime: Float = 0
+    /// Programmable so a test can freeze playback time — the end-of-track
+    /// signal for a stream that reports no usable duration.
+    var currentTimeValue: Float = 0
     var asbd = AudioStreamBasicDescription()
     var state: Player.State = .idle
     var volume: Float = 1
@@ -109,7 +112,7 @@ final class FakePlayer: PlayerCompatible {
     func resume() { resumeCount += 1 }
     func toggle() {}
     func setup(_: AudioStreamBasicDescription) { setupCount += 1 }
-    func currentTime() -> Float { 0 }
+    func currentTime() -> Float { currentTimeValue }
     init(config: ConfigurationCompatible) {}
     init() {}
 }

@@ -7,6 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A5A5A53642776A78FD45D886 /* tone.opus in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A5CF22C8071CBE49DD9F /* tone.opus */; };
+		A5A5A558EAD53197F94A97B3 /* tone.m4a in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A5117C2171AACF415A95 /* tone.m4a */; };
+		A5A5A5E30EDC71BE1B4DCC8C /* tone-alac.m4a in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A5E8B849A19C2844298F /* tone-alac.m4a */; };
+		A5A5A5530F401EB4984F2C9F /* tone-cbr.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A51476131F35984B8395 /* tone-cbr.mp3 */; };
+		A5A5A5A2CEFE2040644164A5 /* tone-vbr.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A5825981860A894782B7 /* tone-vbr.mp3 */; };
+		A5A5A5063A547376A141B498 /* tone.aac in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A51290B19425514B5AA8 /* tone.aac */; };
+		A5A5A51413402F3CE649EDA8 /* tone.aifc in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A5CA93C7C5762F44758B /* tone.aifc */; };
+		A5A5A59BF50D738BF54555AC /* tone.aiff in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A5F3CB933765584FEB9F /* tone.aiff */; };
+		A5A5A50C250739E1144984AB /* tone.caf in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A55D94546C7B9C43D8A4 /* tone.caf */; };
+		A5A5A5B7399D36924D4D5293 /* tone.flac in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A52CB63934C2C24DDCB6 /* tone.flac */; };
+		A5A5A5F327690E89A44C5FAF /* tone.wav in Resources */ = {isa = PBXBuildFile; fileRef = A5A5A5EE059BBD0370458A8D /* tone.wav */; };
 		1009026422785EE500BAA9BE /* a.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 1009026322785EE500BAA9BE /* a.m4a */; };
 		106D4F0421F5D9B700EA58C4 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106D4F0321F5D9B700EA58C4 /* AppDelegate.swift */; };
 		106D4F0621F5D9B700EA58C4 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106D4F0521F5D9B700EA58C4 /* ViewController.swift */; };
@@ -67,6 +78,17 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A5A5A5CF22C8071CBE49DD9F /* tone.opus */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.opus; sourceTree = "<group>"; };
+		A5A5A5117C2171AACF415A95 /* tone.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.m4a; sourceTree = "<group>"; };
+		A5A5A5E8B849A19C2844298F /* tone-alac.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-alac.m4a; sourceTree = "<group>"; };
+		A5A5A51476131F35984B8395 /* tone-cbr.mp3 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-cbr.mp3; sourceTree = "<group>"; };
+		A5A5A5825981860A894782B7 /* tone-vbr.mp3 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-vbr.mp3; sourceTree = "<group>"; };
+		A5A5A51290B19425514B5AA8 /* tone.aac */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.aac; sourceTree = "<group>"; };
+		A5A5A5CA93C7C5762F44758B /* tone.aifc */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.aifc; sourceTree = "<group>"; };
+		A5A5A5F3CB933765584FEB9F /* tone.aiff */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.aiff; sourceTree = "<group>"; };
+		A5A5A55D94546C7B9C43D8A4 /* tone.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.caf; sourceTree = "<group>"; };
+		A5A5A52CB63934C2C24DDCB6 /* tone.flac */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.flac; sourceTree = "<group>"; };
+		A5A5A5EE059BBD0370458A8D /* tone.wav */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.wav; sourceTree = "<group>"; };
 		1009026322785EE500BAA9BE /* a.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = a.m4a; sourceTree = "<group>"; };
 		106D4F0121F5D9B700EA58C4 /* APlayDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = APlayDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		106D4F0321F5D9B700EA58C4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -123,6 +145,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A5A5A5SAMPLESGROUP000000 /* Samples */ = {
+			isa = PBXGroup;
+			children = (
+				A5A5A5CF22C8071CBE49DD9F /* tone.opus */,
+				A5A5A5117C2171AACF415A95 /* tone.m4a */,
+				A5A5A5E8B849A19C2844298F /* tone-alac.m4a */,
+				A5A5A51476131F35984B8395 /* tone-cbr.mp3 */,
+				A5A5A5825981860A894782B7 /* tone-vbr.mp3 */,
+				A5A5A51290B19425514B5AA8 /* tone.aac */,
+				A5A5A5CA93C7C5762F44758B /* tone.aifc */,
+				A5A5A5F3CB933765584FEB9F /* tone.aiff */,
+				A5A5A55D94546C7B9C43D8A4 /* tone.caf */,
+				A5A5A52CB63934C2C24DDCB6 /* tone.flac */,
+				A5A5A5EE059BBD0370458A8D /* tone.wav */,
+			);
+			path = Samples;
+			sourceTree = "<group>";
+		};
 		106D4F0221F5D9B700EA58C4 /* APlayDemo */ = {
 			isa = PBXGroup;
 			children = (
@@ -133,6 +173,7 @@
 				106D4F0A21F5D9B800EA58C4 /* Assets.xcassets */,
 				106D4F0C21F5D9B800EA58C4 /* LaunchScreen.storyboard */,
 				106D4F0F21F5D9B900EA58C4 /* Info.plist */,
+				A5A5A5SAMPLESGROUP000000 /* Samples */,
 			);
 			path = APlayDemo;
 			sourceTree = "<group>";
@@ -376,6 +417,17 @@
 				106D4F0B21F5D9B800EA58C4 /* Assets.xcassets in Resources */,
 				106D4F0921F5D9B700EA58C4 /* Main.storyboard in Resources */,
 				1009026422785EE500BAA9BE /* a.m4a in Resources */,
+				A5A5A53642776A78FD45D886 /* tone.opus in Resources */,
+				A5A5A558EAD53197F94A97B3 /* tone.m4a in Resources */,
+				A5A5A5E30EDC71BE1B4DCC8C /* tone-alac.m4a in Resources */,
+				A5A5A5530F401EB4984F2C9F /* tone-cbr.mp3 in Resources */,
+				A5A5A5A2CEFE2040644164A5 /* tone-vbr.mp3 in Resources */,
+				A5A5A5063A547376A141B498 /* tone.aac in Resources */,
+				A5A5A51413402F3CE649EDA8 /* tone.aifc in Resources */,
+				A5A5A59BF50D738BF54555AC /* tone.aiff in Resources */,
+				A5A5A50C250739E1144984AB /* tone.caf in Resources */,
+				A5A5A5B7399D36924D4D5293 /* tone.flac in Resources */,
+				A5A5A5F327690E89A44C5FAF /* tone.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

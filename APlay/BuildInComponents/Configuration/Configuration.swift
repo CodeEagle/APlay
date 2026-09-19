@@ -169,10 +169,17 @@ extension APlay {
         ///
         /// - Parameter isToDownloadImage: Bool
         ///
-        /// - Note: Touches main-actor-isolated APIs (`AVAudioSession`, `UIApplication`); callers are
-        ///   expected to be on the main thread (the playback entry points are).
+        /// - Note: Touches main-actor-isolated APIs (`AVAudioSession`, `UIApplication`); the work
+        ///   runs on the main thread, also when a caller (e.g. the gapless preloader) reaches
+        ///   it from a background queue.
         public func startBackgroundTask(isToDownloadImage: Bool = false) {
             #if os(iOS)
+                guard Thread.isMainThread else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.startBackgroundTask(isToDownloadImage: isToDownloadImage)
+                    }
+                    return
+                }
                 MainActor.assumeIsolated {
                     if isToDownloadImage {
                         guard _backgroundTask != UIBackgroundTaskIdentifier.invalid else { return }
@@ -202,6 +209,12 @@ extension APlay {
         /// - Parameter isToDownloadImage: Bool
         public func endBackgroundTask(isToDownloadImage: Bool) {
             #if os(iOS)
+                guard Thread.isMainThread else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
+                    }
+                    return
+                }
                 MainActor.assumeIsolated {
                     if isToDownloadImage { return }
                     guard _backgroundTask != UIBackgroundTaskIdentifier.invalid else { return }

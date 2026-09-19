@@ -46,6 +46,9 @@ public final class APlay: @unchecked Sendable {
     private lazy var __isFlagReseted = false
     private lazy var __lastDelta: Float = -1
     private lazy var __lastDeltaHitCount: Int = 0
+    private lazy var __lastFrozenTime: Float = -1
+    private lazy var __frozenHitCount: Int = 0
+    private let __frozenLock = NSLock()
     private var __currentComposer: Composer?
     /// The track buffering one step ahead of `__currentComposer`, so the
     /// handover at the end of the current track needs no reopen and no pause.
@@ -111,6 +114,13 @@ public final class APlay: @unchecked Sendable {
                     obj._isFlagReseted = false
                     obj._nowPlayingInfo.play(elapsedPlayback: time)
                     debug_log("NowPlayingInfo:\(obj._nowPlayingInfo.info)")
+                }
+                // A stream that never reports a usable duration (opus in an ogg
+                // container) also stops emitting decoder-`.empty` events once the
+                // streamer is done, so end-of-track is detected here instead:
+                // `checkPlayEnded` fires on the second identical sample.
+                if obj._isSteamerEndEncounted {
+                    obj.checkPlayEnded()
                 }
                 obj.eventPipeline.call(.playback(time))
             case let .error(error):
@@ -308,6 +318,8 @@ private extension APlay {
         _isDecoderEndEncounted = false
         _lastDelta = -1
         _lastDeltaHitCount = 0
+        _lastFrozenTime = -1
+        _frozenHitCount = 0
         _player.startTime = 0
         _isFlagReseted = true
         config.logger.reset()
@@ -320,22 +332,44 @@ private extension APlay {
             eventPipeline.call(.waitForStreaming)
             return
         }
-        guard let dur = _currentComposer?.duration else { return }
+        let frozenHitThreshold = 2
         let currentTime = _player.currentTime()
+        // Playback time that stops advancing while the stream is already fully
+        // received is a truer end-of-track signal than the estimated duration
+        // (opus in an ogg container reports none that Core Audio honours, and
+        // the estimate can even come back NaN while the format is still being
+        // pinned down, so a delta-based check alone never fires).
+        if currentTime > 0 {
+            if _lastFrozenTime != currentTime {
+                _lastFrozenTime = currentTime
+                _frozenHitCount = 0
+            } else {
+                _frozenHitCount += 1
+                if _frozenHitCount >= frozenHitThreshold {
+                    handlePlayEnded(after: 0)
+                    return
+                }
+            }
+        }
+        guard let dur = _currentComposer?.duration, dur.isFinite else { return }
         let delta = abs(currentTime - dur)
         let deltaThreshold: Float = 0.02
-        let lastDeltaThreshold: Float = 1
         let lastDeltaHitThreshold = 2
         if delta <= deltaThreshold {
             handlePlayEnded(after: delta)
         } else {
             if _lastDelta != delta {
                 _lastDelta = delta
+                _lastDeltaHitCount = 0
             } else if _lastDelta <= deltaThreshold {
                 handlePlayEnded(after: delta)
             } else {
+                // Playback time stopped advancing while the stream is already
+                // done: the track has run dry even though the estimated duration
+                // never agreed with reality (opus in an ogg container reports
+                // no duration Core Audio honours).
                 _lastDeltaHitCount += 1
-                if _lastDeltaHitCount > lastDeltaHitThreshold, _lastDelta <= lastDeltaThreshold {
+                if _lastDeltaHitCount > lastDeltaHitThreshold {
                     handlePlayEnded(after: _lastDelta)
                 }
             }
@@ -622,6 +656,16 @@ extension APlay {
     private var _lastDeltaHitCount: Int {
         get { return _propertiesQueue.sync { __lastDeltaHitCount } }
         set { _propertiesQueue.async(flags: .barrier) { self.__lastDeltaHitCount = newValue } }
+    }
+
+    private var _lastFrozenTime: Float {
+        get { __frozenLock.lock(); defer { __frozenLock.unlock() }; return __lastFrozenTime }
+        set { __frozenLock.lock(); __lastFrozenTime = newValue; __frozenLock.unlock() }
+    }
+
+    private var _frozenHitCount: Int {
+        get { __frozenLock.lock(); defer { __frozenLock.unlock() }; return __frozenHitCount }
+        set { __frozenLock.lock(); __frozenHitCount = newValue; __frozenLock.unlock() }
     }
 
     private var _currentComposer: Composer? {

@@ -16,6 +16,17 @@ v2.1.0
    format hint table so the right decoder is selected up front
 5. Recover from transient server errors (HTTP 5xx) by reconnecting instead of reporting
    end of stream
+6. Fix a crash on device when the gapless preloader reaches the audio-session setup
+   from a background queue: `startBackgroundTask`/`endBackgroundTask` were guarded by a
+   main-thread assertion that trapped off the main thread; the work is now dispatched
+   to the main thread instead of assumed onto it
+7. Fix end-of-track detection for streams that report no usable duration (opus in an ogg
+   container exposes none that Core Audio honours, and the estimate can even come back
+   NaN mid-parse). Playback time that stops advancing after the stream is fully received
+   now ends the track, so such files advance through a playlist instead of stalling
+8. The demo app adopts the UIScene lifecycle (required to launch on iOS 17+) and ships
+   every bundled audio format as a playable sample, so a device run shows at a glance
+   which formats this platform decodes
 
 v2.0.0
 ---

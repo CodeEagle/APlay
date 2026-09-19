@@ -17,18 +17,6 @@ final class DefaultAudioDecoder: @unchecked Sendable {
 
     private lazy var _propertiesQueue = DispatchQueue(concurrentName: "PacketIO")
 
-    private var __packetLinkList: Packet?
-    private weak var __packetLinkListTail: Packet?
-    
-    private var _packetLinkList: Packet? {
-        get { return _propertiesQueue.sync { __packetLinkList } }
-        set { _propertiesQueue.async(flags: .barrier) { self.__packetLinkList = newValue } }
-    }
-    private weak var _packetLinkListTail: Packet? {
-        get { return _propertiesQueue.sync { __packetLinkListTail } }
-        set { _propertiesQueue.async(flags: .barrier) { self.__packetLinkListTail = newValue } }
-    }
-    
     private lazy var _audioFileStream: AudioFileStreamID? = nil
     private lazy var __audioConverter: AudioConverterRef? = nil
     private var _audioConverter: AudioConverterRef? {
@@ -433,53 +421,6 @@ private extension DefaultAudioDecoder {
             }
         }
     }
-}
-
-// MARK: - Packet io v2
-
-private extension DefaultAudioDecoder {
-    final class Packet: @unchecked Sendable {
-        let desc: AudioStreamPacketDescription
-        let data: Data
-        var next: Packet?
-        init(desc: AudioStreamPacketDescription, value: UnsafeRawPointer, count: Int) {
-            self.desc = desc
-            data = Data.init(bytes: value, count: count)
-        }
-    }
-    
-    func handleAudioPacketsv2(bytes: UInt32, packets: UInt32, data: UnsafeRawPointer, packetDescriptions: UnsafeMutablePointer<AudioStreamPacketDescription>?) {
-        if info.srcFormat.isLinearPCM {
-            outputStream.call(.output((data, bytes)))
-            return
-        }
-        let total = Int(packets)
-        for i in 0 ..< total {
-            guard var desc = packetDescriptions?.advanced(by: i).pointee else { return }
-            let offset = Int(desc.mStartOffset)
-            // set to zero because decode packet singly, not in a list
-            desc.mStartOffset = 0
-            let packet = Packet(desc: desc, value: data.advanced(by: offset), count: Int(desc.mDataByteSize))
-            if _packetLinkList == nil {
-                _packetLinkList = packet
-                _packetLinkListTail = packet
-            } else {
-                _packetLinkListTail?.next = packet
-                _packetLinkListTail = packet
-            }
-            
-            if info.calculate(packet: desc) {
-                outputStream.call(.bitrate(info.bitrate))
-            }
-        }
-    }
-    
-    func readPacket() -> Packet? {
-        let value = _packetLinkList
-        _packetLinkList = _packetLinkList?.next
-        return value
-    }
-    
 }
 
 // MARK: - Packet io

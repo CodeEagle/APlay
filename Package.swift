@@ -24,7 +24,8 @@ let package = Package(
         .testTarget(
             name: "APlayTests",
             dependencies: ["APlay"],
-            path: "MacTests"
+            path: "MacTests",
+            resources: [.copy("Fixtures")]
         ),
     ]
 )

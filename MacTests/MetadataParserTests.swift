@@ -362,7 +362,7 @@ final class MetadataParserTests: XCTestCase {
             if case let .other(map) = item { return map }
             return nil
         }.first
-        XCTAssertEqual(other?["TXXX"], "CustomValue\u{0}")
+        XCTAssertEqual(other?["TXXX"], "CustomValue")
     }
 
     func testID3DecodesApicCover() throws {
@@ -373,10 +373,7 @@ final class MetadataParserTests: XCTestCase {
         // APIC body: encoding + mime + \0 + picture type + description \0 + image.
         let jpeg: [UInt8] = [0xFF, 0xD8, 0xFF, 0xE0]
         let body: [UInt8] = [0x00] + Array("image/jpeg\u{0}".utf8) + [0x03, 0x00] + jpeg
-        var frame = v23Frame("APIC", body: body)
-        // Trailing padding keeps the buffer long enough for the cover slice,
-        // which the parser takes relative to the frame body.
-        frame.append(contentsOf: Array(repeating: 0x00, count: 32))
+        let frame = v23Frame("APIC", body: body)
         var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: frame.count)
         bytes.append(contentsOf: frame)
         feed(parser, bytes: bytes)
@@ -386,10 +383,8 @@ final class MetadataParserTests: XCTestCase {
             if case let .cover(data) = item { return data }
             return nil
         }.first
-        XCTAssertNotNil(cover)
-        let coverBytes = Array(cover ?? Data())
-        XCTAssertTrue(coverBytes.contains(0xFF))
-        XCTAssertTrue(coverBytes.contains(0xD8))
+        // The cover slice now spans exactly the picture data.
+        XCTAssertEqual(cover, Data(jpeg))
     }
 
     // MARK: - ID3v1
@@ -432,6 +427,24 @@ final class MetadataParserTests: XCTestCase {
         XCTAssertEqual(stringItem(items, "title"), "V11Title")
         XCTAssertEqual(stringItem(items, "track"), "9")
         XCTAssertEqual(stringItem(items, "comment"), "V11Comment")
+    }
+
+    func testID3v23DeunsynchronisesFF00Padding() throws {
+        let parser = ID3Parser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in
+            collector.append(event)
+        }
+        // On disk the v2.3 body carries a padding 00 after every FF. The frame
+        // size field states the *clean* length (4), not the raw 5.
+        let rawBody: [UInt8] = [0x00, 0xFF, 0x00, 0x41, 0x00]
+        var frame = v23Frame("TIT2", body: rawBody)
+        frame.replaceSubrange(4 ... 7, with: be32(4))
+        var bytes = v2Header(version: 0x03, flags: 0x80, tagSize: frame.count)
+        bytes.append(contentsOf: frame)
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        let items = try waitForMetadata()
+        XCTAssertEqual(stringItem(items, "title"), "\u{00FF}A")
     }
 
     func testID3v1RejectsFileWithoutTag() throws {
@@ -515,6 +528,110 @@ final class MetadataParserTests: XCTestCase {
         feed(parser, bytes: bytes)
         let items = try waitForMetadata()
         XCTAssertEqual(stringItem(items, "title"), "AfterUndefined")
+    }
+
+    func testFlacVorbisCommentsWithInflatedCountClampsSafely() throws {
+        let parser = FlacParser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in
+            collector.append(event)
+        }
+        // The comment count claims 255 entries but only one follows.
+        var body: [UInt8] = []
+        body.append(contentsOf: le32(4))
+        body.append(contentsOf: Array("test".utf8))
+        body.append(contentsOf: le32(0xFF))
+        let comment = "TITLE=Survived"
+        body.append(contentsOf: le32(comment.count))
+        body.append(contentsOf: Array(comment.utf8))
+        var bytes: [UInt8] = [0x66, 0x4C, 0x61, 0x43]
+        bytes.append(contentsOf: flacHeader(isLast: false, type: 0, size: 34))
+        bytes.append(contentsOf: streamInfoBody())
+        bytes.append(contentsOf: flacHeader(isLast: true, type: 4, size: body.count))
+        bytes.append(contentsOf: body)
+        feed(parser, bytes: bytes)
+        let items = try waitForMetadata()
+        XCTAssertEqual(stringItem(items, "title"), "Survived")
+    }
+
+    func testFlacPictureWithInflatedLengthClampsSafely() throws {
+        let parser = FlacParser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in
+            collector.append(event)
+        }
+        // The picture length claims 64 KiB but only a few bytes follow.
+        var body: [UInt8] = []
+        body.append(contentsOf: be32(0x03)) // front cover
+        let mime = Array("image/jpeg".utf8)
+        body.append(contentsOf: be32(mime.count))
+        body.append(contentsOf: mime)
+        body.append(contentsOf: be32(0)) // empty description
+        body.append(contentsOf: be32(100)) // width
+        body.append(contentsOf: be32(100)) // height
+        body.append(contentsOf: be32(24)) // color depth
+        body.append(contentsOf: be32(0)) // colors used
+        body.append(contentsOf: be32(0xFFFF)) // inflated length
+        body.append(contentsOf: [0xFF, 0xD8, 0xFF])
+        var bytes: [UInt8] = [0x66, 0x4C, 0x61, 0x43]
+        bytes.append(contentsOf: flacHeader(isLast: false, type: 0, size: 34))
+        bytes.append(contentsOf: streamInfoBody())
+        bytes.append(contentsOf: flacHeader(isLast: true, type: 6, size: body.count))
+        bytes.append(contentsOf: body)
+        feed(parser, bytes: bytes)
+        let flac = try waitForFlacEvent()
+        XCTAssertEqual(flac.picture?.mimeType, "image/jpeg")
+        XCTAssertEqual(flac.picture?.picData, Data([0xFF, 0xD8, 0xFF]))
+    }
+
+    func testFlacCueSheetWithInflatedTrackCountClampsSafely() throws {
+        let parser = FlacParser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in
+            collector.append(event)
+        }
+        // The track count claims 5 but only one track (36 bytes) follows.
+        var body: [UInt8] = []
+        body.append(contentsOf: Array(repeating: UInt8(0x00), count: 128)) // catalog
+        body.append(contentsOf: be32(0) + [0x00, 0x00, 0x00, 0x00]) // lead-in
+        body.append(0x80) // isCD
+        body.append(contentsOf: Array(repeating: UInt8(0x00), count: 258))
+        body.append(5) // inflated track count
+        // One track: offset(8) + number(1) + isrc(12) + flags(1) + reserved(13) + index count(1)
+        body.append(contentsOf: be32(0) + [0x00, 0x00, 0x00, 0x00]) // offset
+        body.append(0x01) // track number
+        body.append(contentsOf: Array(repeating: UInt8(0x41), count: 12)) // isrc
+        body.append(0x00) // flags
+        body.append(contentsOf: Array(repeating: UInt8(0x00), count: 13))
+        body.append(0x00) // no index points
+        var bytes: [UInt8] = [0x66, 0x4C, 0x61, 0x43]
+        bytes.append(contentsOf: flacHeader(isLast: false, type: 0, size: 34))
+        bytes.append(contentsOf: streamInfoBody())
+        bytes.append(contentsOf: flacHeader(isLast: true, type: 5, size: body.count))
+        bytes.append(contentsOf: body)
+        feed(parser, bytes: bytes)
+        let flac = try waitForFlacEvent()
+        XCTAssertEqual(flac.cueSheet?.tracks.count, 1)
+        XCTAssertEqual(flac.cueSheet?.isCD, true)
+    }
+
+    func testFlacSeekTableIgnoresPartialTrailingPoint() throws {
+        let parser = FlacParser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in
+            collector.append(event)
+        }
+        // 20 bytes = one 18-byte point plus 2 stray bytes.
+        var point: [UInt8] = []
+        point.append(contentsOf: be32(44100) + [0x00, 0x00, 0x00, 0x00]) // sample number
+        point.append(contentsOf: be32(0) + [0x00, 0x00, 0x00, 0x00]) // stream offset
+        point.append(contentsOf: [0x0B, 0x40]) // 2880 frame samples
+        let body = point + [0x00, 0x00]
+        var bytes: [UInt8] = [0x66, 0x4C, 0x61, 0x43]
+        bytes.append(contentsOf: flacHeader(isLast: false, type: 0, size: 34))
+        bytes.append(contentsOf: streamInfoBody())
+        bytes.append(contentsOf: flacHeader(isLast: true, type: 3, size: body.count))
+        bytes.append(contentsOf: body)
+        feed(parser, bytes: bytes)
+        let flac = try waitForFlacEvent()
+        XCTAssertEqual(flac.seekTable?.points.count, 1)
+        XCTAssertEqual(flac.seekTable?.points.first?.frameSamples, 2880)
     }
 
     /// Waits for the parser's barrier queue to flush a `.flac` event.

@@ -15,6 +15,7 @@ final class ID3Parser: @unchecked Sendable {
     private lazy var _nextParseStartAt = 0
     private lazy var _metadatas: [Version: [MetadataParser.Item]] = [:]
     private lazy var _isSkippedExtendedHeader = false
+    private lazy var _isDeunsynchronised = false
     private unowned let _config: ConfigurationCompatible
 
     private var _v2Info: ID3V2? {
@@ -104,6 +105,14 @@ extension ID3Parser {
             _v2State = .parsering
         }
         guard _v2State == .parsering, let info = _v2Info else { return }
+        // Undo v2.2/v2.3 unsynchronisation once, over the whole tag body, so the
+        // frame sizes and bodies read as written. Only applied once the tag is
+        // fully buffered, since a partial body would leave half-desynchronised
+        // bytes next to freshly appended ones. v2.4 sizes are already sync-safe.
+        if info.version < 4, info.flags.contains(.unsynchronisation), _isDeunsynchronised == false, _data.count >= Int(info.size) - ID3V2.headerFrameLength {
+            _isDeunsynchronised = true
+            _data = Data(deunsynchronise(_data))
+        }
         // Skip Extended Header
         if info.version >= 3, _isSkippedExtendedHeader == false, info.hasExtendedHeader {
             guard _data.count >= 4 else { return }
@@ -201,8 +210,12 @@ extension ID3Parser {
                  */
                 let mimeTypeStartIndex = readlength
                 var mimeTypeEndIndex = mimeTypeStartIndex
-                while _data[mimeTypeEndIndex] != 0 {
+                while mimeTypeEndIndex < _data.count, _data[mimeTypeEndIndex] != 0 {
                     mimeTypeEndIndex += 1
+                }
+                guard mimeTypeEndIndex < _data.count else {
+                    _v2State = .error("APIC mime type is not terminated")
+                    break
                 }
 
                 guard let mimeType = String(data: _data[mimeTypeStartIndex ..< mimeTypeEndIndex], encoding: .utf8) else {
@@ -210,15 +223,26 @@ extension ID3Parser {
                     break
                 }
 
-                let picType = MetadataParser.PictureType(rawValue: _data[mimeTypeEndIndex]) ?? .undifined
-                readlength = mimeTypeEndIndex + 1
-                // skip desc
-                while true {
-                    defer { readlength += 1 }
-                    guard _data[readlength] == 0, _data[readlength + 1] != 0 else { continue }
+                // Picture type follows the mime type's terminator.
+                let picTypeIndex = mimeTypeEndIndex + 1
+                guard picTypeIndex < _data.count else {
+                    _v2State = .error("APIC picture type is missing")
                     break
                 }
-                let data = Data(_data[readlength ..< readlength + frameSize])
+                let picType = MetadataParser.PictureType(rawValue: _data[picTypeIndex]) ?? .undifined
+                // Description is a \0-terminated string; skip past it.
+                var descEnd = picTypeIndex + 1
+                while descEnd < _data.count, _data[descEnd] != 0 {
+                    descEnd += 1
+                }
+                guard descEnd < _data.count else {
+                    _v2State = .error("APIC description is not terminated")
+                    break
+                }
+                readlength = descEnd + 1
+                // The picture occupies the rest of the frame body, so the slice
+                // ends at the frame size, not at `readlength + frameSize`.
+                let data = Data(_data[readlength ..< frameSize])
                 var meta = _metadatas[info.ver] ?? []
                 meta.append(.cover(data))
                 _metadatas[info.ver] = meta
@@ -236,7 +260,7 @@ extension ID3Parser {
                         case "TRCK", "TRK": meta.append(.track(value))
                         case "COMM", "COM": meta.append(.comment(value))
                         case "TDAT", "TDA": meta.append(.year(value))
-                        default: meta.append(.other([frameName: text]))
+                        default: meta.append(.other([frameName: value]))
                         }
                         _metadatas[info.ver] = meta
                         _config.logger.log("(\(frameName))(\(frameSize)bytes)=\"\(value)\"", to: .metadataParser)
@@ -248,6 +272,26 @@ extension ID3Parser {
             _data = _data.advanced(by: frameSize)
             _nextParseStartAt += frameSize
         }
+    }
+}
+
+// MARK: - Unsynchronisation
+
+private extension ID3Parser {
+    /// Removes the $00 padding inserted after every $FF (ID3v2.2/2.3 scheme).
+    func deunsynchronise(_ data: Data) -> [UInt8] {
+        var out: [UInt8] = []
+        out.reserveCapacity(data.count)
+        var previousWasFF = false
+        for byte in data {
+            if previousWasFF, byte == 0 {
+                previousWasFF = false
+                continue
+            }
+            out.append(byte)
+            previousWasFF = (byte == 0xFF)
+        }
+        return out
     }
 }
 

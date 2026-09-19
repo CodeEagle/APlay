@@ -237,18 +237,20 @@ public struct FlacMetadata {
         init(bytes: Data, header: Header) {
             self.header = header
             var data = bytes.advanced(by: 0)
-            let vendorLength = Int(Array(data[0 ..< 4]).unpack(isLittleEndian: true))
-            data = data.advanced(by: 4)
-            let vendorData = data[0 ..< vendorLength]
+            let vendorLength = data.count >= 4 ? Int(Array(data[0 ..< 4]).unpack(isLittleEndian: true)) : 0
+            data = data.advanced(by: min(4, data.count))
+            let vendorData = data[0 ..< min(vendorLength, data.count)]
             vendor = String(data: vendorData, encoding: .utf8) ?? ""
-            data = data.advanced(by: vendorLength)
-            let commentsCount = Array(data[0 ..< 4]).unpack(isLittleEndian: true)
-            data = data.advanced(by: 4)
+            data = data.advanced(by: min(vendorLength, data.count))
+            let commentsCount = data.count >= 4 ? Array(data[0 ..< 4]).unpack(isLittleEndian: true) : 0
+            data = data.advanced(by: min(4, data.count))
             var map: [Field: String] = [:]
             var metas: [String] = []
             for _ in 0 ..< commentsCount {
+                guard data.count >= 4 else { break }
                 let length = Int(Array(data[0 ..< 4]).unpack(isLittleEndian: true))
                 data = data.advanced(by: 4)
+                guard length <= data.count else { break }
                 let strData = data[0 ..< length]
                 guard let value = String(data: strData, encoding: .utf8) else { continue }
                 data = data.advanced(by: length)
@@ -316,32 +318,31 @@ public struct FlacMetadata {
             let value = Array(data[0 ..< 4]).unpack()
             type = MetadataParser.PictureType(rawValue: UInt8(value)) ?? .undifined
             data = data.advanced(by: 4)
-            let mimeTypeLength = Int(Array(data[0 ..< 4]).unpack())
-            data = data.advanced(by: 4)
-            let mimeTypeData = data[0 ..< mimeTypeLength]
-            mimeType = String(data: mimeTypeData, encoding: .ascii) ?? ""
-            data = data.advanced(by: mimeTypeLength)
-            let descLength = Int(Array(data[0 ..< 4]).unpack())
-            data = data.advanced(by: 4)
+            let mimeTypeLength = data.count >= 4 ? Int(Array(data[0 ..< 4]).unpack()) : 0
+            data = data.advanced(by: min(4, data.count))
+            mimeType = String(data: data[0 ..< min(mimeTypeLength, data.count)], encoding: .ascii) ?? ""
+            data = data.advanced(by: min(mimeTypeLength, data.count))
+            let descLength = data.count >= 4 ? Int(Array(data[0 ..< 4]).unpack()) : 0
+            data = data.advanced(by: min(4, data.count))
             if descLength > 0 {
-                let descData = data[0 ..< descLength]
+                let descData = data[0 ..< min(descLength, data.count)]
                 desc = String(data: descData, encoding: .utf8) ?? ""
-                data = data.advanced(by: descLength)
+                data = data.advanced(by: min(descLength, data.count))
             } else {
                 desc = ""
             }
-            let width = Array(data[0 ..< 4]).unpack()
-            data = data.advanced(by: 4)
-            let height = Array(data[0 ..< 4]).unpack()
-            data = data.advanced(by: 4)
+            let width = data.count >= 4 ? Array(data[0 ..< 4]).unpack() : 0
+            data = data.advanced(by: min(4, data.count))
+            let height = data.count >= 4 ? Array(data[0 ..< 4]).unpack() : 0
+            data = data.advanced(by: min(4, data.count))
             size = CGSize(width: CGFloat(width), height: CGFloat(height))
-            colorDepth = Array(data[0 ..< 4]).unpack()
-            data = data.advanced(by: 4)
-            colorUsed = Array(data[0 ..< 4]).unpack()
-            data = data.advanced(by: 4)
-            length = Array(data[0 ..< 4]).unpack()
-            data = data.advanced(by: 4)
-            picData = data[0 ..< Int(length)]
+            colorDepth = data.count >= 4 ? Array(data[0 ..< 4]).unpack() : 0
+            data = data.advanced(by: min(4, data.count))
+            colorUsed = data.count >= 4 ? Array(data[0 ..< 4]).unpack() : 0
+            data = data.advanced(by: min(4, data.count))
+            length = data.count >= 4 ? Array(data[0 ..< 4]).unpack() : 0
+            data = data.advanced(by: min(4, data.count))
+            picData = Data(data[0 ..< min(Int(length), data.count)])
         }
     }
 
@@ -368,10 +369,13 @@ public struct FlacMetadata {
             data = data.advanced(by: 8)
             isCD = (UInt32(data[0]) & 0x80) != 0
             data = data.advanced(by: 258 + 1)
-            let tracksCount = data[0]
+            let tracksCount = data.isEmpty ? 0 : data[0]
             data = data.advanced(by: 1)
             var tracks: [Track] = []
             for _ in 0 ..< tracksCount {
+                // Track header: offset(8) + number(1) + isrc(12) + flags(1) +
+                // reserved(13) + index count(1) = 36 bytes.
+                guard data.count >= 36 else { break }
                 let offset = Array(data[0 ..< 8]).unpackUInt64()
                 data = data.advanced(by: 8)
                 let number = data[0]
@@ -387,6 +391,7 @@ public struct FlacMetadata {
                 if numberOfIndexPoints > 0 {
                     for _ in 0 ..< numberOfIndexPoints {
                         let size = Track.Index.size
+                        guard data.count >= size else { break }
                         let pointData = data[0 ..< size]
                         data = data.advanced(by: size)
                         let offset = Array(pointData[0 ..< 8]).unpackUInt64()
@@ -428,8 +433,9 @@ public struct FlacMetadata {
             let point0 = bytes.startIndex
             let point4 = point0 + 4
             let value = Array(bytes[point0 ..< point4]).unpack()
+            let end = min(Int(header.metadataBlockDataSize), bytes.endIndex)
             name = String(from: value)?.trimZeroTerminator() ?? "\(value)"
-            data = Data(bytes[point4 ..< Int(header.metadataBlockDataSize)])
+            data = Data(bytes[point4 ..< end])
         }
     }
 
@@ -446,6 +452,8 @@ public struct FlacMetadata {
             for i in 0 ..< totalPoints {
                 let offset = i * 18 + startIndex
                 let end = offset + 18
+                // A truncated trailing point is not a seek point at all.
+                guard end <= bytes.endIndex else { break }
                 let point = SeekPoint(bytes: bytes[offset ..< end])
                 pointTable.append(point)
             }

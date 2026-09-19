@@ -62,6 +62,20 @@ v2.1.0
    covers, the unknown-frame `.other` fallback, ID3v1 and v1.1 local files, plus FLAC
    vorbis comments, padding and undefined block types. ID3Parser line coverage rose
    from 28% to 92%, FlacParser from 37% to 55%, and the package total to 81%
+15. Fix ID3v2.3 APIC cover parsing: the picture type is the byte after the mime
+   type's terminator (not the terminator itself), the description is skipped past
+   its own \0, and the cover slice now spans the rest of the frame body instead of
+   `readlength + frameSize`, which mis-sliced every embedded cover. Unknown frames'
+   `.other` text is trimmed of its terminator, and ID3v2.2/v2.3 unsynchronisation
+   (the $00 inserted after every $FF) is now undone over the whole tag body, so
+   frames behind the flag decode instead of reading garbage lengths
+16. Harden the FLAC parser against truncated or hostile metadata blocks: vorbis
+   comment vendor/comment lengths, picture mime/description/width/height/data
+   lengths, CUESheet track and index counts, SeekTable trailing points and
+   Application block sizes are all clamped to the bytes actually present, so a bad
+   length field fails closed instead of reading out of bounds. Four byte-level
+   robustness tests pin the clamps; FlacParser line coverage rose from 55% to 83%
+   and the package total to 82.5%
 
 v2.0.0
 ---

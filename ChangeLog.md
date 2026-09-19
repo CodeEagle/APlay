@@ -57,6 +57,11 @@ v2.1.0
    concept, so those stay compiled out there and playback runs on the decoder, ring
    buffer and render path alone. The image typealias, the default user agent and every
    platform branch were widened to match
+14. Test coverage: the ID3 and FLAC tag parsers are pinned by byte-level tests —
+   ID3v2.2/2.3/2.4 text frames, sync-safe sizes, the extended-header skip, APIC
+   covers, the unknown-frame `.other` fallback, ID3v1 and v1.1 local files, plus FLAC
+   vorbis comments, padding and undefined block types. ID3Parser line coverage rose
+   from 28% to 92%, FlacParser from 37% to 55%, and the package total to 81%
 
 v2.0.0
 ---

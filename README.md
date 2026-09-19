@@ -95,7 +95,7 @@ Installation
 
 [CocoaPods](https://cocoapods.org/) `pod 'APlay'`
 
-[Swift Package Manager](https://swift.org/package-manager/) `.package(url: "https://github.com/CodeEagle/APlay.git", from: "1.4.0")`
+[Swift Package Manager](https://swift.org/package-manager/) `.package(url: "https://github.com/CodeEagle/APlay.git", from: "2.0.0")`
 
 Todo
 ---

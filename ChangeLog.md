@@ -1,6 +1,10 @@
-v1.4.0
+v2.0.0
 ---
 >2026.09.19
+
+Major release: the pre-iOS-11 legacy stack is gone (deployment target is now iOS 15),
+so this is not source/drop-in compatible with the 0.x line — the v1.3.x entries below
+are the migration steps that landed in this same modernization.
 
 1. New: `APlay.prepare(_:)` preloads a track without starting the output audio unit (issue #14).
    The streamer and decoder run and fill the ring buffer; a subsequent `play(_:)` of the same URL

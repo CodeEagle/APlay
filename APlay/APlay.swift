@@ -15,7 +15,7 @@ import AVFoundation
 /// A public class for control audio playback
 public final class APlay: @unchecked Sendable {
     /// Current framework version
-    public static let version: String = "1.3.1"
+    public static let version: String = "2.0.0"
 
     /// Loop pattern for playback list
     public var loopPattern: PlayList.LoopPattern {

@@ -16,7 +16,7 @@ final class APlaySmokeTests: XCTestCase {
     /// `eventPipeline`/`state` previously referenced internal `Event`/`State`,
     /// which made the primary delegate API unusable for binary-framework users.
     func testPublicEventTypesAreReachable() throws {
-        XCTAssertEqual(APlay.version, "1.3.1")
+        XCTAssertEqual(APlay.version, "2.0.0")
 
         let player = APlay()
         if case .idle = player.state {

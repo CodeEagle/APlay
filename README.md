@@ -49,6 +49,31 @@ The default is off, so single-track playback behaves exactly as before. A handof
 different audio formats (for example MP3 → FLAC) still re-initializes the graph and is not
 seamless.
 
+Supported formats
+---
+Anything Core Audio can stream-decode, APlay can play. The matrix below is pinned by
+`MacTests/FormatCompatibilityTests.swift`, which drives every bundled fixture through the
+real decoder (`AudioFileStream` + `AudioConverter`) — a format only counts as supported
+when it both parses its metadata *and* decodes to canonical PCM.
+
+| Format | Container / codec | Decode | Note |
+| --- | --- | --- | --- |
+| AAC | MP4 (`.m4a`) | ✅ | |
+| AAC | raw ADTS (`.aac`) | ✅ | |
+| MP3 | CBR and VBR (`.mp3`) | ✅ | seek supported |
+| FLAC | native (`.flac`) | ✅ | seek supported (with a seek table) |
+| Opus | in OGG (`.opus`) | ✅ | Core Audio parses the container on this platform |
+| WAVE | PCM (`.wav`) | ✅ | tolerates extra chunks (`LIST`/`INFO`, `FLLR`) before `data`; seek supported |
+| ALAC | MP4 (`.m4a`) | ✅ | |
+| ALAC | CAF (`.caf`) | ⚠️ parse only | the packet table trails the audio data, so the streaming parser reports `optm`. Seekable local files play; a stream cannot |
+| AIFF / AIFF-C | PCM (`.aiff`, `.aifc`) | ⚠️ parse only | `AudioFileStream` reports a packet discontinuity (`dsc!`) |
+
+The hint table also routes these Core Audio-native extensions, but no fixture ships for
+them, so they are *not* covered by the test matrix: `.m4b`, `.ac3`, `.amr`, `.3gp`,
+`.3g2`, `.mp2`, `.mp1`, `.au`/`.snd`, `.rf64`, `.sd2`. Formats Core Audio does not ship
+(Vorbis, Opus outside an OGG container, …) need an injected custom decoder — see
+`audioDecoderBuilder` and the Todo list.
+
 ✅ Known issue (fixed)
 ---
 Earlier releases could only run in `DEBUG` mode: with optimization enabled (`-O`) the decode
@@ -57,8 +82,6 @@ loop would stall. The root cause was a set of dangling pointers around the audio
 converter dereferences *after* the input callback returns, and the decode/output buffers were
 handed to Core Audio through unscoped `inout` references. These are now backed by stable,
 object-owned storage and scoped pointer access, so optimized `Release` builds work correctly.
-
-No CocoaPods `post_install` workaround is needed anymore — `pod 'APlay'` works out of the box.
 
 > ℹ️ Plain `http://` streams: iOS blocks non-HTTPS URLs via App Transport Security by default.
 > If your stream URL is `http://...`, add an `NSAllowsArbitraryLoads` (or a per-domain) exception
@@ -112,11 +135,16 @@ Features
 
 Installation
 ---
-[Carthage](https://github.com/Carthage/Carthage) `github "CodeEagle/APlay"`
+[Swift Package Manager](https://swift.org/package-manager/) is the only supported way to
+add APlay — there is no CocoaPods spec and no Carthage support anymore:
 
-[CocoaPods](https://cocoapods.org/) `pod 'APlay'`
+```Swift
+.package(url: "https://github.com/CodeEagle/APlay.git", from: "2.0.0")
+```
 
-[Swift Package Manager](https://swift.org/package-manager/) `.package(url: "https://github.com/CodeEagle/APlay.git", from: "2.0.0")`
+Add the `APlay` product to your app target. The same `Package.swift` also builds the
+`APlayMacPlayback` end-to-end validation target and the `APlayTests` suite on macOS, so
+`swift build` and `swift test` are the single source of truth for the framework.
 
 Todo
 ---

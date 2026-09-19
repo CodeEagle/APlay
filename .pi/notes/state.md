@@ -1,42 +1,44 @@
 State format: capsule-v2
-State revision: 33
+State revision: 35
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
-- Baseline: 2026-09-19；Xcode 27.0 / Swift 6.4；iOS 15.0 部署；测试真机
-  lincoln-phone（iPhone 15 Pro Max，iOS 27.0，UDID 00008130-000E7959262B803A）。
-  本地领先 origin 27 commit 未 push（含 d61b53e）。
+- Baseline: 2026-09-19；Xcode 27.0 / Swift 6.4；iOS 15.0 部署；真机
+  lincoln-phone（iOS 27.0，UDID 00008130-000E7959262B803A）。本地领先 origin
+  28 commit 未 push（含 718c466）。
 
 ## Task
-- Goal: opus 真机验证（用户: "打包发手机测 opus"）——**已完成**。⑤ 未启动。
-- Unit: 无活跃单元。
-- Done when: （已完成）真机 12 格式全部播放并逐轨推进 + swift test 86/86 +
-  iOS 8 套构建 + MacPlayback 双端到端 + 提交。
+- Goal: 用户四项改造（goal 3b94daf6）: ① README 格式支持表; ② 不支持格式的可选
+  子库; ③ 改 SPM-only 安装; ④ AirPlay2 支持。①③ 已完成，②④ 未开始。
+- Unit: ①+③ 已交付并验证; 次 ② 定范围（Core Audio 不支持的编码/容器）;
+  最后 ④ AirPlay2 最小自研。
+- Done when: 四项代码+文档完成，swift test 全绿 + iOS 构建零业务警告后提交。
 
 ## Progress
-- Done: opus 真机原生解码确认（无需注入解码器）; Demo 改真机格式试机
-  （Samples 资源 + SceneDelegate + result.log 诊断链）; 三个框架 bug 修复
-  （startBackgroundTask 主线程派发、无 duration 流的停驻曲终检测、iOS 17+
-  Scene 生命周期），均已提交 d61b53e。详见 full SF-0028。
-- Open: ⑤ 未启动; origin 未 push（镜像仓库，未经允许不 push）。
-- Checks: swift test 86/86; iOS 8 套构建 SUCCEEDED（仅 appintents 工具链噪声）;
-  swift build -c release 零警告; MacPlayback 单轨+gapless 双 PASS; 真机 12
-  格式逐轨推进（wav→aifc 跨格式 paused 一次，符合文档）。
-- Pending: 无。
+- Done: ① README "Supported formats" 段（据 FormatCompatibilityTests 已验矩阵:
+  7 解码成功 + 2 parse-only + hint 表已映射无 fixture 的扩展）; ③ git rm
+  APlay.podspec、Installation 仅 SPM、删 Known-issue 的 pod 句、Fastfile 去
+  pod 三动作并加 test lane + bump_swift_version_constant（bump 先于 test，
+  靠 APlaySmokeTests:19 断言把关）、ChangeLog v2.1.0 加第 9/10 条。详见 SF-0030。
+- Open: ② 可选子库（范围待定: ogg/vorbis、非 OGG 的 opus 等 Core Audio 不支持者，
+  须不污染主库、只走 audioDecoderBuilder 注入缝）; ④ AirPlay2 缺
+  MPRemoteCommandCenter/AVRoutePickerView/routeChange 处理（待查证）。
+- Checks: swift test 86/86 零失败; iOS 8 套构建 SUCCEEDED 零业务警告;
+  swift run -c release APlayMacPlayback 播 a.m4a PASS（-O 优化路径实证）。
+- Pending: ①③ 的提交（验证已过，待 commit; 排除 xcuserstate 与 .DS_Store）。
 
 ## Rules
-- Constraints: 镜像仓库未经允许不 push; 每批改动须 iOS 四套构建 +
-  MacPlayback 端到端验证后才提交; 只测可注入协议接缝; 提交排除 xcuserstate
-  与 .DS_Store。
-- 真机打包: 命令行 build setting 覆盖对 Xcode 27 签名解析无效; 用 Xcode 库内
-  wildcard profile（team 77SXM8HYXF，UUID 82de0928-9338-4e57-80b8-26dc00957e0e）
-  + 工程命令行 DEVELOPMENT_TEAM/CODE_SIGN_STYLE=Automatic +
-  -allowProvisioningUpdates，由 Xcode 签名栈完成; devicectl 取诊断用
-  copy from systemCrashLogs 与 appDataContainer。
-- 教训: ①~㉚ 见 full; iOS 17+ 无 SceneManifest 启动即 trap; 异步 barrier
-  属性在同步连发事件下读不到新值（停驻计数用 NSLock）。
+- Constraints: 镜像仓库未经允许不 push; 每批改动须 iOS 四套构建 + MacPlayback
+  端到端验证后才提交; 只测可注入协议接缝; 提交排除 xcuserstate 与 .DS_Store。
+- 真机打包: 用 Xcode 库内 wildcard profile（team 77SXM8HYXF，UUID
+  82de0928-9338-4e57-80b8-26dc00957e0e）+ 工程命令行 DEVELOPMENT_TEAM/
+  CODE_SIGN_STYLE=Automatic + -allowProvisioningUpdates; 诊断取
+  devicectl copy from systemCrashLogs/appDataContainer。
+- 教训: ①~㉚ 见 full; iOS 17+ 无 SceneManifest 启动即 trap; 异步 barrier 属性
+  在同步连发事件下读不到新值（用 NSLock）。
 
 ## Next
-- Action: 等待用户指定 ⑤ 或其他任务。
-- Verify: 无（本批已闭环）。
-- Refs: SF-0026、SF-0027、SF-0028。
+- Action: 提交 ①③（README.md、ChangeLog.md、APlay.podspec 删除、fastlane/Fastfile
+  + 本批 notes），然后开 ②: 查 audioDecoderBuilder 注入缝，定可选子库最小范围。
+- Verify: 提交后 git status 无 xcuserstate/.DS_Store; ② 的子库须 swift test 仍 86/86。
+- Refs: SF-0029（调查）、SF-0030（①③ 实况）; goal 3b94daf6。

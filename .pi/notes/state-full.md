@@ -771,3 +771,63 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   devicectl copy from systemCrashLogs + appDataContainer，比 console 可靠;
   ㉚ 跨属性异步 barrier set 在同步连发事件下读不到新值，停驻计数改 NSLock。
 - 剩余: 无（本批闭环; ⑤ 未启动）。
+
+## SF-0029
+- Revision: 34
+- 任务（用户四项改造，进行中，goal 3b94daf6）:
+  1. README 写格式支持表;
+  2. 不支持的格式加"可选子库"实现;
+  3. 改为只用 SPM 安装（去 Carthage/CocoaPods）;
+  4. Todo 的 AirPlay2 支持也要实现。
+- 已调查事实:
+  * 安装方式现状: 仅 APlay.podspec（无 Cartfile/xcworkspace）; Package.swift 已存在
+    （products: APlay library; targets: APlay、APlayMacPlayback executable、
+    APlayTests(MacTests, resources Fixtures)）; README Installation 段列
+    Carthage/CocoaPods/SPM 三种;"Known issue (fixed)"段还提 `pod 'APlay'`。
+  * 格式矩阵（MacTests/FormatCompatibilityTests.swift 已验）:
+    解码成功: m4a(AAC/MP4)、aac(ADTS)、mp3 CBR/VBR、flac、opus-in-ogg、wav PCM、
+    ALAC-in-MP4。
+    解码失败（parse 成功但 decode 失败）: caf(ALAC-in-CAF, packet table 在数据后
+    'optm', 流式不可, seekable 可)、aiff/aifc(AudioFileStream 报 dsc! 间断)。
+  * AudioFileType 全集（AudioDecoderCompatible.swift 159-178）: aiff aifc wave rf64
+    soundDesigner2 next mp3 mp2 mp1 ac3 aacADTS mp4 m4a m4b caf k3gp k3gp2 amr flac
+    opus。扩展映射（StreamProviderCompatible.swift 156-178）含 m4b/ac3/amr/3gp/au/
+    rf64/sd2，default → mp3。
+  * AirPlay2: origin/airplay2 分支仅空壳 AirPlayer2.swift（方法全空，v0.0.3 时代,
+    1051 文件差异，不可合，仅供思路）。APlay 现状已具备: Configuration
+    startBackgroundTask 设 `.playback` + `RouteSharingPolicy.longFormAudio`
+    （AirPlay2 长音频基础）。缺口待查: MPRemoteCommandCenter 接线（锁屏/控制中心
+    遥控 play/pause/next/previous/seek）、AVRoutePickerView 接入点、
+    routeChangeNotification 处理。
+- 未做: 四项改造的代码与文档均未开始; 未提交。
+- Next: 先写格式支持表（据已验矩阵）+ SPM-only 改造（删 podspec、改 README）;
+  再定可选子库范围（针对 Core Audio 不支持格式，待定 ogg/vorbis 等）; AirPlay2
+  做最小自研（MPRemoteCommandCenter 接线 + 路由选择接入点 + 文档）。
+
+## SF-0030
+- Revision: 35
+- 取代：SF-0029 的"四项均未开始"——①③ 已完成并验证，本文记其实况。
+- 任务①（README 格式支持表）: 新增 "Supported formats" 段（Gapless 段后、Known
+  issue 段前）。表据 FormatCompatibilityTests 已验矩阵: 解码成功 7 行（AAC-MP4、
+  AAC-ADTS、MP3 CBR/VBR、FLAC、Opus-in-OGG、WAVE-PCM、ALAC-MP4）；parse-only 2 行
+  （ALAC-in-CAF 'optm' 流式不可/AIFF-AIFF-C 'dsc!'）。另列 hint 表已映射但无 fixture
+  的扩展（m4b/ac3/amr/3gp/3g2/mp2/mp1/au/rf64/sd2），明标"未含测试矩阵"。
+- 任务③（SPM-only）: git rm APlay.podspec; README Installation 仅留 SPM 并说明无
+  CocoaPods/Carthage; 删 Known issue 段的 `pod 'APlay'` post_install 句;
+  fastlane/Fastfile 去 pod_lib_lint/version_bump_podspec/pod_push，新增
+  `test` lane（swift test）与 `bump_swift_version_constant`（gsub 改 APlay.swift 的
+  `APlay.version` 常量，bump 在 test 之前跑——APlaySmokeTests:19 断言版本号，
+  测试只在常量与断言同步时才绿）。ChangeLog v2.1.0 加第 9、10 条。
+- 验证（本批）: swift test 86/86 零失败; iOS 8 套构建（APlay/APlayDemo ×
+  iphoneos/iphonesimulator × Debug/Release，CODE_SIGNING_ALLOWED=NO）全 BUILD
+  SUCCEEDED、零业务警告（仅工具链噪声）; swift run -c release APlayMacPlayback 播
+  APlayDemo/a.m4a PASS（137s→.playing→推进 2.0s），即 README "Known issue (fixed)"
+  所指的 -O 优化路径又跑过一次实证。
+- 已知漂移（未改，非本批范围）: APlay.version 常量与 APlaySmokeTests 断言仍 2.0.0，
+  而 ChangeLog 头已 v2.1.0; README SPM `from: "2.0.0"`。发版时由
+  bump_swift_version_constant 统一。
+- 未做: ②可选子库（范围待定: Core Audio 不支持的容器/编码，候选 ogg/vorbis、
+  非 OGG 的 opus）；④AirPlay2（MPRemoteCommandCenter 锁屏遥控、AVRoutePickerView
+  接入点、routeChange 处理）。
+- Next: ② 先定范围——查 APlay 现有 audioDecoderBuilder 注入缝能吞哪些自定义解码器，
+  定一个最小可选 target（如 APlayVorbis），不污染主库; 再做 ④ 最小自研。

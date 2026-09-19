@@ -27,6 +27,13 @@ v2.1.0
 8. The demo app adopts the UIScene lifecycle (required to launch on iOS 17+) and ships
    every bundled audio format as a playable sample, so a device run shows at a glance
    which formats this platform decodes
+9. Installation is Swift Package Manager only: the CocoaPods spec and the Carthage
+   mention are gone, and the release lane bumps the `APlay.version` Swift constant
+   instead of a podspec
+10. The README documents the supported-format matrix pinned by
+   `FormatCompatibilityTests` — what the real decoder both parses and decodes to
+   PCM (AAC, MP3, FLAC, Opus-in-OGG, WAVE, ALAC), and what only parses today
+   (ALAC-in-CAF, AIFF/AIFF-C)
 
 v2.0.0
 ---

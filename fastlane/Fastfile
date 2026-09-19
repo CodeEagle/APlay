@@ -6,12 +6,9 @@ platform :ios do
   before_all do
 
   end
-  desc "Lint"
-  lane :lint do
-      pod_lib_lint(
-          allow_warnings: true,
-          sources: ["https://github.com/CocoaPods/Specs.git"]
-      )
+  desc "Run the Swift package test suite"
+  lane :test do
+      Actions.sh("swift test")
   end
 
   desc "Release new version"
@@ -22,11 +19,9 @@ platform :ios do
       ensure_git_branch
       ensure_git_status_clean
 
-      # test_all_schemes
-      lint
+      bump_swift_version_constant(target_version)
 
-      increment_version_number(version_number: target_version)
-      version_bump_podspec(path: "APlay.podspec", version_number: target_version)
+      test
 
       changelog = changelog_from_git_commits
 
@@ -36,8 +31,22 @@ platform :ios do
       Actions.sh("git tag -a #{target_version} -m ''")
 
       push_to_git_remote
+  end
 
-      pod_push(allow_warnings: true)
+  # The version source of truth is the `APlay.version` Swift constant; the
+  # podspec is gone, so the constant is bumped here instead of
+  # `version_bump_podspec`. The bump runs *before* the test lane on purpose:
+  # `APlaySmokeTests` asserts `APlay.version` equals the release number, so the
+  # suite only goes green when the constant and its assertion move together.
+  def bump_swift_version_constant(target_version)
+    path = "APlay/APlay.swift"
+    contents = File.read(path)
+    updated = contents.gsub(
+      /(public static let version: String = ")[^"]*(")/,
+      "\\1#{target_version}\\2"
+    )
+    UI.user_error!("Could not find the APlay.version constant in #{path}") if updated == contents
+    File.write(path, updated)
   end
 
   after_all do |lane|

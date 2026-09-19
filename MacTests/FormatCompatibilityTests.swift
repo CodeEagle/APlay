@@ -160,22 +160,24 @@ final class FormatCompatibilityTests: XCTestCase {
         return url
     }
 
-    // MARK: - Hint-table gaps
+    // MARK: - Hint-table coverage
 
-    /// Extensions Core Audio can parse but the hint table currently drops,
-    /// falling back to `.mp3` and failing. Each is a one-line fix behind this
-    /// test: add the extension to `fileHint(from:)`.
-    func testHintTableGapsForCoreAudioCapableFormats() {
-        // M4B is an audiobook MP4: Core Audio parses it as soon as it is hinted
-        // as an MPEG-4 container instead of falling back to MP3.
-        XCTAssertEqual(StreamProvider.URLInfo.fileHint(from: "m4b"), .mp3,
-                       "m4b is not hinted today — this row documents the gap")
-
-        // The AudioFileType table also declares types the hint table never maps.
-        let declaredButUnmapped = ["ac3", "amr", "3gp", "3g2", "mp2", "mp1", "au", "snd", "rf64", "sd2"]
-        for ext in declaredButUnmapped {
-            XCTAssertEqual(StreamProvider.URLInfo.fileHint(from: ext), .mp3,
-                           "\"\(ext)\" is declared in AudioFileType but unmapped — falls back to .mp3")
+    /// Extensions the hint table used to drop (falling back to `.mp3` and
+    /// failing), now mapped to the AudioFileType Core Audio opens natively.
+    /// This test pins the fix: any of these regressing to `.mp3` is a bug.
+    func testHintTableCoversCoreAudioCapableFormats() {
+        let mapped: [String: AudioFileType] = [
+            "m4b": .m4b,               // audiobook MP4
+            "ac3": .ac3,
+            "amr": .amr,
+            "3gp": .k3gp, "3g2": .k3gp2,
+            "mp2": .mp2, "mp1": .mp1,
+            "au": .next, "snd": .next,
+            "rf64": .rf64, "sd2": .soundDesigner2,
+        ]
+        for (ext, expected) in mapped {
+            XCTAssertEqual(StreamProvider.URLInfo.fileHint(from: ext), expected,
+                           "\"\(ext)\" must map to \(expected.rawValue), not fall back to .mp3")
         }
     }
 }

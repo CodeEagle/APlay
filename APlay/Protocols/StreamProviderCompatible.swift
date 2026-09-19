@@ -155,14 +155,27 @@ public struct StreamProvider {
             switch value.lowercased() {
             case "flac": return .flac
             case "mp3", "mpg3", "audio/mpeg", "audio/mp3": return .mp3
+            case "mp2": return .mp2
+            case "mp1": return .mp1
             case "wav", "wave", "audio/x-wav": return .wave
             case "aifc", "audio/x-aifc": return .aifc
             case "aiff", "audio/x-aiff": return .aiff
             case "m4a", "audio/x-m4a": return .m4a
+            // Audiobook MP4: same MPEG-4 container as m4a, hinted separately so
+            // Core Audio takes the MP4 branch instead of falling back to MP3.
+            case "m4b": return .m4b
             case "mp4", "mp4f", "mpg4", "audio/mp4", "video/mp4": return .mp4
             case "caf", "caff", "audio/x-caf": return .caf
             case "aac", "adts", "aacp", "audio/aac", "audio/aacp": return .aacADTS
             case "opus", "audio/opus": return .opus
+            // Containers Core Audio opens natively but the table never mapped.
+            case "ac3", "audio/ac3": return .ac3
+            case "amr": return .amr
+            case "3gp", "3gpp", "audio/3gpp": return .k3gp
+            case "3g2", "3gp2", "audio/3gpp2": return .k3gp2
+            case "au", "snd", "audio/basic": return .next
+            case "rf64": return .rf64
+            case "sd2": return .soundDesigner2
             default: return .mp3
             }
         }

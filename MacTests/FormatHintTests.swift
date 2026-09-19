@@ -21,21 +21,32 @@ final class FormatHintTests: XCTestCase {
             "flac": .flac,
             // MPEG audio
             "mp3": .mp3, "mpg3": .mp3, "audio/mpeg": .mp3, "audio/mp3": .mp3,
-            // WAVE
+            "mp2": .mp2,
+            "mp1": .mp1,
+            // WAVE family
             "wav": .wave, "wave": .wave, "audio/x-wav": .wave,
+            "rf64": .rf64,
             // AIFF family
             "aiff": .aiff, "audio/x-aiff": .aiff,
             "aifc": .aifc, "audio/x-aifc": .aifc,
             // MPEG-4 container
             "m4a": .m4a, "audio/x-m4a": .m4a,
+            "m4b": .m4b,   // audiobook MP4
             "mp4": .mp4, "mp4f": .mp4, "mpg4": .mp4, "audio/mp4": .mp4, "video/mp4": .mp4,
             // Core Audio Format
             "caf": .caf, "caff": .caf, "audio/x-caf": .caf,
             // Raw AAC / ADTS
             "aac": .aacADTS, "adts": .aacADTS, "aacp": .aacADTS,
             "audio/aac": .aacADTS, "audio/aacp": .aacADTS,
-            // Opus — the hint is recognised, but decoding it needs an injected
-            // decoder (issue #17); Core Audio has no AudioFileStream opus parser.
+            // Dolby / speech / legacy containers Core Audio opens natively
+            "ac3": .ac3, "audio/ac3": .ac3,
+            "amr": .amr,
+            "3gp": .k3gp, "3gpp": .k3gp, "audio/3gpp": .k3gp,
+            "3g2": .k3gp2, "3gp2": .k3gp2, "audio/3gpp2": .k3gp2,
+            "au": .next, "snd": .next, "audio/basic": .next,
+            "sd2": .soundDesigner2,
+            // Opus — the hint is recognised; on the macOS 14 SDK Core Audio
+            // decodes it, but iOS 15 may still need an injected decoder (#17).
             "opus": .opus, "audio/opus": .opus,
         ]
 

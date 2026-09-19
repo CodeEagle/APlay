@@ -536,24 +536,29 @@ extension DefaultAudioDecoder {
 
         let bitsPerSample = [34, 35].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
 
-        let totalSize: UInt32
-        let dataData: Data
-        // https://stackoverflow.com/questions/19991405/how-can-i-detect-whether-a-wav-file-has-a-44-or-46-byte-header
-        let offset: Int
-        if subchunk1Size == 18 {
-            totalSize = 46
-            offset = 2
-            dataData = Data(bytes: raw.advanced(by: 38), count: 4)
-        } else {
-            totalSize = 44
-            offset = 0
-            dataData = Data(bytes: raw.advanced(by: 36), count: 4)
+        // Walk the RIFF chunk list instead of assuming a fixed 44/46-byte header:
+        // real files (ffmpeg writes LIST/INFO, afconvert writes FLLR) insert chunks
+        // between `fmt ` and `data`, so "data" is only at offset 36 in the simplest case.
+        // Chunk bodies are word-aligned (a trailing pad byte after odd sizes).
+        var offset = 12               // first chunk starts right after "RIFF"+size+"WAVE"
+        var dataOffset = 0
+        while offset + 8 <= Int(data.1) {
+            let tag = String(bytes: Data(bytes: raw.advanced(by: offset), count: 4), encoding: .ascii) ?? ""
+            let chunkSize: UInt32 = [offset + 4, offset + 5, offset + 6, offset + 7]
+                .compactMap { raw.advanced(by: $0).pointee }
+                .unpack(isLittleEndian: true)
+            if tag == "data" {
+                dataOffset = offset + 8
+                break
+            }
+            offset += 8 + Int(chunkSize) + Int(chunkSize % 2)   // skip unknown chunks + pad
         }
-        guard let dataHeader = String(data: dataData, encoding: .ascii), dataHeader == "data" else {
+        guard dataOffset > 0 else {
             outputStream.call(.error(.open("Not a validate wave format")))
             return
         }
-        let start = 40 + offset
+        // The 4-byte size field sits immediately before the payload: ["data"][size][payload].
+        let start = dataOffset - 4
         let subchunk2Size = [start, start + 1, start + 2, start + 3].compactMap { raw.advanced(by: $0).pointee }.unpack(isLittleEndian: true)
 
         info.srcFormat.mSampleRate = Float64(sampleRate)
@@ -571,7 +576,7 @@ extension DefaultAudioDecoder {
 
         info.dstFormat = info.srcFormat
         info.waveSubchunk1Size = subchunk1Size
-        info.dataOffset = UInt(totalSize)
+        info.dataOffset = UInt(dataOffset)
         info.audioDataByteCount = UInt(subchunk2Size)
         info.audioDataPacketCount = info.audioDataByteCount / UInt(blockAlign)
         info.sampleRate = Float64(sampleRate)
@@ -584,8 +589,8 @@ extension DefaultAudioDecoder {
         info.bitrate = byteRate * 8 / 1000
         info.infoUpdated()
 
-        let left = data.1 - totalSize
-        let d = UnsafeRawPointer(raw.advanced(by: Int(totalSize)))
+        let left = data.1 - UInt32(dataOffset)
+        let d = UnsafeRawPointer(raw.advanced(by: dataOffset))
         let ret = (d, left)
         outputStream.call(.output(ret))
         outputStream.call(.bitrate(info.bitrate))

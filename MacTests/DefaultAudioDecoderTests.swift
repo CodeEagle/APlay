@@ -12,71 +12,24 @@ import AudioToolbox
 
 final class DefaultAudioDecoderTests: XCTestCase {
 
-    // MARK: - Output collection
+    // MARK: - Harness
 
-    /// Copies decoder output into a buffer the moment it arrives: the pointer in an
-    /// `.output` event is only valid for the duration of the delegate call.
-    final class OutputCollector {
-        private let lock = NSLock()
-        private var _bytes = Data()
-        private(set) var bitrateEvents: UInt32 = 0
-        private(set) var emptyCount = 0
-        private(set) var errors: [APlay.Error] = []
-
-        func append(_ pointer: UnsafeRawPointer, _ count: UInt32) {
-            let buffer = UnsafeBufferPointer(start: pointer.assumingMemoryBound(to: UInt8.self), count: Int(count))
-            lock.lock(); _bytes.append(contentsOf: buffer); lock.unlock()
-        }
-
-        func record(event: AudioDecoder.Event) {
-            switch event {
-            case let .output((pointer, count)): append(pointer, count)
-            case .bitrate: lock.lock(); bitrateEvents &+= 1; lock.unlock()
-            case .empty: lock.lock(); emptyCount &+= 1; lock.unlock()
-            case let .error(error): lock.lock(); errors.append(error); lock.unlock()
-            case .seekable: break
-            }
-        }
-
-        var bytes: Data { lock.lock(); defer { lock.unlock() }; return _bytes }
-        var totalBytes: Int { bytes.count }
-    }
-
-    // MARK: - Fixtures
-
-    private let fixtureURL = Bundle.module.url(forResource: "a", withExtension: "m4a", subdirectory: "Fixtures")!
-
-    /// The decoder holds its config `unowned`, so the test must keep one alive for
-    /// as long as the decoder runs (lesson ④: unowned references must be owned
-    /// by the test, not passed as temporaries).
-    private let config = APlay.Configuration(logPolicy: .disable)
-
-    private func makeDecoder() -> DefaultAudioDecoder {
-        DefaultAudioDecoder(config: config)
-    }
+    private let harness = DecoderTestHarness()
 
     /// Wires a collector to a fresh decoder and returns both.
     private func makeWiredDecoder() -> (decoder: DefaultAudioDecoder, collector: OutputCollector) {
-        let decoder = makeDecoder()
-        let collector = OutputCollector()
-        decoder.outputStream.delegate(to: collector) { collector, event in
-            collector.record(event: event)
-        }
-        return (decoder, collector)
+        harness.makeWiredDecoder()
     }
 
-    /// Feeds `data` in chunks exactly like a streamer would. `inputStream.call` is
-    /// synchronous, so a per-chunk pointer is valid for the whole call.
+    private var fixtureURL: URL { try! harness.fixture("a", "m4a") }
+
+    private func makeDecoder() -> DefaultAudioDecoder {
+        harness.makeDecoder()
+    }
+
+    /// Feeds `data` in chunks exactly like a streamer would.
     private func feed(_ data: Data, to decoder: DefaultAudioDecoder, chunk: Int = 8 * 1024) {
-        data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-            guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            var offset = 0
-            while offset < data.count {
-                let length = min(chunk, data.count - offset)
-                decoder.inputStream.call((base.advanced(by: offset), UInt32(length), offset == 0))
-                offset += length
-            }
-        }
+        harness.feed(data, to: decoder, chunk: chunk)
     }
 
     /// Builds a 16-bit PCM WAV file. `subchunk1Size` of 18 adds the `cbSize` field,
@@ -119,15 +72,7 @@ final class DefaultAudioDecoderTests: XCTestCase {
     }
 
     private func attach(_ decoder: DefaultAudioDecoder, hint: AudioFileType, url: URL, contentLength: UInt = 0) -> FakeStreamProvider {
-        let streamer = FakeStreamProvider()
-        streamer.info = .local(url, hint)
-        streamer.contentLength = contentLength
-        try? decoder.prepare(for: streamer, at: 0)
-        // Composer syncs the streamer's hint into the decoder on the first data
-        // event; mirror that here so the decoder takes the right input branch
-        // (the hand-rolled WAV parser only runs once `info.fileHint == .wave`).
-        decoder.info.fileHint = hint
-        return streamer
+        harness.attach(decoder, hint: hint, url: url, contentLength: contentLength)
     }
 
     // MARK: - WAV parsing (synchronous, hand-rolled header parser)

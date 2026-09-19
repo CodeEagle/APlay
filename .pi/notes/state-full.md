@@ -730,3 +730,44 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - 提交: 本批一并提交源码、测试、MacPlayback、ChangeLog、README、笔记；
   排除 xcuserstate（Xcode 界面噪声）。
 - 剩余: opus 注入式解码仍须 iOS 真机验证（不阻塞本批）。
+
+## SF-0028
+- Revision: 33
+- 取代: SF-0027 的"剩余: opus 须 iOS 真机验证"——已验证（真机原生解码，无需注入），
+  并连带修复三个 iOS 真实缺陷。
+- 任务（用户）: "把支持的音乐文件放到测试，然后直接打包发我手机测 opus"。
+- 做了什么:
+  1. APlayDemo 改造为真机格式试机: APlayDemo/Samples/ 放 11 个格式 fixture
+     （pbxproj 手工注入资源引用，已验 8 套构建）; ViewController 改为顺序播放
+     12 个本地文件（opus 首位）、屏幕逐行显示结果、日志同步写 Documents/result.log
+     （devicectl device copy from appDataContainer 取回）; Info.plist 加
+     UIApplicationSceneManifest + AppDelegate 提供 configurationForConnecting
+     与 SceneDelegate（iOS 17+ 必需，否则启动即 EXC_BREAKPOINT NoSceneLifecycle）。
+  2. 真机签名: 命令行覆盖对 GatherProvisioningInputs 无效; 最终用 Xcode 库内
+     team 77SXM8HYXF 的 wildcard profile "iOS Team Provisioning Profile: *"
+     (UUID 82de0928…) + 工程命令行 DEVELOPMENT_TEAM/CODE_SIGN_STYLE=Automatic
+     + -allowProvisioningUpdates 由 Xcode 签名栈完成（devicectl install/process
+     launch/pasteboard/copy from/systemCrashLogs 均可用; xcuserstate 与
+     .DS_Store 不入提交）。
+  3. 三个框架修复（均已提交 d61b53e）:
+     a. Configuration.startBackgroundTask/endBackgroundTask 的
+        MainActor.assumeIsolated 在后台队列被 Composer.preload 调用时 SIGTRAP;
+        改为非主线程时 DispatchQueue.main.async 派发。
+     b. 曲终检测 checkPlayEnded 依赖 composer.duration; opus-in-ogg 无可用时长
+        （估算甚至 NaN），delta 死局; 改为: streamerEnd 后 currentTime 连续停驻
+        （NSLock 同步的 _lastFrozenTime/_frozenHitCount，阈值 >=2）即判曲终，
+        并在 APlay 的 .playback 事件处补触发（opus 曲 decoderEmpty 停报）。
+        去掉 lastDelta 回退分支的 `<= lastDeltaThreshold` 死约束并补 hitCount 重置。
+     c. Demo 的 Scene 生命周期（见上）。
+- 验证: swift test 86/86（新增 testFrozenPlaybackTimeEndsTrackWithoutDuration;
+  FakePlayer.currentTimeValue 可编程）; iOS 8 套构建 SUCCEEDED（仅
+  appintentsmetadataprocessor 工具链噪声）; swift build -c release 零警告;
+  MacPlayback 单轨 + gapless 双 PASS; 真机 12 格式全部播放并逐轨推进
+  （opus 第 2 轨 play ended; 仅 wav→aifc 跨格式 paused 一次，符合文档）。
+- 教训: ⑳㉗ 之后——⑱ 命令行 build setting 覆盖对 Xcode 27 的签名解析无效，
+  用工程内/Xcode 库内 wildcard profile 才能过 GatherProvisioningInputs;
+  ㉘ iOS 17+ 无 SceneManifest 启动即 trap（bug_type 309/EXC_BREAKPOINT），
+  旧 AppDelegate 生命周期 Demo 必须补 SceneDelegate; ㉙ 真机诊断链:
+  devicectl copy from systemCrashLogs + appDataContainer，比 console 可靠;
+  ㉚ 跨属性异步 barrier set 在同步连发事件下读不到新值，停驻计数改 NSLock。
+- 剩余: 无（本批闭环; ⑤ 未启动）。

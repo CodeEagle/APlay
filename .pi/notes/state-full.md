@@ -484,3 +484,125 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   AIFF/AIFC-PCM 要求整文件可寻址→dsc!。矩阵按不支持记录并注明原因。
 - 教训 ⑮⑯⑰⑱（属性渐进到达/属性常量别混用/OpaquePointer 与 C 回调穿法/先查官方头注释）。
 - 未竟：本批待提交；③覆盖率；④gapless；opus iOS 真机验证。
+
+## SF-0019
+- Revision: 24
+- 取代 SF-0016 的覆盖率旧口径（重新实测，含 Vendor）。
+- 实测命令：swift test --enable-code-coverage；
+  xcrun llvm-cov report -instr-profile=.build/out/Products/Debug/codecov/default.profdata \
+  .build/out/Products/Debug/APlayTests.xctest/Contents/MacOS/APlayTests \
+  -ignore-filename-regex=".build|MacTests|MacPlayback"
+- 结果 TOTAL 53.00%（行）。缺口排序（未覆盖行数）:
+  Streamer 24.98%/751、ID3Parser 24.54%/289、APlay.swift 45.37%/230、
+  FlacParser 37.27%/207、Composer 47.68%/169、NowPlayingInfo 31.75%/86、
+  APlayer 67.36%/63、Configuration 66.01%/52、Delegated 46.67%/32、
+  DefaultAudioDecoder 89.29%/80。
+- 教训 ⑲⑳（profdata 位置/静态库用 xctest+ignore-regex；llvm-cov 输出排序用 -t'%' -k1）。
+- 未竟：③ 补测试未开始；④gapless 未做；opus iOS 真机验证未做。
+
+## SF-0020
+- Revision: 25
+- 取代 SF-0019 的③进度（基线已定，现有本地测试已摸清）。
+- 已读 StreamerLocalTests（6 例，本地路径覆盖良好）：全量投递+EOF、首包标志仅一次、
+  contentLength/bufferingProgress、open(at:) 定位、destroy 后可重开、二次 open 拒绝。
+- 结论：Streamer 24.98% 的缺口主要在**远程/缓存/ICY/看门狗**分支，非本地读循环。
+- 教训 ⑳：llvm-cov -show-functions 别叠加复杂 awk，先看原始全表。
+- 未竟：③ 远程分支测试未动笔；④gapless；opus iOS 真机验证。
+
+## SF-0021
+- Revision: 26
+- 取代 SF-0020 的③进度（注入路径已定）。
+- 摸清 Configuration 接缝：session: public let URLSession；另有 sessionBuilder
+  闭包可注入自定义会话。但 Streamer.init 用 URLSession(configuration:config.session.configuration,
+  delegate:bridge, delegateQueue:nil) 自建会话——只继承配置，不继承 delegate/协议类实例。
+- 结论：远程分支测试不可直接注入 URLSession 实例；官方可行路径是
+  URLSessionConfiguration.protocolClasses 挂自定义 URLProtocol 拦截请求（无真实网络），
+  networkPolicy.requestPermission 控制权限分支。
+- 远程处理落点（待测）: handle(response:) 处理 200/206（contentLength+position）、
+  401/407 与 5xx（startReconnectWatchDog）、其他码（networkStatusCode 错误）；
+  ICY 识别在 icy-metaint/icy-notice1；缓存落盘在 handleEndEncountered→CacheInfo.writeFile
+  （条件 _fileWritten==targetLength，且经 httpFileCompletionValidator 校验）。
+- 教训 ㉑：grep 源码路径不要带 APlay/APlay/ 前缀（实际是 APlay/BuildInComponents/...）。
+- 未竟：StreamerCoverageTests 未动笔；④gapless；opus iOS 真机验证。
+
+## SF-0022
+- Revision: 27
+- 取代 SF-0021 的③进度（接口已定位，代码未动笔——预算中断点）。
+- 已定位 Configuration 接口行号:
+  HttpFileValidationPolicy(246, 默认 .notValidate)、networkPolicy(46, 默认 .noRestrict,
+  其 requestPermission 在 313)、CachePolicy(289)、CacheFileNamingPolicy.name(for:)(267)。
+- 实现方案（下次直接照写）: Configuration(sessionBuilder: { proxyPolicy in
+  URLSession(configuration: 挂自定义 URLProtocol 的 config) })；
+  Streamer 继承 config.session.configuration 自建会话，故 protocolClasses 生效。
+  URLProtocol.canInit(with:) 过滤目标 URL，startLoading 喂 HTTPURLResponse(url:statusCode:headerFields:)
+  + Data，client?.urlProtocoldidLoad... 完成回调。
+- 未竟：StreamerCoverageTests 未动笔；④gapless；opus iOS 真机验证。
+
+## SF-0023
+- Revision: 28
+- ③ 完成：StreamerCoverageTests.swift（8 测试）已提交 82051c0。
+  覆盖率实测（swift test --enable-code-coverage + llvm-cov，口径同 SF-0019）:
+  TOTAL 行 53.00%→59.81%；Streamer 24.98%→51.75%；ID3Parser 24.54%→27.68%。
+- 8 个测试: 200 全 body+contentLength+不重连、Content-Type 覆盖 URL 扩展名、
+  206 contentLength+position、404→.networkStatusCode(404)、500 现状钉定、
+  icy-name→.metadata(.title)、完整响应落盘缓存、截断流断点续传（200 短 body→
+  看门狗 0.5s 后 _open(at:1000) 带 Range bytes=1000-→206 补齐）。
+- 关键设计（照此维护）: FakeServerProtocol 按 Range 头分流——ID3Parser 的
+  bytes=-128 探测（processingID3V1FromRemote 复用 config.session）单回 128 字节
+  不消耗队列；否则队列顺序消费。空 body 不发 didLoad（URLSession 对空 body
+  不调 didReceive(data:)，否则 handle(data:) 的 reset() 会中去看门狗）。
+  静态计数器全部经 NSLock（协议线程 vs 主线程读）。会话由 sessionBuilder 注入
+  挂 protocolClasses 的 ephemeral config；Streamer 重建会话时继承该 configuration。
+  Collector 补 .metadata case（StreamerLocalTests.swift +2 行）。
+- 验证: swift test 64/64（连跑 8 次 EXIT=0）；iOS 8 套构建（APlay/APlayDemo ×
+  iphoneos/iphonesimulator × Debug/Release，CODE_SIGNING_ALLOWED=NO）全 BUILD
+  SUCCEEDED，零编译警告（仅 appintentsmetadataprocessor 与 destination 提示，
+  属工具链噪声）；swift run APlayMacPlayback 端到端 PASS（137s，.playing，推进）。
+- 新发现缺陷（open，未改产品代码）: 首个请求返回 5xx（空 body）时，
+  handle(response:) 里 startReconnectWatchDog 挂的看门狗会被随后的
+  handleEndEncountered 的 else 分支 _watchDogInfo.reset() 中和 → 不重连，
+  直接投递 .endEncountered 并写 0 字节缓存文件（404 亦然：先 .errorOccurred
+  再 .endEncountered）。已被 testRemote500CurrentlyEndsTheStream 钉住。
+  最小修法（待用户定夺）: handleEndEncountered 的 else 分支与 handle(data:) 的
+  reset() 仅在当前响应非 5xx 时执行；5xx 保留看门狗到 maxRemoteStreamOpenRetry
+  后报 .reachMaxRetryTime。注意流中途 5xx（contentLength 已建立）走第一个分支，
+  能正常重连——只有初始错误路径是死的。
+- 未竟: ④gapless；opus iOS 真机验证；上面的 5xx 缺陷。
+
+## SF-0024
+- Revision: 29
+- ④ gapless 前置已提交 f946759: ① APlay player 注入接缝；② 编排层测试（回归网）；
+  ③ 修掉 streamer 测试的 tearDown 野读崩溃。
+- 接缝取舍: 原打算像 streamerBuilder 一样在 Configuration 加 public playerBuilder，
+  但 PlayerCompatible 是 internal（readClosure 是原始指针闭包，且关联 internal 的
+  Player/Player.Event/Player.canonical），public 化会连带暴露一堆内部类型。
+  改用 APlay 的 internal 指定初始化器 init(player:configuration:)，public init 降为
+  convenience 委派之——公共面零变化，@testable 测试可见。
+- APlayOrchestrationTests（6 测试，复用 ComposerCoordinationTests 的三个 fake）:
+  播列表开第一轨、prepare→play 复用预加载 composer（不重开流、resume 一次）、
+  URL 不同则重建、曲终 pauseAll→.playEnded→next()→重建（老 composer destroy、
+  player setup 两次）、next() 重建、seek 重建。
+  变异验证: 删 pauseAll 里的 next() 立刻 4 条断言失败——测试敏感。
+- 崩溃根因（修了）: tearDown 里 streamer?.destroy() 把 close 派发到 _stateQueue 且
+  强捕获 self，close 经 unowned _config 读配置；随后 streamer=nil、config=nil 使
+  config 先于该块被释放 → "Attempted to read an unowned reference" 野读（约 1/5 概率）。
+  修法: destroy 后 RunLoop 转 50ms 让队列排空，再释放两者（StreamerLocalTests 同构同修）。
+  修后 12 连跑零崩溃。
+- 覆盖率: TOTAL 行 59.81%→63.66%；APlay.swift 45.37%→67.69%；Composer 47.68%→60.99%。
+- 验证: swift test 70/70（12 连 clean）；iOS 8 套构建 SUCCEEDED 零编译警告；
+  MacPlayback PASS（137s→.playing→推进）。
+- gapless 设计（下一批，待用户定 API 形状）:
+  现状断口: checkPlayEnded→pauseAll(after:)→_player.pause()+composer.pause()+
+  .playEnded→next()→_play()→新建 Composer→play(autoplay:true)→main asyncAfter 0.5s
+  才 resume；且 readClosure 在每次 Composer.play 里重新布设、读该 composer 自己的
+  2MB Uroboros。
+  方案: 维护一个预加载的"下一曲" composer（prepare(autoplay:false) 语义，但不动当前
+  composer）；在当前 composer 的 .decoderEmptyEncountered 且下一曲 ring buffer 有数据时，
+  原子切换 player 的取数据源并 startPlayback()，全程不停 AU。
+  同采样格式可真无缝；格式不同仍须 setup() 重初始化 AU（不可免，须文档化）。
+  取舍: (a) 自动预加载 playlist.nextURL()，Configuration 开关默认关；
+        (b) 显式 APlay.prepareNext(_:)。倾向 (a)。
+  风险: readClosure 由 AU 实时渲染线程调用，活跃源切换须无锁（os_unfair_lock 非竞争即可），
+  需把"每次 play 重布闭包"改为一个稳定闭包读原子源。
+- 未竟: ④ gapless 实现（设计已定，待选 API 形状）；opus iOS 真机验证；
+  5xx 初始错误不重连缺陷（SF-0023，未改产品）。

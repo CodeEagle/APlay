@@ -23,8 +23,11 @@ extension APlay {
         private var _totalSize: UInt64 = 0
 
         deinit {
-            guard let fileHandle = _fileHandler else { return }
-            _logQueue.sync { fileHandle.closeFile() }
+            // deinit runs under exclusive access: every queued barrier write
+            // captures self, so none can still be pending, and the file can be
+            // closed inline. Hopping to _logQueue here would deadlock whenever
+            // the last release happens on that queue itself.
+            _fileHandler?.closeFile()
         }
 
         init(policy: Logger.Policy) {

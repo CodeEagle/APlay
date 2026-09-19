@@ -28,6 +28,9 @@ final class FakeStreamProvider: StreamProviderCompatible {
 
     func open(url: URL, at position: StreamProvider.Position) {
         openCalls.append((url, position))
+        // Reflect the requested url so callers that key on `composer.url`
+        // (preload reuse) see a match.
+        info = .local(url, .mp3)
     }
 
     func destroy() { destroyCount += 1 }
@@ -220,6 +223,45 @@ final class ComposerCoordinationTests: XCTestCase {
 
         XCTAssertEqual(harness.streamer.destroyCount, 1)
         XCTAssertEqual(harness.decoder.destroyCount, 1)
+    }
+
+    // MARK: - Preloading (issue #14)
+
+    func testPrepareBuffersWithoutStartingOutput() {
+        let harness = makeHarness()
+        let url = URL(string: "https://example.com/a.mp3")!
+
+        harness.composer.play(url, autoplay: false)
+
+        XCTAssertEqual(harness.composer.isPreloading, true)
+        XCTAssertEqual(harness.player.resumeCount, 0, "prepare must not start the output unit")
+        XCTAssertEqual(harness.streamer.openCalls.count, 1)
+
+        // Data still flows: readyForRead prepares the decoder as usual.
+        harness.streamer.emit(.readyForRead)
+        XCTAssertEqual(harness.decoder.prepareCalls.count, 1)
+    }
+
+    func testStartPlaybackResumesThePreloadedTrack() {
+        let harness = makeHarness()
+        let url = URL(string: "https://example.com/a.mp3")!
+        harness.composer.play(url, autoplay: false)
+
+        harness.composer.startPlayback()
+
+        XCTAssertEqual(harness.composer.isPreloading, false)
+        XCTAssertEqual(harness.player.resumeCount, 1, "startPlayback must resume the output unit exactly once")
+    }
+
+    func testStartPlaybackIsNoOpWhenNotPreloading() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/a.mp3")!, autoplay: true)
+
+        harness.composer.startPlayback()
+
+        XCTAssertEqual(harness.composer.isPreloading, false)
+        // The 0.5s auto-resume has not fired yet, and startPlayback must not add one.
+        XCTAssertEqual(harness.player.resumeCount, 0)
     }
 
     func testPauseAndResumePropagate() {

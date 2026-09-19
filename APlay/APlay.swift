@@ -54,7 +54,14 @@ public final class APlay: @unchecked Sendable {
     private lazy var _obs: [NSObjectProtocol] = []
 
     deinit {
-        destroy()
+        // deinit runs under exclusive access to self: no other strong reference
+        // exists, so the backing storage can be touched directly. Going through
+        // the queue-safe accessors here would be wrong as well as wasteful — the
+        // last release can happen on _propertiesQueue itself (a block it captured
+        // is destroyed while the queue drains), and a `sync` onto the queue that
+        // is already executing the current thread is a deadlock.
+        __currentComposer?.destroy()
+        _player.destroy()
         _obs.forEach({ NotificationCenter.default.removeObserver($0) })
         config.endBackgroundTask(isToDownloadImage: false)
         debug_log("\(self) \(#function)")
@@ -119,9 +126,29 @@ public extension APlay {
     /// - Parameter url: a autoclosure to produce URL
     func play(_ url: @autoclosure () -> URL) {
         let u = url()
+        // If the same track is already preloaded (buffered but not playing),
+        // start playback from the filled ring buffer instead of reopening it.
+        if let com = _currentComposer, com.url == u, com.isPreloading {
+            com.startPlayback()
+            return
+        }
         let urls = [u]
         playlist.changeList(to: urls, at: 0)
         _play(u)
+    }
+
+    /// Preload a track without starting playback.
+    ///
+    /// The streamer and decoder run and fill the ring buffer, but the output
+    /// audio unit is not started. A subsequent `play` of the same URL picks up
+    /// the buffered data and starts immediately. See issue #14.
+    ///
+    /// - Parameter url: a autoclosure to produce URL
+    func prepare(_ url: @autoclosure () -> URL) {
+        let u = url()
+        let urls = [u]
+        playlist.changeList(to: urls, at: 0)
+        _play(u, autoplay: false)
     }
 
     /// play whit variable parametric
@@ -242,11 +269,11 @@ private extension APlay {
 
     // MARK: Playback
 
-    func _play(_ url: URL) {
+    func _play(_ url: URL, autoplay: Bool = true) {
         resetFlag()
         _currentComposer?.destroy()
         let com = createComposer()
-        com.play(url)
+        com.play(url, autoplay: autoplay)
         _currentComposer = com
         _nowPlayingInfo.play(elapsedPlayback: 0)
     }

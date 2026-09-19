@@ -21,8 +21,10 @@ final class GCDTimer {
     deinit {
         _timer?.setEventHandler {}
         _timer?.cancel()
-        let isStopped = _stateQueue.sync { _isStopped }
-        if isStopped { _timer?.resume() }
+        // Reading inline is safe: deinit has exclusive access, so no pause/resume
+        // or timer handler can be racing it. Syncing to _stateQueue here instead
+        // would deadlock whenever the last release happens on that queue itself.
+        if _isStopped { _timer?.resume() }
         debug_log("\(self)[\(_name)] \(#function)")
     }
 

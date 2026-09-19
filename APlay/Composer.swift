@@ -13,6 +13,9 @@ import Foundation
 
 final class Composer: @unchecked Sendable {
     lazy var eventPipeline: Delegated<Event, Void> = Delegated<Event, Void>()
+    /// True while the composer is buffering a prepared track without playing it
+    /// (see `prepare`). `startPlayback` flips it back to false.
+    private(set) var isPreloading = false
     private(set) var isRunning: Bool {
         get { return _queue.sync { _isRuning } }
         set { _queue.async(flags: .barrier) { self._isRuning = newValue } }
@@ -192,7 +195,8 @@ extension Composer {
 
     var url: URL { return _streamer.info.url }
 
-    func play(_ url: URL, position: StreamProvider.Position = 0, info: AudioDecoder.Info? = nil) {
+    func play(_ url: URL, position: StreamProvider.Position = 0, info: AudioDecoder.Info? = nil, autoplay: Bool = true) {
+        isPreloading = autoplay == false
         eventPipeline.toggle(enable: true)
         if let value = info { _decoder.info.update(from: value) }
         _decoder.resume()
@@ -206,13 +210,21 @@ extension Composer {
             }
             return (readSize, isFirstData)
         }
-        if _streamer.info.isRemoteWave == false {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: {
-                self._player?.resume()
+        if autoplay, _streamer.info.isRemoteWave == false {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: { [weak self] in
+                self?._player?.resume()
             })
         }
         isRunning = true
         _config.startBackgroundTask(isToDownloadImage: false)
+    }
+
+    /// Starts the output unit for a track opened with `autoplay: false`.
+    /// The ring buffer already holds decoded data, so playback starts from it.
+    func startPlayback() {
+        guard isPreloading else { return }
+        isPreloading = false
+        _player?.resume()
     }
 
     func position(for time: inout TimeInterval) -> StreamProvider.Position {

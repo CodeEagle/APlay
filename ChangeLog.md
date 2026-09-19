@@ -50,6 +50,13 @@ v2.1.0
    `Configuration(enableRemoteCommandHandling:)`. Route picking stays app-level
    UI — add your own `AVRoutePickerView` — and now-playing metadata was already
    published to `MPNowPlayingInfoCenter`
+13. tvOS 15+ and visionOS 1+ are now supported platforms (the package already shipped
+   for macOS 12+ and iOS 15+). visionOS behaves like iOS — the audio session runs the
+   long-form-audio route sharing policy and the lock screen / AirPlay 2 remote commands
+   are wired; tvOS has no `AVAudioSession`, `MPNowPlayingInfoCenter` or background-task
+   concept, so those stay compiled out there and playback runs on the decoder, ring
+   buffer and render path alone. The image typealias, the default user agent and every
+   platform branch were widened to match
 
 v2.0.0
 ---

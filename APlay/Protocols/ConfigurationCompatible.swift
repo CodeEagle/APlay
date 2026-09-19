@@ -9,7 +9,7 @@
 import Foundation
 #if os(macOS)
     import AppKit
-#elseif os(iOS)
+#elseif canImport(UIKit)
     import UIKit
 #endif
 // Using __`unowned let`__ to avoid retain cycle

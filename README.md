@@ -142,9 +142,17 @@ add APlay — there is no CocoaPods spec and no Carthage support anymore:
 .package(url: "https://github.com/CodeEagle/APlay.git", from: "2.0.0")
 ```
 
-Add the `APlay` product to your app target. The same `Package.swift` also builds the
-`APlayMacPlayback` end-to-end validation target and the `APlayTests` suite on macOS, so
-`swift build` and `swift test` are the single source of truth for the framework.
+Add the `APlay` product to your app target. The package declares macOS 12+, iOS 15+,
+tvOS 15+ and visionOS 1+ as supported platforms. The same `Package.swift` also builds
+the `APlayMacPlayback` end-to-end validation target and the `APlayTests` suite on
+macOS, so `swift build` and `swift test` are the single source of truth for the
+framework.
+
+Platform notes: on iOS and visionOS the audio session is configured with the
+`.playback` category and the long-form-audio route sharing policy, and the lock screen
+/ AirPlay 2 remote commands are wired (see *AirPlay 2 and remote control* below). tvOS
+has no `AVAudioSession`, `MPNowPlayingInfoCenter` or background-task concept, so those
+stay compiled out there — the decoder, ring buffer and render path work unchanged.
 
 Optional formats: `APlayExtras`
 ---

@@ -13,22 +13,22 @@ import Foundation
 
 #if os(macOS)
     import AppKit
-#elseif os(iOS)
+#elseif os(iOS) || os(tvOS) || os(visionOS)
     import UIKit
 #endif
 
-/// Platform image type: `NSImage` on macOS, `UIImage` on iOS.
+/// Platform image type: `NSImage` on macOS, `UIImage` on iOS, tvOS and visionOS.
 #if os(macOS)
     public typealias APlayImage = NSImage
-#elseif os(iOS)
+#elseif os(iOS) || os(tvOS) || os(visionOS)
     public typealias APlayImage = UIImage
 #endif
 
 /// AVFoundation.AudioFileTypeID
 public typealias AudioFileTypeID = AVFoundation.AudioFileTypeID
 
-/// AVFoundation.AVAudioSession (iOS-family only; unavailable on macOS)
-#if os(iOS) || os(tvOS) || os(watchOS)
+/// AVFoundation.AVAudioSession (iOS and visionOS; unavailable on macOS and tvOS)
+#if os(iOS) || os(visionOS)
     public typealias AVAudioSession = AVFoundation.AVAudioSession
 #endif
 

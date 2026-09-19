@@ -8,7 +8,7 @@
 
 import AudioToolbox
 import AVFoundation
-#if os(iOS)
+#if canImport(UIKit)
     import UIKit
 #endif
 
@@ -84,7 +84,7 @@ extension APlay {
             else { return nil }
         }
 
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
             private lazy var _backgroundTask = UIBackgroundTaskIdentifier.invalid
         #endif
 
@@ -181,7 +181,7 @@ extension APlay {
         ///   runs on the main thread, also when a caller (e.g. the gapless preloader) reaches
         ///   it from a background queue.
         public func startBackgroundTask(isToDownloadImage: Bool = false) {
-            #if os(iOS)
+            #if os(iOS) || os(visionOS)
                 guard Thread.isMainThread else {
                     DispatchQueue.main.async { [weak self] in
                         self?.startBackgroundTask(isToDownloadImage: isToDownloadImage)
@@ -206,8 +206,9 @@ extension APlay {
                         self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
                     })
                 }
-            #elseif os(macOS)
-                // No background-task / audio-session concept needed on macOS; playback is foreground.
+            #else
+                // No background-task / audio-session concept here (macOS playback
+                // is foreground; tvOS has neither concept).
                 _ = isToDownloadImage
             #endif
         }
@@ -216,7 +217,7 @@ extension APlay {
         ///
         /// - Parameter isToDownloadImage: Bool
         public func endBackgroundTask(isToDownloadImage: Bool) {
-            #if os(iOS)
+            #if os(iOS) || os(visionOS)
                 guard Thread.isMainThread else {
                     DispatchQueue.main.async { [weak self] in
                         self?.endBackgroundTask(isToDownloadImage: isToDownloadImage)
@@ -250,8 +251,15 @@ extension APlay.Configuration {
     /// Default User-Agent for network streaming
     public static var defaultUA: String {
         var osStr = ""
-        #if os(iOS)
-            osStr = "iOS \(MainActor.assumeIsolated { UIDevice.current.systemVersion })"
+        #if os(iOS) || os(tvOS) || os(visionOS)
+            let systemVersion = MainActor.assumeIsolated { UIDevice.current.systemVersion }
+            #if os(iOS)
+                osStr = "iOS \(systemVersion)"
+            #elseif os(tvOS)
+                osStr = "tvOS \(systemVersion)"
+            #else
+                osStr = "visionOS \(systemVersion)"
+            #endif
         #elseif os(OSX)
             // No need to be so concervative with the cache sizes
             osStr = "macOS"

@@ -7,10 +7,12 @@
 //
 #if os(macOS)
     import AppKit
-#elseif os(iOS)
+#elseif canImport(UIKit)
     import UIKit
 #endif
-import MediaPlayer
+#if os(macOS) || os(iOS) || os(visionOS)
+    import MediaPlayer
+#endif
 extension APlay {
     final class NowPlayingInfo: @unchecked Sendable {
         var name = ""
@@ -43,7 +45,7 @@ extension APlay {
                 map[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(playbackTime)
                 map[MPNowPlayingInfoPropertyPlaybackRate] = Double(playbackRate)
                 map[MPMediaItemPropertyPlaybackDuration] = duration
-                #if os(iOS)
+                #if os(iOS) || os(visionOS)
                     if let image = artwork {
                         map[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                     }
@@ -83,7 +85,7 @@ extension APlay {
         }
 
         func update() {
-            #if os(iOS)
+            #if os(iOS) || os(visionOS)
                 DispatchQueue.main.async {
                     let nowPlayingInfo = self.info
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
@@ -101,7 +103,7 @@ extension APlay {
                 self.playbackRate = 0
                 self.playbackTime = 0
             }
-            #if os(iOS)
+            #if os(iOS) || os(visionOS)
                 DispatchQueue.main.async {
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
                 }

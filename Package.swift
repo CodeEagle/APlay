@@ -6,6 +6,8 @@ let package = Package(
     platforms: [
         .macOS(.v12),
         .iOS(.v15),
+        .tvOS(.v15),
+        .visionOS(.v1),
     ],
     products: [
         .library(name: "APlay", targets: ["APlay"]),

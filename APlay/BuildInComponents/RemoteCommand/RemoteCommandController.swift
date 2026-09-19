@@ -12,7 +12,7 @@
 //  sink to talk to. This wires the system commands to the player's own API.
 //
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
     import MediaPlayer
 
 extension APlay {

@@ -35,7 +35,7 @@ public final class APlay: @unchecked Sendable {
 
     private let _player: PlayerCompatible
     private let _nowPlayingInfo: NowPlayingInfo
-    #if os(iOS)
+    #if os(iOS) || os(visionOS)
         /// Lock screen / Control Center / AirPlay 2 remote-command handlers.
         /// Kept alive for the player's lifetime so the installed targets stay
         /// installed; nil when the feature is disabled in the configuration.
@@ -99,7 +99,7 @@ public final class APlay: @unchecked Sendable {
 
         _nowPlayingInfo = NowPlayingInfo(config: config)
 
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
             if config.isEnabledRemoteCommandHandling {
                 _remoteCommandController = RemoteCommandController(player: self)
             }
@@ -593,7 +593,7 @@ private extension APlay {
     private func addInteruptOb() {
         config.logger.log("config.isAutoHandlingInterruptEvent: \(config.isAutoHandlingInterruptEvent)", to: .player)
         guard config.isAutoHandlingInterruptEvent else { return }
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
             /// RouteChange
 
             let note1 = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) {[weak self] (note) in

@@ -1,3 +1,23 @@
+v1.4.0
+---
+>2026.09.19
+
+1. New: `APlay.prepare(_:)` preloads a track without starting the output audio unit (issue #14).
+   The streamer and decoder run and fill the ring buffer; a subsequent `play(_:)` of the same URL
+   picks up the buffered data and starts instantly instead of reopening the stream
+2. Fix a reachable deadlock at teardown: the `deinit` of `APlay`, `InternalLogger` and `GCDTimer`
+   hopped to their own property queue via `sync`, which traps when the last release happens on
+   that queue itself (all queued work captures `self`, so `deinit` now touches the backing
+   storage inline under its exclusive access)
+3. Fix the single-open race in `Streamer`: `open()` claims the opened flag synchronously at the
+   entry point, so a second `open()` before the async open completes is rejected
+4. Opus decode-by-injection (issue #17): `AudioFileType.opus` is delivered to a custom decoder
+   through the existing `audioDecoderBuilder` seam — an injected decoder observes the stream's
+   file hint at `prepare(for:at:)` and can decode a format Core Audio does not ship
+5. Unit test suite added (`swift test`, 35 tests): `Uroboros` ring buffer, `PlayList` ordering,
+   ID3/FLAC tag parsers, `Streamer` local paths, and `Composer` coordination covering the event
+   flow, preloading and the injected-decoder hint
+
 v1.3.1
 ---
 >2026.09.19

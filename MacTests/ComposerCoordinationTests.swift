@@ -29,8 +29,9 @@ final class FakeStreamProvider: StreamProviderCompatible {
     func open(url: URL, at position: StreamProvider.Position) {
         openCalls.append((url, position))
         // Reflect the requested url so callers that key on `composer.url`
-        // (preload reuse) see a match.
-        info = .local(url, .mp3)
+        // (preload reuse) see a match, while keeping whatever file hint the
+        // test configured (issue #17 asserts an injected decoder sees .opus).
+        info = .remote(url, info.fileHint)
     }
 
     func destroy() { destroyCount += 1 }
@@ -53,6 +54,8 @@ final class FakeDecoder: AudioDecoderCompatible {
     let inputStream = Delegated<AudioDecoder.AudioInput, Void>()
 
     private(set) var prepareCalls: [StreamProvider.Position] = []
+    /// The file hint each `prepare` observed on the streamer it was handed.
+    private(set) var prepareFileHints: [AudioFileType] = []
     private(set) var pauseCount = 0
     private(set) var resumeCount = 0
     private(set) var destroyCount = 0
@@ -60,6 +63,7 @@ final class FakeDecoder: AudioDecoderCompatible {
 
     func prepare(for provider: StreamProviderCompatible, at position: StreamProvider.Position) throws {
         prepareCalls.append(position)
+        prepareFileHints.append(provider.info.fileHint)
         // The decoder must be handed the streamer it is parsing for, so that
         // duration/seek math can read contentLength and position.
         XCTAssertTrue((provider as AnyObject) === attachedProvider, "decoder must be handed the exact streamer it parses for")
@@ -132,11 +136,14 @@ final class ComposerCoordinationTests: XCTestCase {
         let config: APlay.Configuration
     }
 
-    func makeHarness(url: URL = URL(string: "https://example.com/a.mp3")!) -> Harness {
+    func makeHarness(url: URL = URL(string: "https://example.com/a.mp3")!,
+                     fileHint: AudioFileType = .mp3) -> Harness {
         let streamer = FakeStreamProvider()
         let decoder = FakeDecoder()
         let player = FakePlayer()
         let collector = Collector()
+
+        streamer.info = .remote(url, fileHint)
 
         // Point the decoder's prepare assertion at the streamer the Composer
         // actually builds with.
@@ -262,6 +269,24 @@ final class ComposerCoordinationTests: XCTestCase {
         XCTAssertEqual(harness.composer.isPreloading, false)
         // The 0.5s auto-resume has not fired yet, and startPlayback must not add one.
         XCTAssertEqual(harness.player.resumeCount, 0)
+    }
+
+    // MARK: - Injected decoder (issue #17)
+
+    func testOpusHintReachesTheInjectedDecoder() {
+        // An app ships its own opus decoder through the `audioDecoderBuilder`
+        // seam instead of `DefaultAudioDecoder`. The framework hands that
+        // decoder the streamer it parses for, so the only thing the decoder
+        // needs to recognise opus is the URL's file hint reaching it intact.
+        let url = URL(string: "https://example.com/a.opus")!
+        let harness = makeHarness(url: url, fileHint: .opus)
+
+        harness.composer.play(url)
+        harness.streamer.emit(.readyForRead)
+
+        XCTAssertEqual(harness.decoder.prepareCalls.count, 1)
+        XCTAssertEqual(harness.decoder.prepareFileHints, [.opus],
+                       "the injected decoder must observe the opus hint at prepare time")
     }
 
     func testPauseAndResumePropagate() {

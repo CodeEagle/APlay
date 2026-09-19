@@ -73,6 +73,10 @@ Features
 
 - [x] Playback can start immediately without needing to wait for buffering
 
+- [x] Pre-load a track with `prepare(_:)`: the streamer and decoder buffer the audio
+      without starting the output audio unit, so a later `play(_:)` of the same URL
+      starts instantly from the filled ring buffer
+
 - [x] Support cached the stream contents to a file
 
 - [x] Built-in `NBandEQ` equalizer wired into the `AUPlayer` audio graph (band frequencies
@@ -98,8 +102,9 @@ Todo
 - [ ] AirPlay2 support (Maybe not — tracked separately, see the `airplay2` branch)
 - [ ] AudioEffectUnit support: band **frequencies** and **gains** are now configurable, but gains
       can only be set per-band — preset management (save/apply an EQ curve) is the remaining gap.
-- [ ] Pre-loading a track before playback (see issue #14): needs a `prepare(_:)` entry point that
-      buffers without starting the output audio unit.
+- [ ] Custom decoder formats (see issue #17): the `audioDecoderBuilder` seam already hands an
+      injected decoder the stream's file hint (verified for `.opus`), so an app can decode a
+      format Core Audio does not ship — the remaining gap is bundling a reference implementation.
 
 Sponsor 
 ---

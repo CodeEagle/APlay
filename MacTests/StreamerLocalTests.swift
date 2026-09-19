@@ -23,6 +23,7 @@ final class StreamerLocalTests: XCTestCase {
         case bytes([UInt8], Bool)
         case endEncountered
         case error(APlay.Error)
+        case metadata([MetadataParser.Item])
     }
 
     final class Collector {
@@ -37,6 +38,7 @@ final class StreamerLocalTests: XCTestCase {
                 safe = .bytes(Array(UnsafeBufferPointer(start: pointer, count: Int(count))), isFirst)
             case .endEncountered: safe = .endEncountered
             case let .errorOccurred(error): safe = .error(error)
+            case let .metadata(items): safe = .metadata(items)
             default: return
             }
             lock.lock()

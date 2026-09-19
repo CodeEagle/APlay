@@ -462,3 +462,25 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   唯一提示 appintentsmetadataprocessor 元数据 warning，四套同样出现，属 Xcode 工具链
   既有噪声，非本仓代码（教训⑭：grep -c warning 会误计，须看来源）。
 - 未竟：本批待提交；②ALAC/AIFF 查因；③覆盖率；④gapless；opus iOS 真机验证。
+
+## SF-0018
+- Revision: 23
+- 取代 SF-0017 的 ALAC 结论（根因找到并修复）。
+- 根因（实测三重证据）:
+  1) 属性到达顺序：ffmt→rrap→dfmt→mgic→flst→bcnt→pcnt→psze→doff→redy。
+     框架在 dfmt(DataFormat) 时 createConverter 并读 cookie，但 mgic(cookie) 尚未到达
+     (size=0)，guard 直接 return；mgic 属性回调落在 switch 的 default: break 从未处理。
+     转换器终生无 cookie → 解码 !dat=kAudioCodecUnsupportedFormatError ×170。
+  2) 更深：读 cookie 用错属性 ID——拿 kAudioConverterDecompressionMagicCookie 去问
+     AudioFileStream，实测返回 1886681407='!prp'(属性不存在)；正确常量是
+     kAudioFileStreamProperty_MagicCookieData(实测 size=24)。
+  3) 探针直接验证 AudioConverterNew + setCookie 均 status=0，确认转换器本身可建。
+- 修复：propertyValueCallback switch 加 case kAudioFileStreamProperty_MagicCookieData
+  → magicCookieChanged()；新增 applyMagicCookie(data)（暂存 + 即时注入已有转换器）；
+  createConverter 创建新转换器后用 _magicCookie 做种子；createConverter 内的属性读取
+  改用正确常量并去掉错误路径下的误报 error 事件。
+- 结果：ALAC-in-M4A 从"仅解析"翻转为"完全支持"，56/56 全绿，四套构建零警告。
+- CAF/AIFF 判定为容器固有限制（非框架 bug）: CAF 的 pakt 包表在音频数据后→optm；
+  AIFF/AIFC-PCM 要求整文件可寻址→dsc!。矩阵按不支持记录并注明原因。
+- 教训 ⑮⑯⑰⑱（属性渐进到达/属性常量别混用/OpaquePointer 与 C 回调穿法/先查官方头注释）。
+- 未竟：本批待提交；③覆盖率；④gapless；opus iOS 真机验证。

@@ -33,6 +33,9 @@ final class DefaultAudioDecoder: @unchecked Sendable {
 
     private lazy var _decodeTimer: GCDTimer? = nil
     private lazy var _outputBuffer: [UInt8] = []
+    /// The magic cookie, once the file stream has handed it over. Kept so a
+    /// converter created after a format change can be seeded with it.
+    private var _magicCookie: [UInt8] = []
     private let asbdSize = UInt32(MemoryLayout<AudioStreamPacketDescription>.size)
 
     private unowned let _config: ConfigurationCompatible
@@ -260,6 +263,20 @@ private extension DefaultAudioDecoder {
             info.infoUpdated()
         }
 
+        /// The magic cookie arrives *after* the data format: the decoder creates
+        /// its converter on `DataFormat`, but for ALAC the cookie only shows up
+        /// here. Without it the converter rejects every packet ('!dat'), so push
+        /// it into the converter the moment it appears.
+        func magicCookieChanged() {
+            guard let stream = _audioFileStream else { return }
+            var size: UInt32 = 0
+            var writable = DarwinBoolean(false)
+            guard AudioFileStreamGetPropertyInfo(stream, kAudioFileStreamProperty_MagicCookieData, &size, &writable) == noErr, size > 0 else { return }
+            var data = [UInt8](repeating: 0, count: Int(size))
+            guard AudioFileStreamGetProperty(stream, kAudioFileStreamProperty_MagicCookieData, &size, &data) == noErr else { return }
+            applyMagicCookie(data)
+        }
+
         switch propertyId {
         case kAudioFileStreamProperty_BitRate: bitrate()
         case kAudioFileStreamProperty_DataOffset: dataOffset()
@@ -268,6 +285,7 @@ private extension DefaultAudioDecoder {
         case kAudioFileStreamProperty_AudioDataByteCount: audioDataByteCount()
         case kAudioFileStreamProperty_AudioDataPacketCount: audioDataPacketCount()
         case kAudioFileStreamProperty_FormatList: formatListChanged()
+        case kAudioFileStreamProperty_MagicCookieData: magicCookieChanged()
         case kAudioFileStreamProperty_ReadyToProducePackets: readyToProducePackets()
         default: break
         }
@@ -281,6 +299,18 @@ private extension DefaultAudioDecoder {
         guard let converter = _audioConverter else { return }
         AudioConverterDispose(converter)
         _audioConverter = nil
+    }
+
+    /// Hands the magic cookie to the converter, keeping a copy so a converter
+    /// created later (a reset after a format change) can be seeded with it too.
+    func applyMagicCookie(_ data: [UInt8]) {
+        _magicCookie = data
+        guard let converter = _audioConverter, data.isEmpty == false else { return }
+        var copy = data
+        let status = AudioConverterSetProperty(converter, kAudioConverterDecompressionMagicCookie, UInt32(data.count), &copy)
+        if status != noErr {
+            _config.logger.log("Error setting the magic cookie, error \(status)", to: .audioDecoder)
+        }
     }
 
     func createConverter(with source: AudioStreamBasicDescription) {
@@ -336,20 +366,25 @@ private extension DefaultAudioDecoder {
                 outputStream.call(.error(.parser(status)))
                 return
             }
+            // Seed the new converter with the cookie if it arrived earlier.
+            if _magicCookie.isEmpty == false {
+                applyMagicCookie(_magicCookie)
+            }
         }
         info.srcFormat = source
         guard let st = _audioFileStream, info.fileHint != .aacADTS else { return }
+        // The cookie usually is not available yet when the converter is created
+        // (it arrives later via MagicCookieData); read whatever is there now and
+        // apply it, and again when the property fires.
         var writable: DarwinBoolean = false
         var cookieSize: UInt32 = 0
         status = AudioFileStreamGetPropertyInfo(st, kAudioFileStreamProperty_MagicCookieData, &cookieSize, &writable)
-        guard status == noErr else { return }
-        var cookiesData: [UInt8] = Array(repeating: 0, count: Int(cookieSize))
-        status = AudioFileStreamGetProperty(st, kAudioConverterDecompressionMagicCookie, &cookieSize, &cookiesData)
-        guard status == noErr, let audioConverterRef = _audioConverter else { return }
-        status = AudioConverterSetProperty(audioConverterRef, kAudioConverterDecompressionMagicCookie, cookieSize, &cookiesData)
-        if status != noErr {
-            _config.logger.log("Error in creating an audio converter, error \(status)", to: .audioDecoder)
-            outputStream.call(.error(.parser(status)))
+        if status == noErr, cookieSize > 0 {
+            var cookiesData: [UInt8] = Array(repeating: 0, count: Int(cookieSize))
+            status = AudioFileStreamGetProperty(st, kAudioFileStreamProperty_MagicCookieData, &cookieSize, &cookiesData)
+            if status == noErr {
+                applyMagicCookie(cookiesData)
+            }
         }
     }
 }

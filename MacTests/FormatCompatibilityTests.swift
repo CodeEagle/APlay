@@ -47,11 +47,16 @@ final class FormatCompatibilityTests: XCTestCase {
               formatID: AudioToolbox.kAudioFormatOpus, note: "Opus in OGG — Core Audio parses it on this platform"),
         .init(name: "tone", ext: "wav", parses: true, decodes: true,
               formatID: CoreAudio.kAudioFormatLinearPCM, note: "WAVE PCM, incl. files with LIST/INFO chunks"),
-        // Parses the container but the ALAC converter rejects it (kAudioCodecUnsupportedFormatError).
-        .init(name: "tone-alac", ext: "m4a", parses: true, decodes: false,
-              formatID: AudioToolbox.kAudioFormatAppleLossless, note: "ALAC in MP4 — converter !dat, tracked separately"),
+        // ALAC in MP4 needs the magic cookie the file stream exposes; before
+        // the fix the decoder asked for the wrong property, got '!prp', and
+        // never fed the cookie to the converter ('!dat').
+        .init(name: "tone-alac", ext: "m4a", parses: true, decodes: true,
+              formatID: AudioToolbox.kAudioFormatAppleLossless, note: "ALAC in MP4"),
+        // CAF carries its packet table after the audio data, so the streaming
+        // parser reports 'optm' (not optimised). A container limitation, not a
+        // decoder bug — seekable-file playback handles it, streaming cannot.
         .init(name: "tone", ext: "caf", parses: true, decodes: false,
-              formatID: AudioToolbox.kAudioFormatAppleLossless, note: "ALAC in CAF — converter !dat, tracked separately"),
+              formatID: AudioToolbox.kAudioFormatAppleLossless, note: "ALAC in CAF — packet table trails the data ('optm')"),
         // AIFF/AIFF-C PCM parse to lpcm but AudioFileStream reports discontinuity.
         .init(name: "tone", ext: "aiff", parses: true, decodes: false,
               formatID: CoreAudio.kAudioFormatLinearPCM, note: "AIFF PCM — dsc!, tracked separately"),

@@ -175,9 +175,32 @@ Local CAF/AIFF/AIFF-C files route through an `ExtAudioFile`-backed decoder; ever
 else goes to the fallback you supply. An app that already injects its own decoder (a
 custom codec, for example) can wrap it instead of the built-in one.
 
+AirPlay 2 and remote control
+---
+The audio session runs the `.playback` category with the `longFormAudio` route sharing
+policy — the combination AirPlay 2 expects for long-form audio — and the lock screen,
+Control Center and AirPlay 2 remote commands are wired to the player by default, so a
+HomePod, an Apple TV or the iOS lock screen can control playback without extra app
+code: play / pause / toggle, next / previous track, change position (when the track is
+seekable) and ±15 s skip:
+
+```Swift
+let player = APlay()  // remote commands already installed
+```
+
+Pass `Configuration(enableRemoteCommandHandling: false)` to opt out.
+
+To let the user *pick* an AirPlay route, add an `AVRoutePickerView` (or an `MPVolumeView`
+with its route button) to your UI — that is app-level UI the framework deliberately does
+not ship. Now-playing metadata (title / artist / album / artwork / elapsed time) is
+already published to `MPNowPlayingInfoCenter` via `metadataUpdate`.
+
 Todo
 ---
-- [ ] AirPlay2 support (Maybe not — tracked separately, see the `airplay2` branch)
+- [x] AirPlay 2 support: the session runs the `longFormAudio` route sharing policy and
+      the lock screen / Control Center / AirPlay 2 remote commands
+      (play / pause / next / previous / seek / ±15 s skip) are wired in by default via
+      `MPRemoteCommandCenter`; route picking stays app-level UI (`AVRoutePickerView`)
 - [ ] AudioEffectUnit support: band **frequencies** and **gains** are now configurable, but gains
       can only be set per-band — preset management (save/apply an EQ curve) is the remaining gap.
 - [ ] Custom decoder formats (see issue #17): the `audioDecoderBuilder` seam already hands an

@@ -59,6 +59,12 @@ extension APlay {
         public let isGaplessPlaybackEnabled: Bool
         /// If YES then volume control will be enabled on iOS
         public let isEnabledVolumeMixer: Bool
+        /// Whether the lock screen / Control Center / AirPlay 2 remote commands
+        /// (play, pause, next, previous, seek) are wired to this player. On by
+        /// default, so an AirPlay 2 route or the iOS lock screen can control
+        /// playback without extra app code; the audio session is already set to
+        /// the long-form-audio route sharing policy that AirPlay 2 expects.
+        public let isEnabledRemoteCommandHandling: Bool
         /// A pointer to a 0 terminated array of band frequencies (iOS 5.0 and later, OSX 10.9 and later)
         public let equalizerBandFrequencies: [Float]
         /// logger
@@ -110,6 +116,7 @@ extension APlay {
                     autoHandlingInterruptEvent: Bool = true,
                     gaplessPlaybackEnabled: Bool = false,
                     enableVolumeMixer: Bool = true,
+                    enableRemoteCommandHandling: Bool = true,
                     sessionBuilder: SessionBuilder? = nil,
                     sessionDelegateBuilder: SessionDelegateBuilder? = nil,
                     loggerBuilder: LoggerBuilder? = nil,
@@ -135,6 +142,7 @@ extension APlay {
             self.maxRemoteStreamOpenRetry = maxRemoteStreamOpenRetry
             self.equalizerBandFrequencies = equalizerBandFrequencies
             isEnabledVolumeMixer = enableVolumeMixer
+            isEnabledRemoteCommandHandling = enableRemoteCommandHandling
             isAutoFillID3InfoToNowPlayingCenter = autoFillID3InfoToNowPlayingCenter
             isAutoHandlingInterruptEvent = autoHandlingInterruptEvent
             isGaplessPlaybackEnabled = gaplessPlaybackEnabled

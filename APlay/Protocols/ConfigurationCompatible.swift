@@ -36,6 +36,9 @@ public protocol ConfigurationCompatible: AnyObject {
     var predefinedHttpHeaderValues: [String: String] { get }
     var isEnabledAutomaticAudioSessionHandling: Bool { get }
     var isEnabledVolumeMixer: Bool { get }
+    /// Whether the lock screen / Control Center / AirPlay 2 remote commands are
+    /// wired to the player. On by default.
+    var isEnabledRemoteCommandHandling: Bool { get }
     var equalizerBandFrequencies: [Float] { get }
     var logger: LoggerCompatible { get }
     var isAutoFillID3InfoToNowPlayingCenter: Bool { get }

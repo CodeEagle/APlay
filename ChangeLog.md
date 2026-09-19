@@ -42,6 +42,14 @@ v2.1.0
    so an app that already injects a custom decoder wraps it instead. Add the product only
    when you need it — plain `APlay` is unchanged, and the new decoder is covered by
    `SeekableFileDecoderTests` plus an end-to-end macOS playback run
+12. New: AirPlay 2 / remote-control support. The audio session already ran the
+   long-form-audio route sharing policy AirPlay 2 expects; the lock screen,
+   Control Center and AirPlay 2 route commands (play, pause, toggle, next,
+   previous, change-position, ±15 s skip) are now wired to the player by
+   default through `MPRemoteCommandCenter`, gated by
+   `Configuration(enableRemoteCommandHandling:)`. Route picking stays app-level
+   UI — add your own `AVRoutePickerView` — and now-playing metadata was already
+   published to `MPNowPlayingInfoCenter`
 
 v2.0.0
 ---

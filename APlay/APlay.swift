@@ -35,6 +35,12 @@ public final class APlay: @unchecked Sendable {
 
     private let _player: PlayerCompatible
     private let _nowPlayingInfo: NowPlayingInfo
+    #if os(iOS)
+        /// Lock screen / Control Center / AirPlay 2 remote-command handlers.
+        /// Kept alive for the player's lifetime so the installed targets stay
+        /// installed; nil when the feature is disabled in the configuration.
+        private var _remoteCommandController: RemoteCommandController?
+    #endif
 
     private var _state: State = .idle
     private var _playlist: PlayList
@@ -92,6 +98,12 @@ public final class APlay: @unchecked Sendable {
         _playlist = PlayList(pipeline: eventPipeline)
 
         _nowPlayingInfo = NowPlayingInfo(config: config)
+
+        #if os(iOS)
+            if config.isEnabledRemoteCommandHandling {
+                _remoteCommandController = RemoteCommandController(player: self)
+            }
+        #endif
 
         addInteruptOb()
 
@@ -275,6 +287,14 @@ public extension APlay {
     /// whether current song support seek
     func seekable() -> Bool {
         return _currentComposer?.seekable() ?? false
+    }
+
+    /// Current playback time, in seconds.
+    ///
+    /// Backs the remote-command skip-forward / skip-backward handlers, which
+    /// need the live position to jump from.
+    func currentTime() -> TimeInterval {
+        return TimeInterval(_player.currentTime())
     }
 
     func metadataUpdate(title: String? = nil, album: String? = nil, artist: String? = nil, cover: APlayImage? = nil) {

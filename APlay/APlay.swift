@@ -67,10 +67,17 @@ public final class APlay: @unchecked Sendable {
         debug_log("\(self) \(#function)")
     }
 
-    public init(configuration: ConfigurationCompatible = Configuration()) {
+    convenience public init(configuration: ConfigurationCompatible = Configuration()) {
+        self.init(player: APlayer(config: configuration), configuration: configuration)
+    }
+
+    /// Test/preview seam: inject a player without exposing the internal
+    /// `PlayerCompatible` protocol (and its raw-pointer render closure) in the
+    /// public initialiser's signature.
+    internal init(player: PlayerCompatible, configuration: ConfigurationCompatible) {
         config = configuration
 
-        _player = APlayer(config: config)
+        _player = player
 
         _playlist = PlayList(pipeline: eventPipeline)
 

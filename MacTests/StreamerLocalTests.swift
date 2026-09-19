@@ -100,6 +100,10 @@ final class StreamerLocalTests: XCTestCase {
 
     override func tearDown() {
         streamer?.destroy()
+        // `destroy()` queues the close onto the streamer's state queue with a
+        // strong self capture, and the streamer reads its config through an
+        // unowned reference — so the config must outlive that queued work.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         streamer = nil
         config = nil
         super.tearDown()

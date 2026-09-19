@@ -26,6 +26,9 @@ final class Streamer: StreamProviderCompatible, @unchecked Sendable {
 
     private unowned let _config: ConfigurationCompatible
 
+    private let _openLock = NSLock()
+    private var _isOpened = false
+
     /// Owns the Streamer as its `URLSessionDataDelegate` through a weak bridge, so
     /// that `Streamer.deinit` still runs (a session strongly retains its delegate).
     private let _urlSession: URLSession
@@ -97,10 +100,14 @@ final class Streamer: StreamProviderCompatible, @unchecked Sendable {
 
 extension Streamer {
     func open(url: URL, at position: StreamProvider.Position) {
-        guard _task == nil, _fileHandle == nil else {
+        _openLock.lock()
+        guard _isOpened == false else {
+            _openLock.unlock()
             outputPipeline.call(.errorOccurred(.openedAlready("stream already open")))
             return
         }
+        _isOpened = true
+        _openLock.unlock()
         reset(url: url)
         guard info.isRemote else {
             _stateQueue.async { self._open(at: position) }
@@ -118,6 +125,11 @@ extension Streamer {
     }
 
     func destroy() {
+        // Cleared synchronously so an open() that follows immediately is not
+        // rejected by the single-open guard; the teardown itself is queued.
+        _openLock.lock()
+        _isOpened = false
+        _openLock.unlock()
         _stateQueue.async { self.close(resetTimer: true) }
     }
 

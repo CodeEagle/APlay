@@ -65,8 +65,8 @@ when it both parses its metadata *and* decodes to canonical PCM.
 | Opus | in OGG (`.opus`) | ✅ | Core Audio parses the container on this platform |
 | WAVE | PCM (`.wav`) | ✅ | tolerates extra chunks (`LIST`/`INFO`, `FLLR`) before `data`; seek supported |
 | ALAC | MP4 (`.m4a`) | ✅ | |
-| ALAC | CAF (`.caf`) | ⚠️ parse only | the packet table trails the audio data, so the streaming parser reports `optm`. Seekable local files play; a stream cannot |
-| AIFF / AIFF-C | PCM (`.aiff`, `.aifc`) | ⚠️ parse only | `AudioFileStream` reports a packet discontinuity (`dsc!`) |
+| ALAC | CAF (`.caf`) | ⚠️ stream only | the packet table trails the audio data, so the streaming parser reports `optm`. Local files play through `APlayExtras` |
+| AIFF / AIFF-C | PCM (`.aiff`, `.aifc`) | ⚠️ stream only | `AudioFileStream` reports a packet discontinuity (`dsc!`). Local files play through `APlayExtras` |
 
 The hint table also routes these Core Audio-native extensions, but no fixture ships for
 them, so they are *not* covered by the test matrix: `.m4b`, `.ac3`, `.amr`, `.3gp`,
@@ -145,6 +145,35 @@ add APlay — there is no CocoaPods spec and no Carthage support anymore:
 Add the `APlay` product to your app target. The same `Package.swift` also builds the
 `APlayMacPlayback` end-to-end validation target and the `APlayTests` suite on macOS, so
 `swift build` and `swift test` are the single source of truth for the framework.
+
+Optional formats: `APlayExtras`
+---
+The two rows above marked `⚠️ stream only` are seekable file formats whose layout a
+streaming parser cannot handle — the packet table sits after the audio data, or the
+container reports a discontinuity. Local files in those formats still play, but only
+through a seekable file decoder.
+
+`APlayExtras` is an optional companion library that adds exactly that. Add the product
+only when you need it; apps that never touch CAF/AIFF/AIFF-C stay on `APlay` alone with
+no extra code:
+
+```Swift
+.product(name: "APlayExtras", package: "APlay")
+```
+
+```Swift
+import APlay
+import APlayExtras
+
+// `audioDecoderBuilder` is read-only after init, so the builder goes through the
+// configuration initializer. The fallback keeps every other format unchanged.
+let player = APlay(configuration: APlay.Configuration(
+    audioDecoderBuilder: APlayExtras.fileDecoder(fallback: APlay.Configuration().audioDecoderBuilder)))
+```
+
+Local CAF/AIFF/AIFF-C files route through an `ExtAudioFile`-backed decoder; everything
+else goes to the fallback you supply. An app that already injects its own decoder (a
+custom codec, for example) can wrap it instead of the built-in one.
 
 Todo
 ---

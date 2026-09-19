@@ -78,6 +78,17 @@ public struct AudioDecoder {
 
         public init() {}
 
+        /// Marks the info as fully populated.
+        ///
+        /// `update(from:)` is internal, but a decoder living outside this module
+        /// (see the optional `APlayExtras` library) populates the same fields
+        /// directly and still needs `isUpdated` — the pipeline reads it for its
+        /// format and duration decisions. Safe to call more than once.
+        public func markAsUpdated() {
+            isUpdated = true
+            isUpdatedOnce = true
+        }
+
         func infoUpdated() { isUpdatedOnce = true }
 
         func reset() {

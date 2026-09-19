@@ -61,8 +61,8 @@ final class Recorder {
     private var _failure: String?
     private var _times: [Float] = []
 
-    init(url: URL) {
-        player = APlay()
+    init(url: URL, configuration: APlay.Configuration? = nil) {
+        player = configuration.map { APlay(configuration: $0) } ?? APlay()
         player.eventPipeline.delegate(to: self) { [weak self] _, event in
             self?.handle(event)
         }
@@ -104,9 +104,13 @@ final class Recorder {
         if let failure = _failure { return .fail(failure) }
         guard _playing, let duration = _duration, _times.count >= 3 else { return .pending }
         let first = _times.first ?? 0
-        let last = _times.last ?? 0
-        guard last > first else { return .fail("playback time never advanced (samples \(_times)) — render loop produced no decoded audio") }
-        return .pass("played \(String(format: "%.1f", last - first))s of a \(duration)s track")
+        // Playback naturally ends by resetting the clock to 0, so the *last*
+        // sample is not the progress signal — the peak is. A frozen render loop
+        // never produces a peak above the first sample either, so the check
+        // stays strict.
+        let peak = _times.max() ?? 0
+        guard peak > first else { return .fail("playback time never advanced (samples \(_times)) — render loop produced no decoded audio") }
+        return .pass("played \(String(format: "%.1f", peak - first))s of a \(duration)s track")
     }
 }
 

@@ -1,6 +1,6 @@
 v2.1.0
 ---
->2026.09.19
+>2026.09.20
 
 1. New: gapless playback between tracks of a playlist. With
    `Configuration(gaplessPlaybackEnabled: true)` the next track is preloaded while the
@@ -33,7 +33,15 @@ v2.1.0
 10. The README documents the supported-format matrix pinned by
    `FormatCompatibilityTests` — what the real decoder both parses and decodes to
    PCM (AAC, MP3, FLAC, Opus-in-OGG, WAVE, ALAC), and what only parses today
-   (ALAC-in-CAF, AIFF/AIFF-C)
+   (ALAC-in-CAF, AIFF/AIFF-C); local files in those two formats play through the
+   optional library in 11.
+11. New: optional `APlayExtras` companion library for the seekable file formats the
+   built-in streaming decoder cannot open (ALAC-in-CAF, AIFF/AIFF-C). Local files in
+   those containers route through an `ExtAudioFile`-backed decoder injected through the
+   same `audioDecoderBuilder` seam; everything else falls through to a builder you supply,
+   so an app that already injects a custom decoder wraps it instead. Add the product only
+   when you need it — plain `APlay` is unchanged, and the new decoder is covered by
+   `SeekableFileDecoderTests` plus an end-to-end macOS playback run
 
 v2.0.0
 ---

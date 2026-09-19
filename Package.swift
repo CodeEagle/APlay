@@ -9,12 +9,18 @@ let package = Package(
     ],
     products: [
         .library(name: "APlay", targets: ["APlay"]),
+        .library(name: "APlayExtras", targets: ["APlayExtras"]),
     ],
     targets: [
         .target(
             name: "APlay",
             path: "APlay",
             exclude: ["Info.plist"]
+        ),
+        .target(
+            name: "APlayExtras",
+            dependencies: ["APlay"],
+            path: "APlayExtras"
         ),
         .executableTarget(
             name: "APlayMacPlayback",
@@ -23,7 +29,7 @@ let package = Package(
         ),
         .testTarget(
             name: "APlayTests",
-            dependencies: ["APlay"],
+            dependencies: ["APlay", "APlayExtras"],
             path: "MacTests",
             resources: [.copy("Fixtures")]
         ),

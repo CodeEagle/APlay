@@ -606,3 +606,127 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   需把"每次 play 重布闭包"改为一个稳定闭包读原子源。
 - 未竟: ④ gapless 实现（设计已定，待选 API 形状）；opus iOS 真机验证；
   5xx 初始错误不重连缺陷（SF-0023，未改产品）。
+
+## SF-0025
+- Revision: 30
+- 取代 SF-0024 的"5xx 缺陷待定夺"——用户已批准修复，批次 A 已提交 98363c5。
+- 修法（Streamer.swift）:
+  ① WatchDogInfo 加 prepareForRetry()=只停 timer+清 isReadedData，不动 reopenTimes。
+     原来 401/407 与 500...599 分支调 reset() 把重试预算清零 → 既不重连也不终止。
+  ② 两个错误分支改用 prepareForRetry()。
+  ③ handle(data:) 对可重试状态码（401/407/5xx，经 static isRetryableStatus +
+     currentResponseStatus（_task?.response））直接 return，不投递错误页、不 reset。
+  ④ handleEndEncountered 对可重试状态码 return，保住看门狗；只有真正的 EOF 才
+     .endEncountered + writeFile。
+- 结果: 持续 500 → 3 次 open（maxRemoteStreamOpenRetry=2）→ .reachMaxRetryTime；
+  服务器恢复 → 第 2 次请求拿到 200 正常投递。测试改为
+  testRemote500RetriesUntilTheBudgetIsExhausted 与 testRemote500RecoversOnTheRetry
+  （testRemote500CurrentlyEndsTheStream 删除）。
+- 顺带修了 APlayer.state getter 死锁（崩溃报告 xctest-2026-09-19-170238.ips）:
+  APlay.deinit 可能落在 APlayer._stateQueue 上（Delegated 的 weak-target 回调返回时
+  释放临时强引用，恰为最后一次释放 → deinit 在该队列执行），而 _player.destroy()→
+  pause()→state getter 的 _stateQueue.sync 重入死锁（SIGTRAP，约 1/15 概率）。
+  修法: _stateQueue setSpecific，getter 在已位于该队列时直接读 _state（barrier 独占，
+  无竞争）。修后 20 连跑零崩溃；此前 1/15。
+- 验证: swift test 71/71（20 连 clean）；iOS 8 套构建 SUCCEEDED 零编译警告；
+  MacPlayback PASS。
+- 未竟: ④ gapless（用户批"都可"，采用方案 (a) 自动预加载+Configuration 开关）；
+  opus iOS 真机验证。
+
+## SF-0026
+- Revision: 31
+- ④ gapless 已实现（方案 a，开关默认关），产品代码+测试完成，**尚未提交**。
+  MacPlayback 的 gapless 模式有两处编译错误待修（见下"待修"），其余全部验证通过。
+- 改动文件:
+  PlayList.swift: 拆 `_nextURL` 为纯函数 `_peekNext(pattern:) -> (index,url)?`；
+    `nextURL()`=peek 后推进 playingIndex；新增 public `peekNextURL()`（不改 index）。
+    `_previousURL(.single)` 改调 `_peekNext(pattern: .single).map { $0.url }`。
+  ConfigurationCompatible.swift: 加 `var isGaplessPlaybackEnabled: Bool { get }`（含
+    跨格式须 setup 重初始化、预加载丢弃条件的文档）。
+  Configuration.swift: `public let isGaplessPlaybackEnabled`；init 参数
+    `gaplessPlaybackEnabled: Bool = false`。**init 参数顺序: …autoFillID3InfoToNowPlayingCenter,
+    autoHandlingInterruptEvent, gaplessPlaybackEnabled, enableVolumeMixer, sessionBuilder…**
+  APlayer.swift: 顶级 `final class RenderReadSlot: @unchecked Sendable`（os_unfair_lock
+    保护闭包；read 先 copy-out 再解锁，故渲染线程内重入 set 不死锁）。
+    `readClosure` 加 didSet → `_readSlot.set(readClosure)`；setup() 的输入闭包改读
+    `_readSlot.read(size, into: sself._buffers)`。destroy() 仍置 readClosure（经 didSet 清槽）。
+  Composer.swift: `isPreloadAhead`（private(set)）；`preload(_:)`（=play(autoplay:false)
+    但不 setup AU、不布 readClosure、不 resume）；`activate()`（若
+    needsAudioUnitReconfiguration 则 player.setup(outputFormat)，再 installReadSource，
+    若 state != .running 则 resume——避免 iOS 主线程 API 落在渲染线程）；
+    `installReadSource()`（play 与 activate 共用，含 PCM readSize==0→.empty 探测）；
+    `outputFormat`(src 线性则 src 否则 dst)、`needsAudioUnitReconfiguration`(
+    info.isUpdated 且 != player.asbd)、`isBufferedAhead`(_ringBuffer.availableData>0)。
+    decoder 委托 .output 分支: **configuringAllowed 在派发前捕获**（派发期间 isPreloadAhead
+    会变，块内读会误配 AU）。
+  APlay.swift: `__nextComposer`+`_nextComposer`(propertiesQueue 保护)；私有
+    `PendingComposerEvents`(NSLock 数组: append/clear/streamerEnded/failed/takeAll)；
+    createComposer 委托改 `[weak com]`（强捕获会循环）+ `isPreloadAhead`→queuePreloadEvent；
+    事件 switch 抽为 `handleComposerEvent(_:)`（可重放）；`.streamerEndEncountered` 追加
+    `preloadNextTrack()`；`checkPlayEnded` 三处 pauseAll 改 `handlePlayEnded(after:)`；
+    handlePlayEnded: 满足条件则 `_isCalledDelayPaused=true`+performGaplessHandoff，否则
+    pauseAll；`canTakeOverPreload(_)`=开关开 && isBufferedAhead && 未失败（URL 匹配交给
+    调用方：曲终 peek，手动 next() 已推进 index 故用传入 url，否则 peek 会指向下一曲）；
+    `performGaplessHandoff`→`playlist.nextURL()` 匹配则 activatePreloadedTrack，否则
+    discardPreload+回 pauseAll；`activatePreloadedTrack(_)`: 记 old、置 streamerEnded 标志、
+    resetFlag()、再置 streamerEnded（resetFlag 异步清，故重置后再断言）、`next.activate()`、
+    `_currentComposer=next`、`old?.destroy()`（换源后再拆旧的）、main async: .playEnded→
+    indexChanged→replayPendingEvents→nowPlayingInfo.play→解 _isCalledDelayPaused；
+    `replayPendingEvents` 丢弃 .decoderEmptyEncountered（缓冲期噪声会让短曲早结束）；
+    `preloadNextTrack`=开关开 && _nextComposer==nil && peek 非空 && != 当前 url；
+    `discardPreload` 在 _play/previous/destroy/deinit(直接读 __nextComposer)。
+- 关键设计决策:
+  换源时机=checkPlayEnded 的 delta<=0.02（老 pauseAll 同一判据）→ 同步原子换源（渲染线程
+  也不停 AU）；异格式 activate() 内 player.setup（若在渲染线程触发则整个换源推迟到 main；
+  跨格式本就不无缝，已文档化）。
+  曲终链: 现行曲 streamer end → 预加载下一曲 → 曲终 decoderEmpty → 换源+replay 事件；
+  重放 `.streamerEndEncountered` 会再触发 preloadNextTrack → 播放链式预加载（_nextComposer
+  已存在则跳过）。.stopWhenAllPlayed 末轨 peek=nil 自然不预加载；single 循环 peek==当前
+  url 跳过。
+- 验证（已过）:
+  swift test 85/85（71→85；+9 gapless 编排测试 +5 RenderReadSlot 测试），连跑 5 次 clean。
+  变异: handlePlayEnded 条件改 `if false, let pre…` →
+    testEndOfTrackHandsOverToThePreloadedTrack 立刻失败"output unit must never be paused"。
+  iOS 8 套构建（APlay/APlayDemo × iphoneos/iphonesimulator × Debug/Release，
+    CODE_SIGNING_ALLOWED=NO）全 BUILD SUCCEEDED；仅工具链噪声 warning（xcodebuild
+    "Using the first of multiple matching destinations"），swift build -c release 零警告。
+  swift run APlayMacPlayback（单轨，默认配置 gapless 关）PASS：137s→.playing→推进 2.0s
+  （渲染回调经 RenderReadSlot 的实时路径已验证）。
+- 待修（MacPlayback/main.swift 编译错误，2 处）:
+  ① 行 ~128 `APlay.Configuration(gaplessPlaybackEnabled: true, logPolicy: .disable, …)`
+    → 参数顺序错，改为 `logPolicy: .disable, gaplessPlaybackEnabled: true,
+    autoHandlingInterruptEvent: false`。
+  ② 行 197 `print("playing \(urls.map(\ $0.lastPathComponent )) …")` → 转义 $0 非法，
+    改 `urls.map { $0.lastPathComponent }`。
+  修后跑 `swift run APlayMacPlayback gapless`（播 MacTests/Fixtures/tone.m4a +
+    tone-alac.m4a，loopPattern=.stopWhenAllPlayed(.order)，配置 gaplessPlaybackEnabled:true），
+    期望 PASS: 未见 .paused 即切到第 2 轨，且第 2 轨 playback 时间推进。
+- 未竟: 修上面两处+跑 gapless 端到端；ChangeLog.md/README.md 记 gapless 开关与跨格式限制；
+  提交（提交信息如 "Preload the next track for a gapless handoff"）；opus iOS 真机验证。
+
+## SF-0027
+- Revision: 32
+- 取代: SF-0026 的"待修/未竟"两段——MacPlayback 编译错已修，gapless 端到端已过，文档已写，
+  本批已提交。
+- 修复 MacPlayback/main.swift 两处编译错:
+  ① Configuration 参数顺序按声明序 logPolicy → autoHandlingInterruptEvent →
+    gaplessPlaybackEnabled（Swift 要求带默认值参数按声明顺序）；
+  ② `urls.map(\ $0.lastPathComponent)` → `urls.map { $0.lastPathComponent }`
+    （字符串插值里 `\ $0` 闭包占位非法）。
+- 验证（全过）:
+  swift run APlayMacPlayback gapless → PASS: 未见 .paused 切到第 2 轨（tone→tone-alac），
+    第 2 轨推进至 2.0s（证明 AU 未停、换源原子）。
+  swift run APlayMacPlayback（单轨回归）→ PASS: 137s 轨推进 2.0s。
+  swift test 85/85 passed、0 failed。
+  iOS 8 套构建（APlay/APlayDemo × iphoneos/iphonesimulator × Debug/Release，
+    CODE_SIGNING_ALLOWED=NO）全 BUILD SUCCEEDED；唯一 warning 为
+    appintentsmetadataprocessor "Metadata extraction skipped, no AppIntents.framework
+    dependency found"（工具链噪声，非本仓代码）。
+  swift build -c release（含 APlayMacPlayback）零警告。
+- 文档: ChangeLog.md 新增 v2.1.0 段（gapless 特性 + 同格式无缝/跨格式不无缝的限制 +
+  ALAC/WAVE/format-hint/5xx 重连四项 2.0 后修复）；README.md 特性清单加 gapless 条目并
+  新增 "Gapless playback" 用法节（Configuration(gaplessPlaybackEnabled: true) +
+  loopPattern .stopWhenAllPlayed(.order) + play([urls])）。
+- 提交: 本批一并提交源码、测试、MacPlayback、ChangeLog、README、笔记；
+  排除 xcuserstate（Xcode 界面噪声）。
+- 剩余: opus 注入式解码仍须 iOS 真机验证（不阻塞本批）。

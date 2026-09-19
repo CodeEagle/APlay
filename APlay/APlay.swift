@@ -47,6 +47,12 @@ public final class APlay: @unchecked Sendable {
     private lazy var __lastDelta: Float = -1
     private lazy var __lastDeltaHitCount: Int = 0
     private var __currentComposer: Composer?
+    /// The track buffering one step ahead of `__currentComposer`, so the
+    /// handover at the end of the current track needs no reopen and no pause.
+    private var __nextComposer: Composer?
+    /// Events collected while `__nextComposer` is only buffering ahead; they are
+    /// replayed through the forwarder the moment the track takes over.
+    private let __pendingNextEvents = PendingComposerEvents()
     private lazy var __isPlayingBeforeInterrupt = false
     private let _maxOpenRestry = 5
     private lazy var _currentOpenRestry = 0
@@ -61,6 +67,7 @@ public final class APlay: @unchecked Sendable {
         // is destroyed while the queue drains), and a `sync` onto the queue that
         // is already executing the current thread is a deadlock.
         __currentComposer?.destroy()
+        __nextComposer?.destroy()
         _player.destroy()
         _obs.forEach({ NotificationCenter.default.removeObserver($0) })
         config.endBackgroundTask(isToDownloadImage: false)
@@ -228,19 +235,29 @@ public extension APlay {
     /// play next song in list
     func next() {
         guard let url = playlist.nextURL() else { return }
-        _play(url)
+        // A skip onto the track that is already buffered ahead of the current
+        // one takes the buffer instead of reopening the stream.
+        if let pre = _nextComposer, pre.url == url, canTakeOverPreload(pre) {
+            _isCalledDelayPaused = true
+            activatePreloadedTrack(pre)
+        } else {
+            discardPreload()
+            _play(url)
+        }
         indexChanged()
     }
 
     /// play previous song in list
     func previous() {
         guard let url = playlist.previousURL() else { return }
+        discardPreload()
         _play(url)
         indexChanged()
     }
 
     /// destroy player
     func destroy() {
+        discardPreload()
         _currentComposer?.destroy()
         _player.destroy()
     }
@@ -278,6 +295,7 @@ private extension APlay {
 
     func _play(_ url: URL, autoplay: Bool = true) {
         resetFlag()
+        discardPreload()
         _currentComposer?.destroy()
         let com = createComposer()
         com.play(url, autoplay: autoplay)
@@ -309,19 +327,128 @@ private extension APlay {
         let lastDeltaThreshold: Float = 1
         let lastDeltaHitThreshold = 2
         if delta <= deltaThreshold {
-            pauseAll(after: delta)
+            handlePlayEnded(after: delta)
         } else {
             if _lastDelta != delta {
                 _lastDelta = delta
             } else if _lastDelta <= deltaThreshold {
-                pauseAll(after: delta)
+                handlePlayEnded(after: delta)
             } else {
                 _lastDeltaHitCount += 1
                 if _lastDeltaHitCount > lastDeltaHitThreshold, _lastDelta <= lastDeltaThreshold {
-                    pauseAll(after: _lastDelta)
+                    handlePlayEnded(after: _lastDelta)
                 }
             }
         }
+    }
+
+    /// End of the current track: hand over to the preloaded next track without
+    /// stopping the output unit when one is ready, otherwise fall back to the
+    /// classic pause → `playEnded` → rebuild path.
+    func handlePlayEnded(after time: Float) {
+        if let pre = _nextComposer, canTakeOverPreload(pre), pre.url == playlist.peekNextURL() {
+            // `_isCalledDelayPaused` guards the whole end-of-track sequence, not
+            // just the delayed pause: it stops a second `.empty` event (the
+            // decoder reports one every timer tick) from re-entering the handoff
+            // before the main-queue tail resets it.
+            _isCalledDelayPaused = true
+            performGaplessHandoff()
+            return
+        }
+        pauseAll(after: time)
+    }
+
+    /// Whether the buffered track is in a state where it can take the output
+    /// over. The URL match is the caller's business: the end of a track peeks at
+    /// the playlist, a manual skip already knows which URL it is moving to (and
+    /// has already moved the index, so a peek would point one track too far).
+    private func canTakeOverPreload(_ pre: Composer) -> Bool {
+        guard config.isGaplessPlaybackEnabled else { return false }
+        guard pre.isBufferedAhead, __pendingNextEvents.failed == false else { return false }
+        return true
+    }
+
+    /// The current track ran dry with a preloaded one waiting: move the
+    /// playlist on to it and hand the output over.
+    private func performGaplessHandoff() {
+        guard let next = _nextComposer else { return }
+        guard let url = playlist.nextURL(), url == next.url else {
+            // The list or the loop pattern changed since the preload started, so
+            // the buffered track is no longer the one up next.
+            discardPreload()
+            _isCalledDelayPaused = false
+            pauseAll(after: 0)
+            return
+        }
+        activatePreloadedTrack(next)
+    }
+
+    /// Shared tail of both entry points into a buffered track (end of track and
+    /// a manual skip onto it): rebind the render source first so the audio unit
+    /// never idles on a drained buffer, then post the events on the main thread
+    /// exactly like the old `pauseAll` path did.
+    private func activatePreloadedTrack(_ next: Composer) {
+        let old = _currentComposer
+        _nextComposer = nil
+        if __pendingNextEvents.streamerEnded {
+            _isSteamerEndEncounted = true
+        }
+        resetFlag()
+        if __pendingNextEvents.streamerEnded {
+            // `resetFlag` clears the flag asynchronously, so re-assert it after;
+            // the new track's end detection must see the stream as ended from
+            // its first `.empty` event on.
+            _isSteamerEndEncounted = true
+        }
+        next.activate()
+        _currentComposer = next
+        old?.destroy()
+        DispatchQueue.main.async { [weak self] in
+            guard let sself = self else { return }
+            sself.eventPipeline.call(.playEnded)
+            sself.indexChanged()
+            sself.replayPendingEvents()
+            sself._nowPlayingInfo.play(elapsedPlayback: sself._player.currentTime())
+            sself._isCalledDelayPaused = false
+        }
+    }
+
+    private func replayPendingEvents() {
+        let events = __pendingNextEvents.takeAll()
+        for event in events {
+            switch event {
+            case .decoderEmptyEncountered:
+                // End-of-track detection for the new track starts from its live
+                // events; the ones collected while it was merely buffering are
+                // stale and would make a short preloaded track end early.
+                continue
+            default:
+                handleComposerEvent(event)
+            }
+        }
+    }
+
+    /// Starts buffering the next track ahead of the current one, once the
+    /// current track's stream has been fully received.
+    private func preloadNextTrack() {
+        guard config.isGaplessPlaybackEnabled else { return }
+        guard _nextComposer == nil else { return }
+        guard let current = _currentComposer else { return }
+        guard let url = playlist.peekNextURL() else { return }
+        // Single-track loop would just rebuffer the track that is already
+        // decoded, and `.stopWhenAllPlayed` has nothing after the last track.
+        guard url != current.url else { return }
+        let com = createComposer()
+        com.preload(url)
+        _nextComposer = com
+    }
+
+    /// Drops the track buffering ahead of the current one. Called whenever the
+    /// user moves somewhere else in the list, or the buffered track takes over.
+    private func discardPreload() {
+        _nextComposer?.destroy()
+        _nextComposer = nil
+        __pendingNextEvents.clear()
     }
 
     func pauseAll(after time: Float) {
@@ -349,46 +476,64 @@ private extension APlay {
 
     func createComposer() -> Composer {
         let com = Composer(player: _player, config: config)
-        com.eventPipeline.delegate(to: self) { obj, event in
-            switch event {
-            case let .seekable(value):
-                obj.eventPipeline.call(.seekable(value))
-            case let .buffering(p):
-                obj.eventPipeline.call(.buffering(p))
-            case .streamerEndEncountered:
-                obj._isSteamerEndEncounted = true
-                obj.eventPipeline.call(.streamerEndEncountered)
-            case let .duration(value):
-                obj.eventPipeline.call(.duration(value))
-                obj._nowPlayingInfo.duration = value
-                obj._nowPlayingInfo.update()
-            case let .error(err):
-                obj.eventPipeline.call(.error(err))
-            case .decoderEmptyEncountered:
-                obj.checkPlayEnded()
-            case let .unknown(error):
-                let state = APlay.State.unknown(error)
-                obj.state = state
-                obj.eventPipeline.call(.state(state))
-            case let .flac(value):
-                obj.eventPipeline.call(.flac(value))
-            case let .metadata(values):
-                obj.metadatas = values
-                obj.eventPipeline.call(.metadata(values))
-                guard obj.config.isAutoFillID3InfoToNowPlayingCenter else { return }
-                for val in values {
-                    switch val {
-                    case let .album(text): obj._nowPlayingInfo.album = text
-                    case let .artist(text): obj._nowPlayingInfo.artist = text
-                    case let .title(text): obj._nowPlayingInfo.name = text
-                        case let .cover(cov): obj._nowPlayingInfo.artwork = APlayImage(data: cov)
-                    default: break
-                    }
-                }
-                obj._nowPlayingInfo.update()
+        // `com` is captured weakly: the pipeline lives on the composer, so a
+        // strong capture would be a cycle. While the composer buffers ahead of
+        // the current track its events are collected instead of forwarded.
+        com.eventPipeline.delegate(to: self) { [weak com] obj, event in
+            if let composer = com, composer.isPreloadAhead {
+                obj.queuePreloadEvent(event)
+                return
             }
+            obj.handleComposerEvent(event)
         }
         return com
+    }
+
+    private func queuePreloadEvent(_ event: Composer.Event) {
+        __pendingNextEvents.append(event)
+    }
+
+    /// Every event of the *current* composer flows through here, and so do the
+    /// replayed events of the track that just took over from it.
+    func handleComposerEvent(_ event: Composer.Event) {
+        switch event {
+        case let .seekable(value):
+            eventPipeline.call(.seekable(value))
+        case let .buffering(p):
+            eventPipeline.call(.buffering(p))
+        case .streamerEndEncountered:
+            _isSteamerEndEncounted = true
+            eventPipeline.call(.streamerEndEncountered)
+            preloadNextTrack()
+        case let .duration(value):
+            eventPipeline.call(.duration(value))
+            _nowPlayingInfo.duration = value
+            _nowPlayingInfo.update()
+        case let .error(err):
+            eventPipeline.call(.error(err))
+        case .decoderEmptyEncountered:
+            checkPlayEnded()
+        case let .unknown(error):
+            let state = APlay.State.unknown(error)
+            self.state = state
+            eventPipeline.call(.state(state))
+        case let .flac(value):
+            eventPipeline.call(.flac(value))
+        case let .metadata(values):
+            metadatas = values
+            eventPipeline.call(.metadata(values))
+            guard config.isAutoFillID3InfoToNowPlayingCenter else { return }
+            for val in values {
+                switch val {
+                case let .album(text): _nowPlayingInfo.album = text
+                case let .artist(text): _nowPlayingInfo.artist = text
+                case let .title(text): _nowPlayingInfo.name = text
+                    case let .cover(cov): _nowPlayingInfo.artwork = APlayImage(data: cov)
+                default: break
+                }
+            }
+            _nowPlayingInfo.update()
+        }
     }
 
     private func addInteruptOb() {
@@ -484,9 +629,65 @@ extension APlay {
         set { _propertiesQueue.async(flags: .barrier) { self.__currentComposer = newValue } }
     }
 
+    private var _nextComposer: Composer? {
+        get { return _propertiesQueue.sync { __nextComposer } }
+        set { _propertiesQueue.async(flags: .barrier) { self.__nextComposer = newValue } }
+    }
+
     private var _isPlayingBeforeInterrupt: Bool {
         get { return _propertiesQueue.sync { __isPlayingBeforeInterrupt } }
         set { _propertiesQueue.async(flags: .barrier) { self.__isPlayingBeforeInterrupt = newValue } }
+    }
+}
+
+// MARK: - Pending Events
+
+/// Events of the composer that buffers one track ahead of the current one.
+/// They are kept back until that track takes over, so the app never sees the
+/// next track's duration/metadata/buffering while the current one is playing,
+/// and nothing is lost at the handoff either.
+private final class PendingComposerEvents {
+    private let lock = NSLock()
+    private var _events: [Composer.Event] = []
+
+    func append(_ event: Composer.Event) {
+        lock.lock()
+        _events.append(event)
+        lock.unlock()
+    }
+
+    func clear() {
+        lock.lock()
+        _events.removeAll()
+        lock.unlock()
+    }
+
+    /// The preloaded track's stream already reported end while it was buffering.
+    /// The new track's end-of-track detection needs the state from its first
+    /// `.empty` event on, which can arrive before the main-queue replay.
+    var streamerEnded: Bool {
+        return contains { if case .streamerEndEncountered = $0 { return true }; return false }
+    }
+
+    /// The preload hit an error, so it must not take over — the normal rebuild
+    /// path replays the URL and surfaces the error.
+    var failed: Bool {
+        return contains { if case .error = $0 { return true }; return false }
+    }
+
+    private func contains(_ predicate: (Composer.Event) -> Bool) -> Bool {
+        lock.lock()
+        let value = _events.contains(where: predicate)
+        lock.unlock()
+        return value
+    }
+
+    func takeAll() -> [Composer.Event] {
+        lock.lock()
+        let events = _events
+        _events.removeAll()
+        lock.unlock()
+        return events
     }
 }
 

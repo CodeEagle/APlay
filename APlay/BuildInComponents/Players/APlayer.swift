@@ -8,8 +8,54 @@
 
 import AVFoundation
 
+/// Indirection between the realtime render callback and the buffer it reads
+/// from, so the active source can be swapped without rebinding the callback and
+/// without stopping the audio unit.
+///
+/// The swap happens when a preloaded track takes over (gapless playback); the
+/// render thread only ever reads. Both sides take an `os_unfair_lock`, which is
+/// a single uncontended atomic load on the read path. The closure is copied out
+/// *before* the lock is released, so a swap performed re-entrantly from inside
+/// the closure itself (linear PCM reports end of track from the render thread)
+/// can never deadlock, and the source it is replacing stays alive for the read
+/// in progress.
+final class RenderReadSlot: @unchecked Sendable {
+    private var _closure: ((UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool))?
+    private var _lock = os_unfair_lock()
+
+    func set(_ closure: @escaping (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool)) {
+        os_unfair_lock_lock(&_lock)
+        _closure = closure
+        os_unfair_lock_unlock(&_lock)
+    }
+
+    func clear() {
+        os_unfair_lock_lock(&_lock)
+        _closure = nil
+        os_unfair_lock_unlock(&_lock)
+    }
+
+    @inline(__always)
+    func read(_ size: UInt32, into pointer: UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) {
+        os_unfair_lock_lock(&_lock)
+        let closure = _closure
+        os_unfair_lock_unlock(&_lock)
+        return closure?(size, pointer) ?? (0, false)
+    }
+}
+
 final class APlayer: PlayerCompatible, @unchecked Sendable {
-    var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) = { _, _ in (0, false) }
+    /// The render callback reads through this slot rather than through
+    /// `readClosure` directly, so a preloaded track can take over the output
+    /// without the callback being rebound. `readClosure` remains the install
+    /// point (see `Composer.installReadSource`).
+    private let _readSlot = RenderReadSlot()
+
+    var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) = { _, _ in (0, false) } {
+        didSet {
+            _readSlot.set(readClosure)
+        }
+    }
 
     var eventPipeline: Delegated<Player.Event, Void> = Delegated<Player.Event, Void>()
 
@@ -204,7 +250,7 @@ extension APlayer {
                 let bytesPerFrame = sself.asbd.mBytesPerFrame
                 let size = bytesPerFrame * frameCount
 
-                let (readSize, _) = sself.readClosure(size, sself._buffers)
+                let (readSize, _) = sself._readSlot.read(size, into: sself._buffers)
                 
                 var totalReadFrame: UInt32 = frameCount
                 if readSize != size {

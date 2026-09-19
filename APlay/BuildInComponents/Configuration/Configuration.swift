@@ -54,6 +54,9 @@ extension APlay {
         public let isAutoFillID3InfoToNowPlayingCenter: Bool
         /** 自动处理中断事件 */
         public let isAutoHandlingInterruptEvent: Bool
+        /// 预加载下一曲并在曲终时无缝切换（默认关）。见
+        /// `APlay.Configuration.isGaplessPlaybackEnabled`。
+        public let isGaplessPlaybackEnabled: Bool
         /// If YES then volume control will be enabled on iOS
         public let isEnabledVolumeMixer: Bool
         /// A pointer to a 0 terminated array of band frequencies (iOS 5.0 and later, OSX 10.9 and later)
@@ -105,6 +108,7 @@ extension APlay {
                     equalizerBandFrequencies: [Float] = [50, 100, 200, 400, 800, 1600, 2600, 16000],
                     autoFillID3InfoToNowPlayingCenter: Bool = true,
                     autoHandlingInterruptEvent: Bool = true,
+                    gaplessPlaybackEnabled: Bool = false,
                     enableVolumeMixer: Bool = true,
                     sessionBuilder: SessionBuilder? = nil,
                     sessionDelegateBuilder: SessionDelegateBuilder? = nil,
@@ -133,6 +137,7 @@ extension APlay {
             isEnabledVolumeMixer = enableVolumeMixer
             isAutoFillID3InfoToNowPlayingCenter = autoFillID3InfoToNowPlayingCenter
             isAutoHandlingInterruptEvent = autoHandlingInterruptEvent
+            isGaplessPlaybackEnabled = gaplessPlaybackEnabled
 
             logger = loggerBuilder?(logPolicy) ?? APlay.InternalLogger(policy: logPolicy)
 

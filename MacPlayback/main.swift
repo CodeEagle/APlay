@@ -32,6 +32,19 @@ private func assetURL() -> URL? {
     return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
 }
 
+/// The two short fixtures the gapless run plays back to back. Both decode to
+/// the canonical output format, so the handoff must be seamless; the second
+/// track is preloaded while the first one is still playing.
+private func gaplessAssets() -> [URL]? {
+    let fixtures = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()      // MacPlayback/
+        .deletingLastPathComponent()      // package root
+        .appendingPathComponent("MacTests/Fixtures")
+    let urls = ["tone.m4a", "tone-alac.m4a"].map { fixtures.appendingPathComponent($0) }
+    guard urls.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) else { return nil }
+    return urls
+}
+
 enum Verdict {
     case pending
     case pass(String)
@@ -97,30 +110,120 @@ final class Recorder {
     }
 }
 
-guard let url = assetURL() else {
-    print("FAIL: sample asset not found (pass a path as the first argument)")
-    exit(2)
+/// Watches a two-track playlist with gapless playback on. The handoff is only
+/// worth anything if the output unit keeps running across it: the recorder fails
+/// on any `.paused` state before the second track is heard, and the second track
+/// must produce advancing playback time of its own.
+final class GaplessRecorder {
+    let player: APlay
+    private let lock = NSLock()
+    private var _failure: String?
+    private var _paused = false
+    private var _playing = false
+    private var _secondTrackTimes: [Float] = []
+    private var _switchedToSecondTrack = false
+
+    init(urls: [URL]) {
+        let config = APlay.Configuration(logPolicy: .disable,
+                                         autoHandlingInterruptEvent: false,
+                                         gaplessPlaybackEnabled: true)
+        player = APlay(configuration: config)
+        player.loopPattern = .stopWhenAllPlayed(.order)
+        player.eventPipeline.delegate(to: self) { [weak self] _, event in
+            self?.handle(event)
+        }
+    }
+
+    private func handle(_ event: APlay.Event) {
+        lock.lock(); defer { lock.unlock() }
+        switch event {
+        case let .state(state):
+            switch state {
+            case .playing:
+                _playing = true
+                print("[gapless] reached .playing")
+            case .paused:
+                _paused = true
+                print("[gapless] paused")
+            default:
+                break
+            }
+        case .playingIndexChanged:
+            print("[gapless] advanced to track 2 without pausing: \(_paused == false)")
+            _switchedToSecondTrack = true
+        case let .playback(time):
+            if _switchedToSecondTrack { _secondTrackTimes.append(time) }
+        case let .error(error):
+            _failure = "error event \(error)"
+        default:
+            break
+        }
+    }
+
+    var verdict: Verdict {
+        lock.lock(); defer { lock.unlock() }
+        if let failure = _failure { return .fail(failure) }
+        guard _switchedToSecondTrack else { return .pending }
+        guard _paused == false else { return .fail("the output unit was paused at the handoff — not gapless") }
+        guard _secondTrackTimes.count >= 2 else { return .pending }
+        guard _secondTrackTimes.last! > _secondTrackTimes.first! else {
+            return .fail("the second track's playback time never advanced — the handoff switched to an empty source")
+        }
+        return .pass("handed over to track 2 without pausing; track 2 advanced to \(String(format: "%.1f", _secondTrackTimes.last!))s")
+    }
 }
 
-print("playing \(url.lastPathComponent)")
-let recorder = Recorder(url: url)
-recorder.player.play(url)
+// MARK: - Entry points
 
-let deadline = Date().addingTimeInterval(90)
-while true {
-    switch recorder.verdict {
-    case let .pass(summary):
-        print("PASS: \(summary)")
-        exit(0)
-    case let .fail(reason):
-        print("FAIL: \(reason)")
-        exit(1)
-    case .pending:
-        break
+/// Single-track end-to-end run (the classic regression baseline).
+private func runSingleTrack() {
+    guard let url = assetURL() else {
+        print("FAIL: sample asset not found (pass a path as the first argument)")
+        exit(2)
     }
-    if Date() > deadline {
-        print("FAIL: timed out waiting for end-to-end playback flow")
-        exit(1)
+    print("playing \(url.lastPathComponent)")
+    let recorder = Recorder(url: url)
+    recorder.player.play(url)
+    poll(recorder.verdict)
+}
+
+/// Two-track gapless run: the second fixture is preloaded and must take the
+/// output over while the audio unit keeps running.
+private func runGapless() {
+    guard let urls = gaplessAssets() else {
+        print("FAIL: gapless fixtures not found (MacTests/Fixtures/tone.m4a and tone-alac.m4a)")
+        exit(2)
     }
-    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.25))
+    print("playing \(urls.map { $0.lastPathComponent }) as a gapless list")
+    let recorder = GaplessRecorder(urls: urls)
+    recorder.player.play(urls, at: 0)
+    poll(recorder.verdict)
+}
+
+/// Polls a verdict on the main run loop until it settles or the deadline lapses.
+private func poll(_ verdictProvider: @autoclosure @escaping () -> Verdict, deadline: TimeInterval = 60) {
+    let deadline = Date().addingTimeInterval(deadline)
+    while true {
+        switch verdictProvider() {
+        case let .pass(summary):
+            print("PASS: \(summary)")
+            exit(0)
+        case let .fail(reason):
+            print("FAIL: \(reason)")
+            exit(1)
+        case .pending:
+            break
+        }
+        if Date() > deadline {
+            print("FAIL: timed out waiting for end-to-end playback flow")
+            exit(1)
+        }
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.25))
+    }
+}
+
+if CommandLine.arguments.dropFirst().first == "gapless" {
+    runGapless()
+} else {
+    runSingleTrack()
 }

@@ -41,6 +41,19 @@ public protocol ConfigurationCompatible: AnyObject {
     var isAutoFillID3InfoToNowPlayingCenter: Bool { get }
     var isAutoHandlingInterruptEvent: Bool { get }
 
+    /// Whether the following track is preloaded and handed over without stopping
+    /// the output audio unit (gapless playback). Off by default.
+    ///
+    /// When enabled, the playlist's next track is buffered as soon as the current
+    /// track's stream has been fully received; at the end of the current track the
+    /// player switches its read source to the buffered one and keeps rendering, so
+    /// there is no pause, no reopen and no rebuild delay. Two tracks sharing a
+    /// sample format are truly seamless; a change of sample format still has to
+    /// re-initialise the audio unit, so the handoff is quick but not seamless
+    /// there. A preloaded track is dropped if the user skips, seeks away, plays
+    /// another URL, or if the playlist no longer points at it.
+    var isGaplessPlaybackEnabled: Bool { get }
+
     func startBackgroundTask(isToDownloadImage: Bool)
     func endBackgroundTask(isToDownloadImage: Bool)
 }

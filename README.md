@@ -33,6 +33,22 @@ adjusted at any time:
 player.setEqualizerBandGain(6, at: 0)
 ```
 
+Gapless playback
+---
+Play a list with `gaplessPlaybackEnabled` turned on and the next track is preloaded while the
+current one is still playing; at the end of the track the output audio unit swaps in the
+buffered source without stopping, so consecutive tracks of the same format play without a gap:
+
+```Swift
+let player = APlay(configuration: APlay.Configuration(gaplessPlaybackEnabled: true))
+player.loopPattern = .stopWhenAllPlayed(.order)
+player.play([first, second, third])
+```
+
+The default is off, so single-track playback behaves exactly as before. A handoff between
+different audio formats (for example MP3 → FLAC) still re-initializes the graph and is not
+seamless.
+
 ✅ Known issue (fixed)
 ---
 Earlier releases could only run in `DEBUG` mode: with optimization enabled (`-O`) the decode
@@ -76,6 +92,11 @@ Features
 - [x] Pre-load a track with `prepare(_:)`: the streamer and decoder buffer the audio
       without starting the output audio unit, so a later `play(_:)` of the same URL
       starts instantly from the filled ring buffer
+
+- [x] Gapless playlist playback: with `Configuration(gaplessPlaybackEnabled: true)` the
+      next track is preloaded while the current one plays, and the output audio unit
+      switches sources at the end of the track without stopping — no gap and no `.paused`
+      state at the handoff (same format only; a format change still re-initializes)
 
 - [x] Support cached the stream contents to a file
 

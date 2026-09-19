@@ -1,3 +1,22 @@
+v2.1.0
+---
+>2026.09.19
+
+1. New: gapless playback between tracks of a playlist. With
+   `Configuration(gaplessPlaybackEnabled: true)` the next track is preloaded while the
+   current one is still playing, and at end of track the output audio unit swaps in the
+   buffered source atomically — it never stops and restarts, so there is no gap, click
+   or state dip to `.paused` at the handoff. Same-format tracks are seamless;
+   a transition between different audio formats still needs a re-setup and is not seamless
+2. Fix ALAC playback: the magic cookie is now fed to the audio converter, so ALAC files
+   decode instead of failing with an unsupported-format error
+3. Fix WAVE files that carry extra chunks between the header and the data chunk: parsing
+   now skips unknown chunks instead of misreading the stream
+4. Map audiobook (.m4b), Dolby (.ac3/.eac3) and speech (.aiff spoken) extensions in the
+   format hint table so the right decoder is selected up front
+5. Recover from transient server errors (HTTP 5xx) by reconnecting instead of reporting
+   end of stream
+
 v2.0.0
 ---
 >2026.09.19

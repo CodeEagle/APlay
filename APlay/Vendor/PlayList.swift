@@ -48,12 +48,25 @@ public final class PlayList: @unchecked Sendable {
     }
 
     public func nextURL() -> URL? {
+        guard let (index, url) = _peekNextFromLoopPattern() else { return nil }
+        playingIndex = index
+        return url
+    }
+
+    /// The URL `nextURL()` would advance to, without moving `playingIndex`.
+    /// Gapless playback uses it to start buffering the following track while the
+    /// current one is still playing.
+    public func peekNextURL() -> URL? {
+        return _peekNextFromLoopPattern()?.url
+    }
+
+    private func _peekNextFromLoopPattern() -> (index: Int, url: URL)? {
         guard list.count > 0 else { return nil }
         switch loopPattern {
-        case .order: return _nextURL(pattern: .order)
-        case .random: return _nextURL(pattern: .random)
-        case .single: return _nextURL(pattern: .single)
-        case let .stopWhenAllPlayed(mode): return _nextURL(pattern: mode)
+        case .order: return _peekNext(pattern: .order)
+        case .random: return _peekNext(pattern: .random)
+        case .single: return _peekNext(pattern: .single)
+        case let .stopWhenAllPlayed(mode): return _peekNext(pattern: mode)
         }
     }
 
@@ -67,7 +80,10 @@ public final class PlayList: @unchecked Sendable {
         }
     }
 
-    private func _nextURL(pattern: LoopPattern) -> URL? {
+    /// Pure variant of `nextURL()`: reports where the list would go next
+    /// without touching `playingIndex`, so `nextURL()` and `peekNextURL()` stay
+    /// two views of the same decision.
+    private func _peekNext(pattern: LoopPattern) -> (index: Int, url: URL)? {
         var index = 0
         switch pattern {
         case .order:
@@ -78,35 +94,32 @@ public final class PlayList: @unchecked Sendable {
                 }
                 index = 0
             }
-            playingIndex = index
-            let url = list[index]
-            return url
+            guard let url = list[ap_safe: index] else { return nil }
+            return (index, url)
         case .random:
             if let idx = playingIndex { index = idx + 1 }
-            if index >= list.count {
+            if index >= _randomList.count {
                 if loopPattern.isGonnaStopAtEndOfList {
                     return nil
                 }
                 index = 0
             }
-            playingIndex = index
-            let url = _randomList[index]
-            return url
+            guard let url = _randomList[ap_safe: index] else { return nil }
+            return (index, url)
         case .single:
             if loopPattern.isGonnaStopAtEndOfList {
                 return nil
             }
             if let idx = playingIndex { index = idx }
-            playingIndex = index
-            let url = list[index]
-            return url
+            guard let url = list[ap_safe: index] else { return nil }
+            return (index, url)
         case let .stopWhenAllPlayed(mode):
             if let idx = playingIndex, idx == list.count - 1 { return nil }
             switch mode {
-            case .order: return _nextURL(pattern: .order)
-            case .random: return _nextURL(pattern: .random)
-            case .single: return _nextURL(pattern: .single)
-            case let .stopWhenAllPlayed(mode2): return _nextURL(pattern: mode2)
+            case .order: return _peekNext(pattern: .order)
+            case .random: return _peekNext(pattern: .random)
+            case .single: return _peekNext(pattern: .single)
+            case let .stopWhenAllPlayed(mode2): return _peekNext(pattern: mode2)
             }
         }
     }
@@ -127,7 +140,7 @@ public final class PlayList: @unchecked Sendable {
             else { index -= 1 }
             playingIndex = index
             return _randomList[ap_safe: index]
-        case .single: return _nextURL(pattern: .single)
+        case .single: return _peekNext(pattern: .single).map { $0.url }
         case let .stopWhenAllPlayed(mode): return _previousURL(pattern: mode)
         }
     }

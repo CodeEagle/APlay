@@ -102,9 +102,10 @@ final class FakePlayer: PlayerCompatible {
     var volume: Float = 1
     private(set) var setupCount = 0
     private(set) var resumeCount = 0
+    private(set) var pauseCount = 0
 
     func destroy() {}
-    func pause() {}
+    func pause() { pauseCount += 1 }
     func resume() { resumeCount += 1 }
     func toggle() {}
     func setup(_: AudioStreamBasicDescription) { setupCount += 1 }

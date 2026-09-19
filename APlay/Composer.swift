@@ -16,6 +16,10 @@ final class Composer: @unchecked Sendable {
     /// True while the composer is buffering a prepared track without playing it
     /// (see `prepare`). `startPlayback` flips it back to false.
     private(set) var isPreloading = false
+    /// True while this composer buffers a track *ahead* of the current one (see
+    /// `preload(_:)`). `APlay` withholds its events and the output unit is left
+    /// alone until `activate()` installs this composer as the read source.
+    private(set) var isPreloadAhead = false
     private(set) var isRunning: Bool {
         get { return _queue.sync { _isRuning } }
         set { _queue.async(flags: .barrier) { self._isRuning = newValue } }
@@ -92,7 +96,15 @@ final class Composer: @unchecked Sendable {
             case .empty:
                 sself.eventPipeline.call(.decoderEmptyEncountered)
             case let .output(item):
+                // A track buffering ahead of the current one must not
+                // reconfigure the audio unit — that would stop the track
+                // that is actually playing. The decision is captured here rather
+                // than read inside the block: a block queued while preloading
+                // can run after `activate()`, and `activate()` configures the
+                // unit itself if the formats differ.
+                let configuringAllowed = sself.isPreloadAhead == false
                 DispatchQueue.main.async {
+                    guard configuringAllowed else { return }
                     if let player = sself._player {
                         let dstFormat = sself._decoder.info.dstFormat
                         let srcFormat = sself._decoder.info.srcFormat
@@ -202,6 +214,79 @@ extension Composer {
         _decoder.resume()
         _streamer.open(url: url, at: position)
         _player?.setup(Player.canonical)
+        installReadSource()
+        if autoplay, _streamer.info.isRemoteWave == false {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: { [weak self] in
+                self?._player?.resume()
+            })
+        }
+        isRunning = true
+        _config.startBackgroundTask(isToDownloadImage: false)
+    }
+
+    /// Opens a track without making it the current one: the streamer and decoder
+    /// run and fill the ring buffer while the output unit keeps reading the
+    /// track that is playing. No render source is installed and the audio unit
+    /// is not touched; `APlay` withholds the events until `activate()`.
+    ///
+    /// This is the `prepare(_:)` semantics turned into a background preload for
+    /// gapless playback.
+    func preload(_ url: URL) {
+        isPreloading = true
+        isPreloadAhead = true
+        eventPipeline.toggle(enable: true)
+        _decoder.resume()
+        _streamer.open(url: url, at: 0)
+        isRunning = true
+        _config.startBackgroundTask(isToDownloadImage: false)
+    }
+
+    /// Takes over as the current track: installs this composer's ring buffer as
+    /// the player's read source through the atomic render slot, so the audio
+    /// unit keeps running and reads the buffered data from the next render
+    /// slice on. Two tracks sharing a sample format hand over seamlessly; a
+    /// change of format re-initialises the unit first (see
+    /// `needsAudioUnitReconfiguration`).
+    func activate() {
+        guard isPreloadAhead else { return }
+        isPreloadAhead = false
+        isPreloading = false
+        if needsAudioUnitReconfiguration, let player = _player {
+            player.setup(outputFormat)
+        }
+        installReadSource()
+        // The unit is already rendering for an end-of-track handoff; only a
+        // handoff the user triggered while paused needs the output started. The
+        // guard keeps `resume()` — which touches main-actor APIs on iOS — off
+        // the realtime render thread.
+        if _player?.state != .running {
+            _player?.resume()
+        }
+    }
+
+    /// The format the audio unit must be configured with to render this track.
+    private var outputFormat: AudioStreamBasicDescription {
+        let info = _decoder.info
+        return info.srcFormat.isLinearPCM ? info.srcFormat : info.dstFormat
+    }
+
+    /// True once the track's sample format is known and differs from the audio
+    /// unit's current configuration, so `setup(_:)` has to run before this
+    /// composer can render. Cross-format handoffs are quick but not seamless —
+    /// the unit is re-initialised.
+    var needsAudioUnitReconfiguration: Bool {
+        guard _decoder.info.isUpdated, let player = _player else { return false }
+        return outputFormat != player.asbd
+    }
+
+    /// Whether the preloaded track has decoded audio waiting in the ring buffer.
+    var isBufferedAhead: Bool {
+        return _ringBuffer.availableData > 0
+    }
+
+    /// Installs the ring buffer (and the linear-PCM end-of-track detection) as
+    /// the player's active render source.
+    private func installReadSource() {
         _player?.readClosure = { [weak self] size, pointer in
             guard let sself = self else { return (0, false) }
             let (readSize, isFirstData) = sself._ringBuffer.read(amount: size, into: pointer)
@@ -210,13 +295,6 @@ extension Composer {
             }
             return (readSize, isFirstData)
         }
-        if autoplay, _streamer.info.isRemoteWave == false {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: { [weak self] in
-                self?._player?.resume()
-            })
-        }
-        isRunning = true
-        _config.startBackgroundTask(isToDownloadImage: false)
     }
 
     /// Starts the output unit for a track opened with `autoplay: false`.

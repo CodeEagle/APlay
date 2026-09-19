@@ -25,7 +25,18 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
     private(set) lazy var asbd = AudioStreamBasicDescription()
 
     private(set) var state: Player.State {
-        get { return _stateQueue.sync { _state } }
+        get {
+            // `APlay.deinit` can run on this queue: the last release of APlay
+            // may land inside a state callback's temporary target retain, and
+            // deinit tears the player down. A sync read from there would
+            // deadlock, so read directly when already serialized on the queue.
+            // That is race-free: `_state` is only mutated inside barrier blocks,
+            // which run exclusively on a concurrent queue.
+            if DispatchQueue.getSpecific(key: APlayer.stateQueueKey) != nil {
+                return _state
+            }
+            return _stateQueue.sync { _state }
+        }
         set {
             _stateQueue.async(flags: .barrier) {
                 self._state = newValue
@@ -35,7 +46,13 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
     }
 
     private lazy var _state: Player.State = .idle
-    private lazy var _stateQueue = DispatchQueue(concurrentName: "APlayer.state")
+    private lazy var _stateQueue: DispatchQueue = {
+        let queue = DispatchQueue(concurrentName: "APlayer.state")
+        queue.setSpecific(key: APlayer.stateQueueKey, value: ())
+        return queue
+    }()
+
+    private static let stateQueueKey = DispatchSpecificKey<Void>()
 
     private lazy var _playbackTimer: GCDTimer = {
         GCDTimer(interval: .seconds(1), callback: { [weak self] _ in

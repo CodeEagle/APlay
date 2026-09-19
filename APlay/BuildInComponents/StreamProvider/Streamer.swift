@@ -376,6 +376,18 @@ private extension Streamer {
 // MARK: - URLSession callbacks (run on _stateQueue)
 
 private extension Streamer {
+    /// Status codes that arm the reconnect watchdog rather than failing at
+    /// once: the server may recover (5xx) or the session delegate may answer
+    /// the authentication challenge (401/407).
+    static func isRetryableStatus(_ statusCode: Int) -> Bool {
+        return statusCode == 401 || statusCode == 407 || (500 ... 599).contains(statusCode)
+    }
+
+    /// Status code of the response the current task is handling, if any.
+    private var currentResponseStatus: Int {
+        return (_task?.response as? HTTPURLResponse)?.statusCode ?? 0
+    }
+
     func handle(response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         guard let http = response as? HTTPURLResponse else {
             // Not HTTP: nothing to parse, the caller may still stream bytes.
@@ -436,11 +448,11 @@ private extension Streamer {
             // The challenge is answered in the session delegate; if the server
             // still answers with 401/407 the reconnect watchdog takes over.
             _config.logger.log("Did receive authentication challenge (\(statusCode))", to: .streamProvider)
-            _watchDogInfo.reset()
+            _watchDogInfo.prepareForRetry()
             startReconnectWatchDog()
         case 500 ... 599:
             _config.logger.log("Server error:\(statusCode)", to: .streamProvider)
-            _watchDogInfo.reset()
+            _watchDogInfo.prepareForRetry()
             startReconnectWatchDog()
         default:
             outputPipeline.call(.errorOccurred(.networkStatusCode(statusCode)))
@@ -450,6 +462,12 @@ private extension Streamer {
 
     func handle(data: Data) {
         if info.isRemote {
+            if Self.isRetryableStatus(currentResponseStatus) {
+                // An error page is not audio: keep the watchdog armed (see
+                // `handleEndEncountered`) and keep the bytes out of the
+                // decoder and the cache.
+                return
+            }
             _watchDogInfo.reset()
             _watchDogInfo.isReadedData = true
         }
@@ -484,8 +502,8 @@ private extension Streamer {
 
     private func handleEndEncountered() {
         guard info.isRemote == true else { return }
-        let statusCode = (_task?.response as? HTTPURLResponse)?.statusCode ?? 0
-        if statusCode == 401 { return }
+        let statusCode = currentResponseStatus
+        if Self.isRetryableStatus(statusCode) { return }
         let read = _bytesRead + position
         if read < contentLength, contentLength > 0 {
             _config.logger.log("HTTP stream end encountered whithout streamimg all content[\(contentLength)] , restart at postion \(read)", to: .streamProvider)
@@ -580,6 +598,13 @@ private extension Streamer {
         func reset() {
             invalidateTimer()
             reopenTimes = 0
+            isReadedData = false
+        }
+
+        /// Stops the timer and clears the read flag without spending the retry
+        /// budget, so a persistent error still terminates at `reopenTimes`.
+        func prepareForRetry() {
+            invalidateTimer()
             isReadedData = false
         }
 

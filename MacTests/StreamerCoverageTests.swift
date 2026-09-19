@@ -244,23 +244,53 @@ final class StreamerCoverageTests: XCTestCase {
         XCTAssertTrue(gotError, "a 404 must surface as .networkStatusCode(404)")
     }
 
-    // A server error on the *first* request cannot reconnect today: the
-    // watchdog armed in `handle(response:)` is reset by the task-completion
-    // handler before it can fire, so the stream reports a normal end. This pins
-    // the current behaviour; the reconnect path itself is covered by
-    // `testTruncatedStreamReconnectsAndResumes`.
-    func testRemote500CurrentlyEndsTheStream() throws {
+    // A persistent server error must keep the reconnect watchdog armed — the
+    // task-completion handler no longer resets it — until the configured budget
+    // is spent, then report the failure instead of a normal end of stream.
+    func testRemote500RetriesUntilTheBudgetIsExhausted() throws {
         let streamer = try makeRemoteStreamer(responses: [
+            Response(statusCode: 500, headers: [:], body: Data()),
+            Response(statusCode: 500, headers: [:], body: Data()),
             Response(statusCode: 500, headers: [:], body: Data()),
         ])
 
         streamer.open(url: testURL, at: 0)
 
-        let ended = waitUntil(timeout: 3) {
-            self.collector.events.contains(where: { if case .endEncountered = $0 { return true }; return false })
+        let failed = waitUntil(timeout: 6) {
+            self.collector.events.contains(where: { event in
+                if case let .error(error) = event, case .reachMaxRetryTime = error { return true }
+                return false
+            })
         }
-        XCTAssertTrue(ended, "a bare 500 currently surfaces as end-of-stream")
-        XCTAssertEqual(FakeServerProtocol.streamRequestCount, 1, "no reconnect is attempted")
+        XCTAssertTrue(failed, "an unrecoverable 500 must exhaust the retries and report it")
+
+        // maxRemoteStreamOpenRetry = 2 allows the initial open plus two retries.
+        XCTAssertEqual(FakeServerProtocol.streamRequestCount, 3)
+        XCTAssertFalse(self.collector.events.contains(where: { if case .endEncountered = $0 { return true }; return false }),
+                       "a server error must not be reported as a normal end of stream")
+    }
+
+    // The watchdog is the whole point of the 5xx branch: once the server
+    // recovers, the retry lands on a good response and the stream continues.
+    func testRemote500RecoversOnTheRetry() throws {
+        let body = Data(repeating: 0x5C, count: 2048)
+        let streamer = try makeRemoteStreamer(responses: [
+            Response(statusCode: 500, headers: [:], body: Data()),
+            Response(statusCode: 200, headers: ["Content-Length": "\(body.count)"], body: body),
+        ])
+
+        streamer.open(url: testURL, at: 0)
+
+        let delivered = waitUntil(timeout: 6) {
+            let chunks = self.collector.events.compactMap { event -> [UInt8]? in
+                if case let .bytes(bytes, _) = event { return bytes }
+                return nil
+            }
+            return chunks.flatMap { $0 } == Array(body)
+        }
+        XCTAssertTrue(delivered, "the retried request must stream its body")
+        XCTAssertEqual(FakeServerProtocol.streamRequestCount, 2)
+        XCTAssertEqual(streamer.contentLength, UInt(body.count))
     }
 
     // The reachable reconnect path: the server announces more content than it

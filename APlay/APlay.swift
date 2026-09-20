@@ -308,12 +308,45 @@ public extension APlay {
     /// Set the gain of an equalizer band at runtime.
     ///
     /// - Parameters:
-    ///   - gain: Band gain in dB.
+    ///   - gain: Band gain in dB (clamped to `-96 ... 24`).
     ///   - index: Band index, in the same order as `Configuration.equalizerBandFrequencies`.
     /// - Note: Has no effect when the built-in equalizer is unavailable (e.g. players that
     ///   don't build an audio graph) or when `index` is out of range.
     func setEqualizerBandGain(_ gain: Float, at index: Int) {
+        guard config.equalizerBandFrequencies.indices.contains(index) else {
+            config.logger.log("Equalizer band index \(index) is out of range (\(config.equalizerBandFrequencies.count) bands)", to: .player)
+            return
+        }
         _player.setEqualizerBandGain(index: index, gain: gain)
+    }
+
+    /// The current gain of every equalizer band, in dB, ordered like
+    /// `Configuration.equalizerBandFrequencies`.
+    var equalizerGains: [Float] {
+        return _player.equalizerBandGains
+    }
+
+    /// Applies an equalizer preset to the running player. Band gains change
+    /// immediately — playback is not paused or restarted.
+    ///
+    /// A preset whose band count differs from `Configuration
+    /// .equalizerBandFrequencies` is ignored (and logged), so a preset saved
+    /// against one band layout never silently shifts the wrong frequencies when
+    /// the configuration changes.
+    /// - Parameter preset: The preset to apply.
+    /// - Returns: `true` if the preset was applied; `false` if its band count
+    ///   did not match the configuration.
+    @discardableResult
+    func applyEqualizerPreset(_ preset: EqualizerPreset) -> Bool {
+        let bandCount = config.equalizerBandFrequencies.count
+        guard preset.gains.count == bandCount else {
+            config.logger.log("Equalizer preset \"\(preset.name)\" has \(preset.gains.count) bands but the configuration has \(bandCount); ignored", to: .player)
+            return false
+        }
+        for (index, gain) in preset.gains.enumerated() {
+            _player.setEqualizerBandGain(index: index, gain: gain)
+        }
+        return true
     }
 }
 

@@ -76,6 +76,17 @@ v2.1.0
    length field fails closed instead of reading out of bounds. Four byte-level
    robustness tests pin the clamps; FlacParser line coverage rose from 55% to 83%
    and the package total to 82.5%
+17. The built-in equalizer actually works now, and presets manage it: the
+   `AVAudioUnitEQ` node was created with 16 bypassed bands on a generic log scale
+   and never wired up, so `setEqualizerBandGain` was a no-op. It is now built from
+   `Configuration.equalizerBandFrequencies` with every band unbypassed — low shelf,
+   high shelf, parametric in between — and the gains reach the audio unit at
+   runtime. `EqualizerPreset` carries a named curve as plain data (ten bundled:
+   flat / rock / pop / jazz / classical / bass / treble / vocal / electronic /
+   acoustic); `applyEqualizerPreset(_:)` sets every band without restarting
+   playback, `equalizerGains` reads the live curve back, and a preset whose band
+   count does not match the configuration is ignored and logged rather than
+   shifting the wrong frequencies
 
 v2.0.0
 ---

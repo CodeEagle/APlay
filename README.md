@@ -203,14 +203,47 @@ with its route button) to your UI — that is app-level UI the framework deliber
 not ship. Now-playing metadata (title / artist / album / artwork / elapsed time) is
 already published to `MPNowPlayingInfoCenter` via `metadataUpdate`.
 
+Equalizer
+---
+The player runs an `AVAudioUnitEQ` in its render chain, one band per entry of
+`Configuration.equalizerBandFrequencies` (8 by default: 50 / 100 / 200 / 400 / 800 /
+1600 / 2600 / 16000 Hz). The first band is a low shelf, the last a high shelf and the
+rest parametric, so a single curve shapes the whole spectrum.
+
+```Swift
+let player = APlay()
+
+// A preset is plain data — one gain in dB per band, in the same order as the
+// configured frequencies. It takes effect immediately; playback is not restarted.
+player.applyEqualizerPreset(.rock)
+
+// Or a single band, clamped to the audio unit's -96...24 dB range.
+player.setEqualizerBandGain(3.5, at: 2)
+
+// Read the current curve back.
+let gains: [Float] = player.equalizerGains
+```
+
+Ten curves are bundled — `flat`, `rock`, `pop`, `jazz`, `classical`, `bassBoost`,
+`trebleBoost`, `vocal`, `electronic`, `acoustic` — or build your own:
+
+```Swift
+let curve = EqualizerPreset(name: "My Curve", gains: [4, 3, 2, 1, 0, 1, 2, 3])
+player.applyEqualizerPreset(curve)
+```
+
+A preset whose band count differs from the configuration's frequencies is ignored
+(and logged), so a saved curve never silently shifts the wrong frequencies after a
+configuration change.
+
 Todo
 ---
 - [x] AirPlay 2 support: the session runs the `longFormAudio` route sharing policy and
       the lock screen / Control Center / AirPlay 2 remote commands
       (play / pause / next / previous / seek / ±15 s skip) are wired in by default via
       `MPRemoteCommandCenter`; route picking stays app-level UI (`AVRoutePickerView`)
-- [ ] AudioEffectUnit support: band **frequencies** and **gains** are now configurable, but gains
-      can only be set per-band — preset management (save/apply an EQ curve) is the remaining gap.
+- [x] AudioEffectUnit support: band **frequencies** and **gains** are configurable, and
+      gains apply at runtime either per band or as a whole preset — see "Equalizer" above.
 - [ ] Custom decoder formats (see issue #17): the `audioDecoderBuilder` seam already hands an
       injected decoder the stream's file hint (verified for `.opus`), so an app can decode a
       format Core Audio does not ship — the remaining gap is bundling a reference implementation.

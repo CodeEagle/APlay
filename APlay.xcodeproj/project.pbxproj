@@ -32,6 +32,7 @@
 		10F83AB620F342C400AF8222 /* APlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9220F342C400AF8222 /* APlayer.swift */; };
 		10F83AB820F342C400AF8222 /* NowPlayingInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9520F342C400AF8222 /* NowPlayingInfo.swift */; };
 		10F83B0B20F342C400AF8222 /* RemoteCommandController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83B0A20F342C400AF8222 /* RemoteCommandController.swift */; };
+		10F83B0E20F342C400AF8222 /* EqualizerPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83B0D20F342C400AF8222 /* EqualizerPreset.swift */; };
 		10F83AB920F342C400AF8222 /* Streamer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9720F342C400AF8222 /* Streamer.swift */; };
 		10F83ABA20F342C400AF8222 /* ID3Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9920F342C400AF8222 /* ID3Parser.swift */; };
 		10F83ABB20F342C400AF8222 /* TagParser+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F83A9A20F342C400AF8222 /* TagParser+Extension.swift */; };
@@ -106,6 +107,7 @@
 		10F83A9220F342C400AF8222 /* APlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = APlayer.swift; sourceTree = "<group>"; };
 		10F83A9520F342C400AF8222 /* NowPlayingInfo.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NowPlayingInfo.swift; sourceTree = "<group>"; };
 		10F83B0A20F342C400AF8222 /* RemoteCommandController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteCommandController.swift; sourceTree = "<group>"; };
+		10F83B0D20F342C400AF8222 /* EqualizerPreset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EqualizerPreset.swift; sourceTree = "<group>"; };
 		10F83A9720F342C400AF8222 /* Streamer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Streamer.swift; sourceTree = "<group>"; };
 		10F83A9920F342C400AF8222 /* ID3Parser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ID3Parser.swift; sourceTree = "<group>"; };
 		10F83A9A20F342C400AF8222 /* TagParser+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "TagParser+Extension.swift"; sourceTree = "<group>"; };
@@ -221,6 +223,7 @@
 				10F83A9120F342C400AF8222 /* Players */,
 				10F83A9420F342C400AF8222 /* NowPlaying */,
 				10F83B0C20F342C400AF8222 /* RemoteCommand */,
+				10F83B0F20F342C400AF8222 /* Equalizer */,
 				10F83A9620F342C400AF8222 /* StreamProvider */,
 				10F83A9820F342C400AF8222 /* TagParser */,
 				10F83A9C20F342C400AF8222 /* AudioDecoder */,
@@ -266,6 +269,14 @@
 				10F83B0A20F342C400AF8222 /* RemoteCommandController.swift */,
 			);
 			path = RemoteCommand;
+			sourceTree = "<group>";
+		};
+		10F83B0F20F342C400AF8222 /* Equalizer */ = {
+			isa = PBXGroup;
+			children = (
+				10F83B0D20F342C400AF8222 /* EqualizerPreset.swift */,
+			);
+			path = Equalizer;
 			sourceTree = "<group>";
 		};
 		10F83A9620F342C400AF8222 /* StreamProvider */ = {
@@ -472,6 +483,7 @@
 				10F83AC020F342C400AF8222 /* APlay+Typealias.swift in Sources */,
 				10F83AB820F342C400AF8222 /* NowPlayingInfo.swift in Sources */,
 				10F83B0B20F342C400AF8222 /* RemoteCommandController.swift in Sources */,
+				10F83B0E20F342C400AF8222 /* EqualizerPreset.swift in Sources */,
 				10F83AB920F342C400AF8222 /* Streamer.swift in Sources */,
 				10F83AB620F342C400AF8222 /* APlayer.swift in Sources */,
 				10F83ABC20F342C400AF8222 /* FlacParser.swift in Sources */,

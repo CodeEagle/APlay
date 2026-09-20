@@ -22,13 +22,18 @@ protocol PlayerCompatible: AnyObject {
 
     func setup(_: AudioStreamBasicDescription)
 
-    /// Set the gain (in dB) of an equalizer band at runtime.
+    /// The current gain (in dB) of an equalizer band at runtime.
     ///
     /// Players without a built-in equalizer implement this as a no-op.
     /// - Parameters:
     ///   - index: Band index, matching the order of `Configuration.equalizerBandFrequencies`.
     ///   - gain: Band gain in dB.
     func setEqualizerBandGain(index: Int, gain: Float)
+
+    /// The current gain of every equalizer band, in dB, ordered like
+    /// `Configuration.equalizerBandFrequencies`. Players without a built-in
+    /// equalizer return an empty array.
+    var equalizerBandGains: [Float] { get }
 
     func currentTime() -> Float
 
@@ -38,6 +43,9 @@ protocol PlayerCompatible: AnyObject {
 extension PlayerCompatible {
     /// Default no-op for players without a built-in equalizer.
     func setEqualizerBandGain(index: Int, gain: Float) {}
+
+    /// Default empty read-back for players without a built-in equalizer.
+    var equalizerBandGains: [Float] { [] }
 }
 
 struct Player {

@@ -133,7 +133,10 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
 
     private let _engine = AVAudioEngine()
     /// <https://baike.baidu.com/item/EQ均衡器>
-    private let _eq = AVAudioUnitEQ()
+    /// Built from `Configuration.equalizerBandFrequencies`; every band is
+    /// unbypassed and given its centre frequency on init, since `AVAudioUnitEQ`
+    /// ships every band bypassed (a no-op) and laid out on a generic log scale.
+    private let _eq: AVAudioUnitEQ
     fileprivate var _renderBlock: AVAudioEngineManualRenderingBlock?
 
     private unowned let _config: ConfigurationCompatible
@@ -144,6 +147,9 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
 
     init(config: ConfigurationCompatible) {
         _config = config
+        let frequencies = config.equalizerBandFrequencies
+        _eq = AVAudioUnitEQ(numberOfBands: frequencies.count)
+        configureEqualizerBands(frequencies)
         _engine.attach(_eq)
         // Avoid requesting microphone permission, set rendering mode first before connect
         let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
@@ -157,6 +163,35 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
 // MARK: - Create Player
 
 private extension APlayer {
+
+    /// Lays the equalizer bands over the configured centre frequencies and
+    /// unbypasses them. Shelf filters bookend the band: the first band shapes
+    /// the low end, the last the top, and the bands between are parametric.
+    func configureEqualizerBands(_ frequencies: [Float]) {
+        let bands = _eq.bands
+        guard bands.count == frequencies.count, bands.count > 0 else { return }
+        for (index, band) in bands.enumerated() {
+            band.bypass = false
+            band.frequency = frequencies[index]
+            band.filterType = APlayer.filterType(forBandAt: index, total: bands.count)
+            // One octave is the natural width for a graphic-style EQ spanned
+            // logarithmically over the audible range.
+            band.bandwidth = 1.0
+            band.gain = 0
+        }
+    }
+
+    private static func filterType(forBandAt index: Int, total: Int) -> AVAudioUnitEQFilterType {
+        switch index {
+        case 0 where total > 1:
+            return .lowShelf
+        case total - 1 where total > 1:
+            return .highShelf
+        default:
+            return .parametric
+        }
+    }
+
     private func updatePlayerConfig() throws {
         guard let unit = _player else { return }
         let s = MemoryLayout.size(ofValue: asbd)
@@ -234,6 +269,24 @@ extension APlayer {
                 }
             #endif
         }
+    }
+
+    func setEqualizerBandGain(index: Int, gain: Float) {
+        guard _eq.bands.indices.contains(index) else { return }
+        // The audio unit clamps to -96...24 dB; clamp here too so the value
+        // read back through `equalizerBandGains` matches what was requested.
+        _eq.bands[index].gain = min(max(gain, -96), 24)
+    }
+
+    var equalizerBandGains: [Float] {
+        return _eq.bands.map { $0.gain }
+    }
+
+    /// The equalizer bands as configured from `Configuration.equalizerBandFrequencies`.
+    /// Internal because the public API exposes them through `APlay.equalizerGains`;
+    /// tests read this to assert frequency, filter type and bypass state.
+    var equalizerBands: [AVAudioUnitEQFilterParameters] {
+        return Array(_eq.bands)
     }
 
     func setup(_ value: AudioStreamBasicDescription) {

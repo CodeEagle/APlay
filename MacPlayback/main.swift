@@ -75,10 +75,15 @@ final class Recorder {
             if case .playing = state {
                 _playing = true
                 print("[phase] reached .playing")
-                // The built-in EQ must accept gains at runtime without disturbing
-                // playback (out-of-range index and live gain must both be safe).
-                player.setEqualizerBandGain(6, at: 0)
-                player.setEqualizerBandGain(-3, at: 3)
+                // The built-in EQ must accept a preset at runtime, on a live
+                // render loop, without disturbing playback — and the gains must
+                // read back exactly what was applied.
+                player.applyEqualizerPreset(.rock)
+                let readBack = player.equalizerGains
+                if readBack != EqualizerPreset.rock.gains {
+                    _failure = "equalizer preset did not reach the audio unit (read back \(readBack))"
+                }
+                // An out-of-range band must stay safe mid-playback.
                 player.setEqualizerBandGain(0, at: Int.max)
             }
         case let .duration(seconds):

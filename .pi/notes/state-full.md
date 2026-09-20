@@ -933,3 +933,22 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   （注：裸 `swift test` 跑 0 tests——测试目录是 MacTests/ 非 Tests/，
    需 --enable-code-coverage 才进入完整套件；非本次回归问题。）
 - 提交 4f3e1d6 并已 push：f3969fe..4f3e1d6 master -> master（fast-forward）。
+
+## SF-0060
+- Revision: 60
+- 取代 SF-0059 的「无待办」。
+
+### 发布收尾：tag + 关 issue
+- `git tag -a v2.1.0 -m "v2.1.0 — gapless playback, ALAC/WAVE fixes, AirPlay 2
+  remote control"`，指向 HEAD 24ca563；已 push（new tag），远端
+  refs/tags/v2.1.0 = 3b4b2d7（tag 对象）。
+- 关闭 4 个旧 issue（均附英文说明，依据指向 v2.1.0/公开 API）：
+  - #19 iOS14 高 CPU：版本太老，当前基线 iOS17+ 真机验证正常。
+  - #10 m4a 无法播放：v2.1.0 修 ALAC magic cookie + .m4a/.m4b 格式提示映射。
+  - #14 预加载请求：已提供 `APlay.prepare(_:)`（APlay.swift:184）
+    + gapless 下一曲预加载（preloadNextTrack，APlay.swift:521）。
+  - #3 HTTP 流：streaming decoder 边下边播 + HTTP 5xx 重连重试。
+- **保留 #17**（opus 无法播放）：iOS 原生 ExtAudioFile 不支持 opus 解码，
+  需自研解码器，未解决，不关闭。
+- GitHub Release 尚未创建（gh 已认证 CodeEagle，keyring ssh）；用户此前
+  问「要不要发 Release」后改令「关闭issue」，Release 待定。

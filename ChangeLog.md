@@ -1,7 +1,17 @@
 unreleased
 ---
 
-1. The format matrix is now backed by fixtures for the formats that were previously
+1. New: optional WavPack (`.wv`) playback. WavPack has no Core Audio decoder, so it
+   ships as a separate `APlayWavPack` product that wraps the reference C library
+   (vendored as `CAPlayWavPack`) behind the same `audioDecoderBuilder` seam as
+   `APlayExtras`. A local file is buffered whole and is seekable, and any channel
+   count is down/up-mixed to the pipeline's canonical 16-bit stereo PCM; live streams
+   are not supported — the framing is not a streaming format. The format matrix
+   gains a fourth bucket for codec libraries the built-in decoder does not own, and
+   WavPack moves from "not supported" into it. Pinned by
+   `MacTests/WavPackDecoderTests.swift`
+
+2. The format matrix is now backed by fixtures for the formats that were previously
    only routed: MP2, AAC in a plain MP4 container, audiobook MP4, IMA ADPCM in WAVE,
    AC-3 and E-AC-3 all decode through the built-in streaming decoder and are pinned
    by `FormatCompatibilityTests`. Dolby Digital Plus (`.eac3`) was claimed in 2.1.0

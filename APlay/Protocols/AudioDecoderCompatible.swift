@@ -185,6 +185,9 @@ public struct AudioDecoder {
         public static let k3gp = AudioFileType("3gpp")
         public static let k3gp2 = AudioFileType("3gp2")
         public static let w64 = AudioFileType("W64 ")
+        /// WavPack — not a Core Audio type at all; owned by the optional
+        /// `APlayWavPack` product.
+        public static let wavpack = AudioFileType("wvpk")
         public static let amr = AudioFileType("amrf")
         public static let flac = AudioFileType("flac")
         public static let opus = AudioFileType("opus")

@@ -12,6 +12,7 @@ let package = Package(
     products: [
         .library(name: "APlay", targets: ["APlay"]),
         .library(name: "APlayExtras", targets: ["APlayExtras"]),
+        .library(name: "APlayWavPack", targets: ["APlayWavPack"]),
     ],
     targets: [
         .target(
@@ -24,6 +25,26 @@ let package = Package(
             dependencies: ["APlay"],
             path: "APlayExtras"
         ),
+        // WavPack decoder, vendored. The C library is pure ANSI C with no
+        // config header; the wrapper implements `AudioDecoderCompatible` and
+        // is wired through the same `audioDecoderBuilder` seam as APlayExtras.
+        .target(
+            name: "CAPlayWavPack",
+            path: "Sources/CAPlayWavPack",
+            publicHeadersPath: "include",
+            cSettings: [
+                // The local headers sit next to the sources; the public one is
+                // reached as <wavpack/wavpack.h>.
+                .headerSearchPath("."),
+                .headerSearchPath("include"),
+                .headerSearchPath("include/wavpack"),
+            ]
+        ),
+        .target(
+            name: "APlayWavPack",
+            dependencies: ["APlay", "CAPlayWavPack"],
+            path: "Sources/APlayWavPack"
+        ),
         .executableTarget(
             name: "APlayMacPlayback",
             dependencies: ["APlay"],
@@ -31,7 +52,7 @@ let package = Package(
         ),
         .testTarget(
             name: "APlayTests",
-            dependencies: ["APlay", "APlayExtras"],
+            dependencies: ["APlay", "APlayExtras", "APlayWavPack"],
             path: "MacTests",
             resources: [.copy("Fixtures")]
         ),

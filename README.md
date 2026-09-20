@@ -94,6 +94,26 @@ row is pinned by `MacTests/SeekableFileDecoderTests.swift`.
 | RF64 (Broadcast WAVE) | `.rf64` | file-only container | no fixture ships — no RF64 muxer was available to build one |
 | Sound Designer II | `.sd2` | file-only container | no fixture ships — no SD2 encoder was available to build one |
 
+### Lossless codecs (via the optional `APlayWavPack` library)
+
+WavPack has no Core Audio decoder, so `.wv` ships as a separate vendored product:
+`APlayWavPack` wraps the reference C library and implements the same
+`audioDecoderBuilder` seam. A local file is buffered whole and is seekable; live
+streams are not (the framing is not a streaming format). Add the product only
+when you need it; plain `APlay` is unchanged. Pinned by
+`MacTests/WavPackDecoderTests.swift`.
+
+```swift
+let config = APlay.Configuration(
+    audioDecoderBuilder: APlayWavPack.decoder(fallback: APlay.Configuration().audioDecoderBuilder))
+```
+
+| Format | Common extensions | Note |
+| --- | --- | --- |
+| WavPack | `.wv` | decodes to canonical 16-bit stereo PCM; any channel count is down/up-mixed |
+
+The vendored C library is BSD-3 licensed (`Sources/CAPlayWavPack/LICENSE.txt`).
+
 ### Not supported
 
 Core Audio ships no decoder for these, or the container cannot be parsed. Any of them can
@@ -107,7 +127,6 @@ be added by implementing `AudioDecoderCompatible` and supplying it through
 | Vorbis in Ogg | `.ogg` | no Core Audio decoder |
 | Opus outside an OGG container | (raw) | containerless Opus is not parsed |
 | Windows Media Audio | `.wma` `.asf` | no Core Audio decoder |
-| WavPack | `.wv` | no Core Audio decoder |
 | Monkey's Audio | `.ape` | no Core Audio decoder |
 | True Audio | `.tta` | no Core Audio decoder |
 | Dolby TrueHD / MLP | `.thd` `.mlp` | no Core Audio decoder |

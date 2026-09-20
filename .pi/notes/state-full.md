@@ -952,3 +952,27 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   需自研解码器，未解决，不关闭。
 - GitHub Release 尚未创建（gh 已认证 CodeEagle，keyring ssh）；用户此前
   问「要不要发 Release」后改令「关闭issue」，Release 待定。
+
+## SF-0061
+- Revision: 61
+- 取代 SF-0060 的「#17 保留 / Release 待定」。
+
+### 更正：opus 实际已支持，#17 已关
+- 之前判断「iOS 原生不支持 opus 解码，需自研」有误：APlay 不经 ExtAudioFile
+  处理 ogg/opus，走自家 streaming decoder。标准 `.opus`（OGG 封装）
+  parses+decodes 全绿。
+- 证据：README.md:65 format matrix「Opus | in OGG (.opus) | ✅」；
+  MacTests/FormatCompatibilityTests.swift:46 `tone.opus` parses:true decodes:true，
+  formatID=kAudioFormatOpus；APlayDemo/Samples/tone.opus 真机可直接播；
+  ChangeLog v2.1.0 第 7/10 条亦列 Opus-in-OGG 为已解码格式。
+- 唯不支持：**裸 Opus（非 OGG 容器）与 Vorbis**——需经 audioDecoderBuilder
+  注入自定义解码器（README.md:74）。
+- #17（2019 年报「can't play opus file」）已附更正说明关闭。Open issues = 0。
+
+### GitHub Release 已发布
+- `gh release create v2.1.0`：非 draft 非 prerelease，已发布。
+  https://github.com/CodeEagle/APlay/releases/tag/v2.1.0
+- 正文由 ChangeLog v2.1.0 全 27 条整理为分组摘要（What's new / Stability /
+  Platforms & demo / Quality），草稿存 /tmp/aplay_v210_notes.md。
+- 发布收尾全部完成：master 已推、tag v2.1.0 已推、5 个 open issue 全关、
+  Release 已发。

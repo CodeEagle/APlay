@@ -910,3 +910,26 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
    喇叭且不卡死（音频会话中断/路由变化自动处理，isAutoHandlingInterruptEvent）。
 5. 回归：AirPlay 路由无法单测，靠真机手测；`swift test` 226/226 保证引擎不退化
    （Tests 目录目前无 NowPlaying/RemoteCommand 专用单测，可后续补）。
+
+## SF-0059
+- Revision: 59
+- 取代 SF-0058 的「无待办」。
+
+### APlayDemo 加 AirPlay 路由选择按钮（用户同意后实现）
+- 新文件 APlayDemo/AirPlayRoutePicker.swift：
+  - `AirPlayRoutePicker: UIViewRepresentable` 包装 AVRoutePickerView
+    （prioritizesVideoDevices=false，tint/activeTintColor 跟随 demo 白色）。
+  - `AirPlayRouteLabel`：读 AVAudioSession.currentRoute.outputs.first，
+    AirPlay 端口显示 "AirPlay · <portName>"；监听
+    AVAudioSession.routeChangeNotification 实时刷新。
+- NowPlayingView：transport 与 loopChips 之间插入 airPlay 行（按钮+路由名）。
+- pbxproj 注册新文件：手动 4 处插入，ID 沿用现有规律
+  fileRef=A5E0A500000000000000110C、buildFile=A5E0A500000000000000120C；
+  plutil -lint OK。教训：传统 xcodeproj 目标，新建 swift 文件必须登记进
+  pbxproj（PBXBuildFile/PBXFileReference/Group/Sources 四处），否则
+  xcodebuild 报 "cannot find ... in scope"。
+- 回归：iOS 模拟器 + 真机(00008130-000E7959262B803A) APlayDemo 均
+  BUILD SUCCEEDED；swift test --enable-code-coverage 226/226。
+  （注：裸 `swift test` 跑 0 tests——测试目录是 MacTests/ 非 Tests/，
+   需 --enable-code-coverage 才进入完整套件；非本次回归问题。）
+- 提交 4f3e1d6 并已 push：f3969fe..4f3e1d6 master -> master（fast-forward）。

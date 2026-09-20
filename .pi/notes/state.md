@@ -1,36 +1,38 @@
 State format: capsule-v2
-State revision: 58
+State revision: 59
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
 - Baseline: 2026-09-20；Xcode 27.0 / Swift 6.4。真机 iPhone 15 Pro Max
   （iOS 27.0，UDID 00008130-000E7959262B803A，Team L5W9FHSX92）。
-  **历史已被 filter-repo 重写，旧哈希 cbae808/73d2d02/e37afb6 均已失效。**
-  HEAD f3969fe；远端 origin/master == f3969fe（已一致）。
+  HEAD 4f3e1d6 == origin/master（已推送）。
 
 ## Task
-- Goal: 推送任务收尾——已完成；并已答「AirPlay 怎么测试」。
-- Unit: 仓库推送 + APlayDemo（AirPlay 演示）。
-- Done when: push origin master 成功并验证远端 == 本地 HEAD（已达成）。
+- Goal: 推送收尾 + AirPlay 测试答复 + demo 内 AirPlay 路由按钮（均已完成）。
+- Unit: APlayDemo（AirPlay 演示）。
+- Done when: 新按钮已构建通过并推送到远端（已达成）。
 
 ## Progress
-- Done: `git push --force origin master` 成功（e37afb6...f3969fe forced update）；
-  origin/master == 本地 HEAD f3969fe。filter-repo 重写历史后强推一次，
-  本地 75 提交全部到远端，瘦身（无 build/、6.6MB）生效。
-- Done: 批 D 提交 28180ce；真机 matrix 验收通过（12 行全亮）。
-- Done: .gitignore 已含 build/（017f651），历史清理 ls-files 无 build/。
-- Done: 已答 AirPlay 测试方法（真机+接收端，控制中心路由切换、锁屏/远端
-  远程控制、路由中断回退、swift test 回归）。
-- Open: 无（Tests 目录缺 NowPlaying/RemoteCommand 专用单测，属可选改进）。
-- Checks: git log origin/master -1 == f3969fe == git rev-parse HEAD。
+- Done: 推送批 D（f3969fe，强推一次）。
+- Done: 答复 AirPlay 测试方法（真机+接收端、控制中心路由、锁屏/远端远程控制、
+  路由中断回退、swift test 回归）。
+- Done: APlayDemo 加 AirPlay 路由按钮——新文件 AirPlayRoutePicker.swift
+  （AVRoutePickerView 的 UIViewRepresentable 包装 + 路由名实时标签），
+  插入 NowPlayingView 的 transport/loopChips 之间；pbxproj 四处登记
+  （fileRef ...110C / buildFile ...120C）。
+- Done: 提交 4f3e1d6 并 push（fast-forward），远端已更新。
+- Open: 无。
+- Checks: iOS 模拟器+真机 APlayDemo BUILD SUCCEEDED；
+  swift test --enable-code-coverage 226/226；plutil -lint OK。
 - Pending: none。
 
 ## Rules
-- Constraints: 历史已重写，旧哈希失效，引用时以现 HEAD 为准。
-- 事实: AirPlay 路由只能真机手测（需外部接收端），模拟器/单测不可覆盖；
-  APlayDemo 未自带 AVRoutePickerView，路由走系统控制中心/锁屏。
+- Constraints: 历史已重写，旧哈希失效；推送需以现 HEAD 为准。
+- 事实: 传统 xcodeproj 目标新建 swift 文件须登记 pbxproj 四处；
+  测试在 MacTests/（非 Tests/），裸 swift test 跑 0 套件，
+  需 --enable-code-coverage 才跑全 226。
 
 ## Next
-- Action: 无待办；等用户下一步指令。
+- Action: 无待办；等用户下一步指令（真机可按 SF-0058 步骤验 AirPlay）。
 - Verify: —
-- Refs: SF-0058（推送完成+AirPlay 测试答复），SF-0057（批D+清理+推送未竟）。
+- Refs: SF-0059（AirPlay 路由按钮），SF-0058（推送+AirPlay 测试答复）。

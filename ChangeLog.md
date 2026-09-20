@@ -87,6 +87,13 @@ v2.1.0
    playback, `equalizerGains` reads the live curve back, and a preset whose band
    count does not match the configuration is ignored and logged rather than
    shifting the wrong frequencies
+18. Test coverage: the logic layers that were only exercised through the playback
+   stack now have direct tests — the utility extensions and `AudioFileType`
+   wrapper, `Configuration` defaults/policies/builder injection, `PlayList`'s loop
+   patterns and event publishing, `Uroboros`' semaphore handshake and defensive
+   clamps, `APlay`'s player-facing API, the `InternalLogger`, and the
+   `APlayExtras` container router's rebuild/pause/destroy bookkeeping. Package
+   line coverage rose from 74.8% to 81% (226 tests, was 94)
 
 v2.0.0
 ---

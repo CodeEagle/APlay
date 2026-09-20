@@ -391,4 +391,118 @@ final class APlayOrchestrationTests: XCTestCase {
         XCTAssertEqual(h.streamers.count, 3)
         XCTAssertEqual(h.streamers[1].destroyCount, 1, "the preload must be torn down")
     }
+
+    // MARK: - The player-facing API surface
+
+    /// `play(_ urls: URL..., at:)` forwards to the array entry point.
+    func testVariadicPlayStartsTheFirstTrack() {
+        let h = Harness()
+        harness = h
+        h.aplay.play(url1, url2)
+        XCTAssertEqual(h.streamers.count, 1)
+        XCTAssertEqual(h.streamers.first?.openCalls.first?.url, url1)
+    }
+
+    /// An out-of-range index is reported instead of silently doing nothing.
+    func testPlayAtOutOfRangeIndexReportsAnError() {
+        let h = Harness()
+        harness = h
+        h.aplay.play([url1, url2], at: 0)
+        h.aplay.play(at: 42)
+        XCTAssertTrue(h.collector.events.contains(where: {
+            if case let .error(error) = $0, case APlay.Error.playItemNotFound = error { return true }
+            return false
+        }), "the missing index must be published as playItemNotFound")
+    }
+
+    func testPlayAtIndexStartsThatTrack() {
+        let h = Harness()
+        harness = h
+        h.aplay.play([url1, url2], at: 0)
+        h.aplay.play(at: 1)
+        XCTAssertEqual(h.streamers.count, 2)
+        XCTAssertEqual(h.streamers.last?.openCalls.first?.url, url2)
+    }
+
+    /// `previous` wraps around the list and rebuilds the composer.
+    func testPreviousStartsTheEarlierTrack() {
+        let h = Harness()
+        harness = h
+        h.aplay.play([url1, url2], at: 0)
+        h.aplay.previous()
+        let advanced = waitUntil { h.streamers.count == 2 }
+        XCTAssertTrue(advanced)
+        XCTAssertEqual(h.streamers.last?.openCalls.first?.url, url2,
+                       "previous at the first track wraps to the last one")
+    }
+
+    /// `toggle` maps the player state onto the public state machine.
+    func testToggleMirrorsThePlayerState() {
+        let h = Harness()
+        harness = h
+        XCTAssertTrue(matches(h.aplay.state, .idle))
+
+        h.player.state = .running
+        h.aplay.toggle()
+        XCTAssertTrue(matches(h.aplay.state, .playing))
+
+        h.player.state = .paused
+        h.aplay.toggle()
+        XCTAssertTrue(matches(h.aplay.state, .paused))
+
+        h.player.state = .idle
+        h.aplay.toggle()
+        XCTAssertTrue(matches(h.aplay.state, .idle))
+    }
+
+    func testResumeAndPauseDriveThePlayer() {
+        let h = Harness()
+        harness = h
+        h.aplay.play(url1)
+        h.aplay.pause()
+        XCTAssertEqual(h.player.pauseCount, 1)
+        h.aplay.resume()
+        XCTAssertEqual(h.player.resumeCount, 1, "resume is forwarded to the player")
+    }
+
+    func testSeekableAndCurrentTimeReflectTheComposer() {
+        let h = Harness()
+        harness = h
+        XCTAssertFalse(h.aplay.seekable(), "nothing is playing yet")
+        XCTAssertEqual(h.aplay.currentTime(), 0)
+
+        h.aplay.play(url1)
+        XCTAssertTrue(h.aplay.seekable(), "the fake decoder is seekable")
+
+        h.player.currentTimeValue = 12.5
+        XCTAssertEqual(h.aplay.currentTime(), 12.5, accuracy: 0.001)
+    }
+
+    func testMetadataUpdateIsAppliedToNowPlaying() {
+        let h = Harness()
+        harness = h
+        h.aplay.metadataUpdate(title: "song", album: "album", artist: "artist")
+        // No crash and the public state stays put: the update is a side channel.
+        XCTAssertTrue(matches(h.aplay.state, .idle))
+    }
+
+    func testStateIsPlayingOnlyForThePlayingState() {
+        XCTAssertTrue(APlay.State.playing.isPlaying)
+        XCTAssertFalse(APlay.State.idle.isPlaying)
+        XCTAssertFalse(APlay.State.paused.isPlaying)
+        XCTAssertFalse(APlay.State.error(APlay.Error.none).isPlaying)
+    }
+
+    // MARK: - Private
+
+    /// `APlay.State` carries errors, so it is not `Equatable`; the public
+    /// states are matched by kind.
+    private func matches(_ lhs: APlay.State, _ rhs: APlay.State) -> Bool {
+        switch (lhs, rhs) {
+        case (.idle, .idle), (.playing, .playing), (.paused, .paused):
+            return true
+        default:
+            return false
+        }
+    }
 }

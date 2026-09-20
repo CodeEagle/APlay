@@ -110,4 +110,103 @@ final class UroborosTests: XCTestCase {
         XCTAssertEqual(Array(out), [1, 2, 3])
         XCTAssertEqual(buffer.availableData, 3, "peek must not consume")
     }
+
+    /// `readInQueue` is the queue-serialised entry point used from the decoder's
+    /// read loop; it must behave exactly like `read`.
+    func testReadInQueueDeliversTheSameBytes() {
+        let buffer = Uroboros(capacity: 16, name: "UroborosTests.swift")
+        write(buffer, [1, 2, 3])
+
+        var out = [UInt8](repeating: 0, count: 3)
+        let result = out.withUnsafeMutableBufferPointer {
+            buffer.readInQueue(amount: 3, into: $0.baseAddress!)
+        }
+        XCTAssertEqual(result.0, 3)
+        XCTAssertTrue(result.1, "the first queue read keeps the first-packet flag")
+        XCTAssertEqual(Array(out), [1, 2, 3])
+        XCTAssertEqual(buffer.availableData, 0)
+    }
+
+    func testReadInQueueCanPeekWithoutCommitting() {
+        let buffer = Uroboros(capacity: 16)
+        write(buffer, [4, 5])
+
+        var out = [UInt8](repeating: 0, count: 2)
+        let peek = out.withUnsafeMutableBufferPointer {
+            buffer.readInQueue(amount: 2, into: $0.baseAddress!, commitRead: false)
+        }
+        XCTAssertEqual(peek.0, 2)
+        XCTAssertEqual(Array(out), [4, 5])
+        XCTAssertEqual(buffer.availableData, 2)
+    }
+
+    /// A zero-length read is not an error, it is simply nothing.
+    func testZeroLengthReadReturnsNothing() {
+        let buffer = Uroboros(capacity: 16)
+        write(buffer, [1, 2])
+
+        var out = [UInt8](repeating: 0, count: 2)
+        let result = out.withUnsafeMutableBufferPointer { buffer.read(amount: 0, into: $0.baseAddress!) }
+        XCTAssertEqual(result.0, 0)
+        XCTAssertFalse(result.1)
+        XCTAssertEqual(buffer.availableData, 2, "a zero-length read must not consume")
+    }
+
+    /// A zero-length write must be dropped before it touches the seam math.
+    func testZeroLengthWriteIsIgnored() {
+        let buffer = Uroboros(capacity: 16)
+        var byte: UInt8 = 0
+        buffer.write(data: &byte, amount: 0)
+        XCTAssertEqual(buffer.availableData, 0)
+        XCTAssertEqual(buffer.availableSpace, 16)
+    }
+
+    /// Writing more than fits blocks the writer until a reader frees the room.
+    /// Both orders of "free" and "block" must terminate; only the blocked one
+    /// exercises the semaphore handshake.
+    func testWriteBlocksUntilSpaceIsFreed() {
+        let buffer = Uroboros(capacity: 8)
+        write(buffer, [0, 1, 2, 3])
+        XCTAssertEqual(buffer.availableSpace, 4)
+
+        let payload: [UInt8] = Array(10 ... 17) // needs the whole capacity
+        let writeCompleted = XCTestExpectation(description: "blocked write completes")
+
+        DispatchQueue.global().async {
+            self.write(buffer, payload)
+            writeCompleted.fulfill()
+        }
+
+        // Let the writer record its requirement and block before freeing it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            self.read(buffer, amount: 4)
+        }
+        wait(for: [writeCompleted], timeout: 5)
+
+        XCTAssertEqual(buffer.availableData, 8)
+        XCTAssertEqual(buffer.availableSpace, 0)
+        XCTAssertEqual(read(buffer, amount: 8), payload, "the wrapped write must keep byte order")
+    }
+
+    /// The public counters are queue-guarded; writes through them must stay
+    /// consistent.
+    func testCountersAreQueueGuarded() {
+        let buffer = Uroboros(capacity: 16)
+        buffer.availableData = 4
+        buffer.availableSpace = 12
+        XCTAssertEqual(buffer.availableData, 4)
+        XCTAssertEqual(buffer.availableSpace, 12)
+        XCTAssertEqual(buffer.capacity, 16)
+    }
+
+    /// Committing more than is buffered must clamp rather than underflow.
+    func testCommitReadBeyondAvailableDataClampsToZero() {
+        let buffer = Uroboros(capacity: 16)
+        write(buffer, [1, 2])
+        XCTAssertEqual(buffer.availableData, 2)
+
+        buffer.commitRead(count: 100)
+        XCTAssertEqual(buffer.availableData, 0)
+        XCTAssertEqual(buffer.availableSpace, 16 + 100 - 2, "the defensive branch adds the committed count")
+    }
 }

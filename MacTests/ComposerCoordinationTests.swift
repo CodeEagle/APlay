@@ -56,6 +56,8 @@ final class FakeDecoder: AudioDecoderCompatible {
     private(set) var prepareCalls: [StreamProvider.Position] = []
     /// The file hint each `prepare` observed on the streamer it was handed.
     private(set) var prepareFileHints: [AudioFileType] = []
+    /// Set to make `prepare` throw, so a composer's error path can be driven.
+    var prepareError: Error?
     private(set) var pauseCount = 0
     private(set) var resumeCount = 0
     private(set) var destroyCount = 0
@@ -67,6 +69,7 @@ final class FakeDecoder: AudioDecoderCompatible {
         // The decoder must be handed the streamer it is parsing for, so that
         // duration/seek math can read contentLength and position.
         XCTAssertTrue((provider as AnyObject) === attachedProvider, "decoder must be handed the exact streamer it parses for")
+        if let prepareError { throw prepareError }
     }
 
     private weak var attachedProvider: AnyObject?
@@ -74,7 +77,10 @@ final class FakeDecoder: AudioDecoderCompatible {
     func pause() { pauseCount += 1 }
     func resume() { resumeCount += 1 }
     func destroy() { destroyCount += 1 }
-    func seekable() -> Bool { true }
+    func seekable() -> Bool { seekableValue }
+
+    /// Programmable so a composer's `seekable()` can be driven from a test.
+    var seekableValue = true
 
     init(config: ConfigurationCompatible) {
         attachedProvider = nil
@@ -306,6 +312,210 @@ final class ComposerCoordinationTests: XCTestCase {
         harness.composer.resume()
         XCTAssertEqual(harness.streamer.resumeCount, 1)
         XCTAssertEqual(harness.decoder.resumeCount, 2)
+    }
+
+    // MARK: - Streamer event forwarding
+
+    func testFlacMetadataIsForwardedAndAttachedToTheDecoder() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/a.flac")!)
+
+        let header = FlacMetadata.Header(bytes: Data([0x80, 0x00, 0x00, 0x22]))
+        let metadata = FlacMetadata(streamInfo: FlacMetadata.StreamInfo(data: Data(count: 34), header: header))
+        harness.streamer.emit(.flac(metadata))
+
+        XCTAssertTrue(harness.collector.events.contains(where: { if case .flac = $0 { return true }; return false }),
+                      "flac metadata must surface on the composer pipeline")
+        XCTAssertNotNil(harness.decoder.info.flacMetadata,
+                       "flac metadata must also reach the decoder for seek math")
+    }
+
+    func testUnknownStreamerFailureIsForwardedAsUnknown() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/a.mp3")!)
+
+        struct Surprise: Error {}
+        harness.streamer.emit(.unknown(Surprise()))
+
+        let unknowns = harness.collector.events.filter { if case .unknown = $0 { return true }; return false }
+        XCTAssertEqual(unknowns.count, 1)
+    }
+
+    func testMetadataSizeReachesTheDecoder() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/a.mp3")!)
+
+        harness.streamer.emit(.metadataSize(120))
+
+        XCTAssertEqual(harness.decoder.info.metadataSize, 120,
+                       "the tag size must be handed to the decoder so duration math can discount it")
+    }
+
+    func testSeekableDecisionIsForwarded() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/a.mp3")!)
+
+        harness.decoder.outputStream.call(.seekable(true))
+
+        XCTAssertTrue(harness.collector.events.contains(where: { if case .seekable(true) = $0 { return true }; return false }))
+    }
+
+    func testParserErrorPausesBothTheDecoderAndThePlayer() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/a.mp3")!)
+        XCTAssertEqual(harness.player.pauseCount, 0)
+
+        harness.decoder.outputStream.call(.error(APlay.Error.parser(-1)))
+
+        XCTAssertEqual(harness.player.pauseCount, 1, "a parser failure must pause the output unit")
+        XCTAssertEqual(harness.decoder.pauseCount, 1, "and the decoder alongside it")
+    }
+
+    // MARK: - Metadata fallback
+
+    /// `MetadataParser.Item` is not `Equatable`, so items are compared as
+    /// `"kind:value"` strings.
+    private func describe(_ items: [MetadataParser.Item]) -> [String] {
+        return items.map { item in
+            switch item {
+            case .title(let value): return "title:\(value)"
+            case .artist(let value): return "artist:\(value)"
+            case .album(let value): return "album:\(value)"
+            case .track(let value): return "track:\(value)"
+            case .year(let value): return "year:\(value)"
+            case .comment(let value): return "comment:\(value)"
+            case .genre(let value): return "genre:\(value)"
+            case .cover(let data): return "cover:\(data.map { String(format: "%02x", $0) }.joined())"
+            case .other(let map): return "other:\(map.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ","))"
+            }
+        }
+    }
+
+    private func metadataEvents(_ collector: Collector) -> [[String]] {
+        return collector.events.compactMap { event in
+            if case let .metadata(items) = event { return describe(items) }
+            return nil
+        }
+    }
+
+    func testMetadataWithATitleIsForwardedUnchanged() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/song.mp3")!)
+
+        harness.streamer.emit(.metadata([.title("Real"), .artist("A")]))
+
+        XCTAssertEqual(metadataEvents(harness.collector), [["title:Real", "artist:A"]])
+    }
+
+    func testMetadataWithAnEmptyTitleDropsItForTheFileName() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/song.mp3")!)
+
+        harness.streamer.emit(.metadata([.title("")]))
+
+        XCTAssertEqual(metadataEvents(harness.collector), [["title:song"]],
+                       "an empty title is removed and the file name takes its place")
+    }
+
+    func testMetadataWithoutATitleUsesTheFileName() {
+        let harness = makeHarness()
+        harness.composer.play(URL(string: "https://example.com/song.mp3")!)
+
+        harness.streamer.emit(.metadata([.artist("A")]))
+
+        XCTAssertEqual(metadataEvents(harness.collector), [["artist:A", "title:song"]])
+    }
+
+    // MARK: - Duration
+
+    func testDurationFromPacketCountAndSampleRate() {
+        let harness = makeHarness()
+        var format = AudioStreamBasicDescription()
+        format.mSampleRate = 44100
+        format.mFramesPerPacket = 1024
+        harness.decoder.info.srcFormat = format
+        harness.decoder.info.audioDataPacketCount = 100
+
+        XCTAssertEqual(harness.composer.duration, Float(100 * 1024) / 44100, accuracy: 0.01)
+    }
+
+    func testDurationFromByteCountAndBitrate() {
+        let harness = makeHarness()
+        harness.decoder.info.audioDataByteCount = 160_000
+        harness.decoder.info.bitrate = 128_000
+
+        XCTAssertEqual(harness.composer.duration, 10, accuracy: 0.01)
+    }
+
+    func testDurationFallsBackToContentLength() {
+        let harness = makeHarness()
+        harness.streamer.contentLength = 200_000
+        harness.decoder.info.bitrate = 128_000
+
+        XCTAssertEqual(harness.composer.duration, 12, accuracy: 0.01)
+    }
+
+    func testDurationIsZeroWithoutEnoughInformation() {
+        let harness = makeHarness()
+        XCTAssertEqual(harness.composer.duration, 0)
+    }
+
+    // MARK: - Prepare failure
+
+    func testPrepareFailureIsForwardedAsAnAPlayError() {
+        let harness = makeHarness()
+        harness.decoder.prepareError = APlay.Error.network("bad stream")
+        harness.composer.play(URL(string: "https://example.com/a.mp3")!)
+
+        harness.streamer.emit(.readyForRead)
+
+        let errors = harness.collector.events.filter { if case .error = $0 { return true }; return false }
+        XCTAssertEqual(errors.count, 1)
+    }
+
+    func testPrepareFailureOfAnUnrelatedErrorIsForwardedAsUnknown() {
+        let harness = makeHarness()
+        harness.decoder.prepareError = NSError(domain: "test", code: 7)
+        harness.composer.play(URL(string: "https://example.com/a.mp3")!)
+
+        harness.streamer.emit(.readyForRead)
+
+        let unknowns = harness.collector.events.filter { if case .unknown = $0 { return true }; return false }
+        XCTAssertEqual(unknowns.count, 1)
+    }
+
+    // MARK: - Seek position
+
+    func testPositionIsZeroWithoutADuration() {
+        let harness = makeHarness()
+        var time: TimeInterval = 5
+        XCTAssertEqual(harness.composer.position(for: &time), 0)
+    }
+
+    func testPositionForATimeBeyondTheDurationClampsToJustBeforeTheEnd() {
+        let harness = makeHarness()
+        harness.decoder.info.audioDataByteCount = 160_000
+        harness.decoder.info.bitrate = 128_000       // duration == 10
+        harness.streamer.contentLength = 100
+        var time: TimeInterval = 60
+
+        // Clamped to duration - 1 (9s) = 90% of the 100-byte stream.
+        XCTAssertEqual(harness.composer.position(for: &time), 90,
+                       "a time past the end must clamp to just before the end before mapping to bytes")
+    }
+
+    func testWavePositionSnapsToTheBlockBoundary() {
+        let harness = makeHarness()
+        harness.streamer.contentLength = 1000
+        harness.decoder.info.fileHint = .wave
+        harness.decoder.info.bitrate = 8000       // duration == 1
+        harness.decoder.info.waveSubchunk1Size = 16
+        harness.decoder.info.dataOffset = 44
+        var time: TimeInterval = 0.5
+
+        // 50% of 1000 bytes = 500, snapped down to a multiple of 16 = 496,
+        // then offset past the 44-byte header.
+        XCTAssertEqual(harness.composer.position(for: &time), 44 + 496)
     }
 }
 

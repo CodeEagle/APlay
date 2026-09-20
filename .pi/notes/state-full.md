@@ -1060,3 +1060,103 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   非解码，定位不同。
 - 回归：swift test --enable-code-coverage 230/230（+4）；APlayDemo iOS 模拟器
   BUILD SUCCEEDED。提交 c004a8d 已推。
+
+## SF-0065
+- Revision: 65
+- 取代 SF-0064。任务进行中，**未提交**。
+
+### 任务：每个 codec 一个独立子库（SPM product，按需加载，配文件测试）
+- 已 clone 源码在 /tmp/codec_probe/：ogg(1.4M) vorbis(7.7M) wavpack(7.0M)
+  opus(26M) speex(5.8M)，**许可全 BSD-3**。样板 = WavPack（纯 C、无 config.h）。
+
+### WavPack 子库已跑通（编译通过 + 解码测试通过）
+- Sources/CAPlayWavPack/：vendored C（26 个 .c + 头；**排除 .asm/.S**）；
+  内部头 wavpack_local.h/wavpack_version.h/decorr_tables.h/unpack3.h 放源码根
+  （供相对 include），公共头 include/wavpack/wavpack.h；
+  cSettings headerSearchPath [".","include","include/wavpack"]。
+- Sources/APlayWavPack/WavPackDecoder.swift：实现 AudioDecoderCompatible；
+  APlayWavPack.decoder(fallback:) 返回 AudioDecoderBuilder（接入点
+  = Configuration(audioDecoderBuilder:)，**不是 streamerBuilder**）；
+  本地 .wv 全读进 Data，WavpackOpenFileInputEx64 + 全部 reader 回调；
+  int32→canonical 16bit 立体声 44.1k（重采样+混声道）；DispatchSourceTimer
+  20ms 驱动 decodeTick；convenience init(config:) 用内部 UnhandledDecoder 兜底。
+- Package.swift：+target CAPlayWavPack(publicHeadersPath:"include")、
+  +target APlayWavPack(dep APlay,CAPlayWavPack)、+product APlayWavPack、
+  APlayTests 依赖 +APlayWavPack。
+- APlay 改动：AudioFileType 加 .wavpack("wvpk")（在 .w64 之后）；
+  fileHint 表加 case "wv"→.wavpack；FormatHintTests 加 "wv":.wavpack。
+- MacTests/Fixtures/tone.wv（ffmpeg -c:a wavpack，44.1k 立体声；afinfo 打不开
+  =Core Audio 不认，正因如此才需本库）。
+- MacTests/WavPackDecoderTests.swift：
+  - testDecodesWavPack **已通过**（≥1000 PCM、0 错误、dstFormat 44100/2ch、
+    seekable）。
+  - testMp3ReachesTheFallback **失败**，原因已查明：FakeStreamProvider 不发
+    数据事件，DefaultAudioDecoder 拿不到字节。应改为只验证路由（仿
+    SeekableFileDecoderTests.testLocalMp3ReachesTheFallback）：用 FakeDecoder
+    （定义在 ComposerCoordinationTests.swift:51；API：prepareCalls/
+    [StreamProvider.Position]、prepareFileHints/[AudioFileType]、
+    setAttached(streamer)），断言 prepareCalls.count==1、prepareFileHints==[.mp3]。
+
+### 关键经验（C 库 wrapper 模式，其余 codec 照抄）
+1. WavpackUnpackSamples(wpc, buf, samples)：**samples=每声道帧数**，库写
+   frames*channels 个 int32 → buffer 必须开 _unpackChunk*channels；返回值
+   =交错总样本数（count/channels 得帧数）。
+2. reader 回调**不能留 nil**：set_pos_rel/push_back_byte 被调到 nil 函数指针
+   → signal 11 段错误。全部实现（set_pos_rel 按 fseek 语义 mode 0/1/2 相对
+   头/当前/尾；push_back_byte 回退一字节返回该字节；truncate_here/close 返回 0）。
+3. C 函数指针只能由**文件级全局 func**或字面闭包生成，不能是静态/实例方法
+   → trampoline 全局函数 + Unmanaged.passUnretained/self 恢复。
+4. WavpackStreamReader64 memberwise init 全 nil（9 个函数指针字段，无 temp_buff）；
+   返回类型须与 C 头一致（set_pos_abs/can_seek→Int32，get_pos/get_length→Int64）。
+5. 协议要求 init(config:)：便利 init + UnhandledDecoder（prepare 抛
+   kAudioFileUnsupportedDataFormatError）。
+6. resume 在 prepare 之前 → _context==nil 走 fallback，timer 不启动；需
+   _pendingResume 标志，openFile 成功后 startTimer。
+7. 同文件全局 trampoline 访问类成员须 **fileprivate**（private 报
+   inaccessible）；import AudioToolbox 才有 kAudioFileUnsupportedDataFormatError。
+8. print 的 stdout 崩溃时不 flush → 调试用 FileHandle.standardError.write。
+
+### 待办（按序）
+1. 修 testMp3ReachesTheFallback 为 FakeDecoder 路由验证。
+2. 删 WavPackDecoder.swift 里 7 处 dbg(...) + dbg 函数（stderr 调试残留）。
+3. 全量回归 swift test --enable-code-coverage（目标 232 = 230+2）。
+4. README 三类表加 WavPack 行（归「本地播放」类，注明经 APlayWavPack；
+   WavPack 非流式）；ChangeLog「unreleased」加第 3 条。
+5. iOS 构建（APlayDemo xcodeproj 不含 APlayWavPack，无需改；仅验库不回归）。
+6. 提交推送（改动多：Package.swift、Sources 新两目录、APlay 两协议、
+   MacTests 测试+fixture tone.wv+tone.w64 等）。
+7. 其余 codec 按同模式复制：Vorbis（+libogg 双库，可能需 config.h）、
+   Opus 裸流、Speex 较简单；APE/TTA/Musepack/Shorten/OptimFROG 源码待找；
+   MP1(mpg123,LGPL)、AMR(libopencore_amrnb)；
+   **不可做**：AC-4/TrueHD/WMA/ATRAC/DSD 无开源解码器；MIDI/SF2 需合成器。
+
+## SF-0066
+- Revision: 66
+- 取代 SF-0065。WavPack 子库**已完成并提交** e4f039b（40 文件，+20266 行）。
+
+### 完成项（相对 SF-0065 的待办清单）
+1. testMp3ReachesTheFallback 改为 FakeDecoder 路由验证：prepareCalls==1、
+   prepareFileHints==[.mp3]，先 fake.setAttached(streamer)，
+   decoder = APlayWavPack.decoder(fallback:{ _ in fake })(config)。
+   原写法失败原因：FakeStreamProvider 不发数据事件，DefaultAudioDecoder
+   无数据可解；路由本身是对的，只验路由即可。
+2. 删尽 7 处 dbg(...) + dbg 函数（readBytes/tick/openFile 各处）。
+3. swift test **232/232 全绿**（230+2），swift build 通过。
+4. README：新增「Lossless codecs (via the optional APlayWavPack library)」
+   一节（第四类 bucket，含 APlayWavPack.decoder(fallback:) 代码示例 +
+   BSD-3 许可注明），WavPack 行从「Not supported」表删除。
+   ChangeLog unreleased 加第 1 条（原第 1 条顺延为第 2 条）。
+5. iOS 构建：APlayDemo BUILD SUCCEEDED；xcodeproj 用本地 framework target
+   镜像 SPM，不含 APlayWavPack，故无需改工程。
+6. 提交 e4f039b「Add optional WavPack playback through a vendored codec
+   library」；notes 按惯例另起提交。
+7. lint：新文件 swiftlint 从 8 违规降到 1（file_length 401>400，无害；
+   仓库无 .swiftlint.yml、CI 无 lint 步骤，既有代码已有 218 违规）。
+
+### 下一 codec 选型（照此样板复制）
+- 样板结构：CAPlayXxx（vendored C，publicHeadersPath + headerSearchPath）
+  + APlayXxx（wrapper 实现 AudioDecoderCompatible）+ Package product
+  + AudioFileType/fileHint 表登记 + 2 测试（解码 + 路由）。
+- 优先 Opus 裸流 / Speex（单库、结构简）；Vorbis-in-Ogg 需 ogg+vorbis
+  双库且可能需 config.h，较重。/tmp/codec_probe 源码全 BSD-3。
+- 不可做：AC-4/TrueHD/WMA/ATRAC/DSD 无开源解码器。

@@ -831,3 +831,82 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   接入点、routeChange 处理）。
 - Next: ② 先定范围——查 APlay 现有 audioDecoderBuilder 注入缝能吞哪些自定义解码器，
   定一个最小可选 target（如 APlayVorbis），不污染主库; 再做 ④ 最小自研。
+## SF-0057
+- Revision: 57
+- 取代: SF-0056 的「批 D 未提交」。
+
+### 批 D 已提交，推送被拒
+- 提交 28180ce「Fix gapless cross-format handoff deadlock; repair demo
+  matrix badges and EQ slider」（7 文件：Composer/APlayer/EqualizerView/
+  TrackLibrary/VerticalEQSlider/pbxproj/ChangeLog 25-27 条）。
+- ChangeLog 加 25（跨格式 reconfig 死锁修复）、26（matrix resourceName 徽章）、
+  27（EQ 滑杆+远程地址）三条。
+- 推送失败两种错误交替：GH013 Repository rule violations；Connection closed
+  by remote host / sideband disconnect（网络抖动）。
+
+### 根因：build/ 构建产物被 git 跟踪
+- .gitignore 只有 .vscode/ 与 .build/（SPM 目录），**漏了 Xcode 的 build/**。
+- 从 76da439 起 build/ 被加入跟踪，之后 40 个未推送提交各拖 955 个构建产物
+  （.pcm 二进制，最大 10MB），共 172MB blob / 73MB pack → GitHub 拒绝。
+- 修复：.gitignore 加 build/；commit 017f651；brew install git-filter-repo；
+  `git filter-repo --path build/ --invert-paths --force` 彻底清除历史。
+  （pip3 装 git-filter-repo 被 PEP 668 拒，brew 可装。）
+- filter-repo 副作用：删除 remote 配置与 origin/* 引用 → 需
+  `git remote add origin git@github.com:CodeEagle/APlay.git` 重建。
+- 清理后 HEAD=f3969fe；前溯 28180ce（批D）、93f3f79（批C，原 cbae808）。
+  哈希被重写，旧 cbae808 已不存在。
+- remote 重建后全量 fetch 仍 sideband 断开（远端仓库大+网络抖）；
+  `git fetch --depth=1 origin master` 成功，origin/master 已恢复。
+- 待推送：FETCH_HEAD..HEAD = 75 commits，6.6MB blob（清理后瘦身成功）。
+
+### matrix 真机验证
+- 用户确认「可以了提交推送」= matrix 12 行全亮（aifc/caf 已 done），验收通过。
+
+### 回归（批 D 最终代码）
+- swift test 226/226；iOS 6 套 BUILD SUCCEEDED；MacPlayback 单曲+gapless 双 PASS。
+
+### 遗留
+- **推送未完成**：需 `git push origin master`。因历史被 filter-repo 重写，
+  若 push 被拒（non-fast-forward）可能需 `--force`（本地 75 提交均未推送，
+  强推安全；但 origin/master 是浅取的 depth=1，先 fetch 全程或直接强推）。
+  推送前注意：镜像仓库规则「未经允许不 push」——用户已明示「提交推送」=授权。
+
+### AirPlay 测试问题（用户提问，未答）
+- 用户问「airplay 的功能怎么测试」。代码现状：ChangeLog 第 12 条 =
+  AirPlay 2/远程控制已接入（MPRemoteCommandCenter，默认开，gated by
+  Configuration(enableRemoteCommandHandling:)）；音频会话已是长音频路由
+  共享策略；now-playing 元数据已发 MPNowPlayingInfoCenter；
+  但**路由选择 UI 是 app 级**——需自带 AVRoutePickerView。
+
+## SF-0058
+- Revision: 58
+- 取代 SF-0057 的「推送未竟」与「AirPlay 问题未答」两条遗留。
+
+### 推送完成
+- `git push --force origin master`：`e37afb6...f3969fe master -> master (forced update)`。
+- 验证 `git log origin/master -1` == `f3969feb13130ce4e383f7f82bd44530527f9317` == 本地 HEAD。
+  推送前 origin/master 为浅取旧 tip e37afb6（rev-list left-right = 1/75），
+  因历史被 filter-repo 重写故强推；本地 75 提交均已推送到远端。
+- 仓库推送任务收尾：master 远端现已与本地一致，瘦身结果（无 build/、6.6MB）生效。
+
+### AirPlay 测试方法（答用户）
+代码现状（已核对源码）：
+- `Configuration.isEnabledRemoteCommandHandling` 默认开；音频会话已设为
+  长音频路由共享策略（AirPlay 2 要求），见 Configuration.swift:62-70 注释。
+- `NowPlayingInfo` 发 MPNowPlayingInfoCenter：title/artist/album/artwork/
+  duration/elapsedPlaybackTime/playbackRate（NowPlayingInfo.swift）。
+- `RemoteCommandController` 接 MPRemoteCommandCenter（播放/暂停/上下曲/拖动）。
+- APlayDemo **未**自带 AVRoutePickerView——路由选择走系统控制中心/锁屏的 AirPlay 按钮。
+
+可操作测试步骤（真机，模拟器无法测 AirPlay 路由）：
+1. 前置：AirPlay 接收端（Apple TV 4K / HomePod / Mac「设置→通用→隔空播放
+   接收器」开启，或 AirPlay 2 第三方音箱）；真机与接收端同一 Wi-Fi。
+2. 路由切换：APlayDemo 播放任一曲目 → 下拉控制中心 → 点右上 AirPlay 图标 →
+   选接收端。验证音频切到接收端后播放连续、进度不跳。
+3. 远程控制（在接收端/锁屏/控制中心操作）：播放、暂停、上一曲、下一曲、
+   拖动进度条——全部应由 RemoteCommandController 响应；锁屏应显示标题/艺术家/
+   专辑/封面/进度（NowPlayingInfo 上报）。
+4. 路由中断：拨掉接收端（关 AirPlay 或断 Wi-Fi）→ 播放应自动回到 iPhone 内置
+   喇叭且不卡死（音频会话中断/路由变化自动处理，isAutoHandlingInterruptEvent）。
+5. 回归：AirPlay 路由无法单测，靠真机手测；`swift test` 226/226 保证引擎不退化
+   （Tests 目录目前无 NowPlaying/RemoteCommand 专用单测，可后续补）。

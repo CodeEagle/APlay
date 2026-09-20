@@ -1,44 +1,36 @@
 State format: capsule-v2
-State revision: 35
+State revision: 58
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
-- Baseline: 2026-09-19；Xcode 27.0 / Swift 6.4；iOS 15.0 部署；真机
-  lincoln-phone（iOS 27.0，UDID 00008130-000E7959262B803A）。本地领先 origin
-  28 commit 未 push（含 718c466）。
+- Baseline: 2026-09-20；Xcode 27.0 / Swift 6.4。真机 iPhone 15 Pro Max
+  （iOS 27.0，UDID 00008130-000E7959262B803A，Team L5W9FHSX92）。
+  **历史已被 filter-repo 重写，旧哈希 cbae808/73d2d02/e37afb6 均已失效。**
+  HEAD f3969fe；远端 origin/master == f3969fe（已一致）。
 
 ## Task
-- Goal: 用户四项改造（goal 3b94daf6）: ① README 格式支持表; ② 不支持格式的可选
-  子库; ③ 改 SPM-only 安装; ④ AirPlay2 支持。①③ 已完成，②④ 未开始。
-- Unit: ①+③ 已交付并验证; 次 ② 定范围（Core Audio 不支持的编码/容器）;
-  最后 ④ AirPlay2 最小自研。
-- Done when: 四项代码+文档完成，swift test 全绿 + iOS 构建零业务警告后提交。
+- Goal: 推送任务收尾——已完成；并已答「AirPlay 怎么测试」。
+- Unit: 仓库推送 + APlayDemo（AirPlay 演示）。
+- Done when: push origin master 成功并验证远端 == 本地 HEAD（已达成）。
 
 ## Progress
-- Done: ① README "Supported formats" 段（据 FormatCompatibilityTests 已验矩阵:
-  7 解码成功 + 2 parse-only + hint 表已映射无 fixture 的扩展）; ③ git rm
-  APlay.podspec、Installation 仅 SPM、删 Known-issue 的 pod 句、Fastfile 去
-  pod 三动作并加 test lane + bump_swift_version_constant（bump 先于 test，
-  靠 APlaySmokeTests:19 断言把关）、ChangeLog v2.1.0 加第 9/10 条。详见 SF-0030。
-- Open: ② 可选子库（范围待定: ogg/vorbis、非 OGG 的 opus 等 Core Audio 不支持者，
-  须不污染主库、只走 audioDecoderBuilder 注入缝）; ④ AirPlay2 缺
-  MPRemoteCommandCenter/AVRoutePickerView/routeChange 处理（待查证）。
-- Checks: swift test 86/86 零失败; iOS 8 套构建 SUCCEEDED 零业务警告;
-  swift run -c release APlayMacPlayback 播 a.m4a PASS（-O 优化路径实证）。
-- Pending: ①③ 的提交（验证已过，待 commit; 排除 xcuserstate 与 .DS_Store）。
+- Done: `git push --force origin master` 成功（e37afb6...f3969fe forced update）；
+  origin/master == 本地 HEAD f3969fe。filter-repo 重写历史后强推一次，
+  本地 75 提交全部到远端，瘦身（无 build/、6.6MB）生效。
+- Done: 批 D 提交 28180ce；真机 matrix 验收通过（12 行全亮）。
+- Done: .gitignore 已含 build/（017f651），历史清理 ls-files 无 build/。
+- Done: 已答 AirPlay 测试方法（真机+接收端，控制中心路由切换、锁屏/远端
+  远程控制、路由中断回退、swift test 回归）。
+- Open: 无（Tests 目录缺 NowPlaying/RemoteCommand 专用单测，属可选改进）。
+- Checks: git log origin/master -1 == f3969fe == git rev-parse HEAD。
+- Pending: none。
 
 ## Rules
-- Constraints: 镜像仓库未经允许不 push; 每批改动须 iOS 四套构建 + MacPlayback
-  端到端验证后才提交; 只测可注入协议接缝; 提交排除 xcuserstate 与 .DS_Store。
-- 真机打包: 用 Xcode 库内 wildcard profile（team 77SXM8HYXF，UUID
-  82de0928-9338-4e57-80b8-26dc00957e0e）+ 工程命令行 DEVELOPMENT_TEAM/
-  CODE_SIGN_STYLE=Automatic + -allowProvisioningUpdates; 诊断取
-  devicectl copy from systemCrashLogs/appDataContainer。
-- 教训: ①~㉚ 见 full; iOS 17+ 无 SceneManifest 启动即 trap; 异步 barrier 属性
-  在同步连发事件下读不到新值（用 NSLock）。
+- Constraints: 历史已重写，旧哈希失效，引用时以现 HEAD 为准。
+- 事实: AirPlay 路由只能真机手测（需外部接收端），模拟器/单测不可覆盖；
+  APlayDemo 未自带 AVRoutePickerView，路由走系统控制中心/锁屏。
 
 ## Next
-- Action: 提交 ①③（README.md、ChangeLog.md、APlay.podspec 删除、fastlane/Fastfile
-  + 本批 notes），然后开 ②: 查 audioDecoderBuilder 注入缝，定可选子库最小范围。
-- Verify: 提交后 git status 无 xcuserstate/.DS_Store; ② 的子库须 swift test 仍 86/86。
-- Refs: SF-0029（调查）、SF-0030（①③ 实况）; goal 3b94daf6。
+- Action: 无待办；等用户下一步指令。
+- Verify: —
+- Refs: SF-0058（推送完成+AirPlay 测试答复），SF-0057（批D+清理+推送未竟）。

@@ -16,6 +16,7 @@ struct NowPlayingView: View {
             titleBlock
             progress
             transport
+            airPlay
             loopChips
         }
         .cardStyle()
@@ -154,6 +155,15 @@ struct NowPlayingView: View {
                                 in: Capsule())
                     .foregroundStyle(player.gaplessEnabled ? .green : .white)
             }
+        }
+    }
+
+    private var airPlay: some View {
+        HStack(spacing: 8) {
+            AirPlayRoutePicker()
+                .frame(width: 30, height: 30)
+            AirPlayRouteLabel()
+            Spacer()
         }
     }
 

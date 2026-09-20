@@ -169,7 +169,7 @@ public struct StreamProvider {
             case "aac", "adts", "aacp", "audio/aac", "audio/aacp": return .aacADTS
             case "opus", "audio/opus": return .opus
             // Containers Core Audio opens natively but the table never mapped.
-            case "ac3", "audio/ac3": return .ac3
+            case "ac3", "eac3", "audio/ac3": return .ac3
             case "amr": return .amr
             case "3gp", "3gpp", "audio/3gpp": return .k3gp
             case "3g2", "3gp2", "audio/3gpp2": return .k3gp2

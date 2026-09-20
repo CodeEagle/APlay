@@ -56,23 +56,91 @@ Anything Core Audio can stream-decode, APlay can play. The matrix below is pinne
 real decoder (`AudioFileStream` + `AudioConverter`) — a format only counts as supported
 when it both parses its metadata *and* decodes to canonical PCM.
 
-| Format | Container / codec | Decode | Note |
-| --- | --- | --- | --- |
-| AAC | MP4 (`.m4a`) | ✅ | |
-| AAC | raw ADTS (`.aac`) | ✅ | |
-| MP3 | CBR and VBR (`.mp3`) | ✅ | seek supported |
-| FLAC | native (`.flac`) | ✅ | seek supported (with a seek table) |
-| Opus | in OGG (`.opus`) | ✅ | Core Audio parses the container on this platform |
-| WAVE | PCM (`.wav`) | ✅ | tolerates extra chunks (`LIST`/`INFO`, `FLLR`) before `data`; seek supported |
-| ALAC | MP4 (`.m4a`) | ✅ | |
-| ALAC | CAF (`.caf`) | ⚠️ stream only | the packet table trails the audio data, so the streaming parser reports `optm`. Local files play through `APlayExtras` |
-| AIFF / AIFF-C | PCM (`.aiff`, `.aifc`) | ⚠️ stream only | `AudioFileStream` reports a packet discontinuity (`dsc!`). Local files play through `APlayExtras` |
+Anything Core Audio can stream-decode, APlay can play. The tables below cover the
+audio formats in common use today, and where each one stands in this library. Status
+meanings:
 
-The hint table also routes these Core Audio-native extensions, but no fixture ships for
-them, so they are *not* covered by the test matrix: `.m4b`, `.ac3`, `.amr`, `.3gp`,
-`.3g2`, `.mp2`, `.mp1`, `.au`/`.snd`, `.rf64`, `.sd2`. Formats Core Audio does not ship
-(Vorbis, Opus outside an OGG container, …) need an injected custom decoder — see
-`audioDecoderBuilder` and the Todo list.
+- ✅ **Verified** — a bundled fixture is driven through the real decoder
+  (`AudioFileStream` + `AudioConverter`) by `MacTests/FormatCompatibilityTests.swift`;
+  the format both parses its metadata *and* decodes to canonical PCM.
+- ✔ **Routed** — mapped in the hint table (`AudioFileType.fileHint(from:)`) to a
+  built-in Core Audio decoder, but no fixture ships, so it is *not* pinned by the
+  test matrix.
+- ⚠️ **Stream-only** — the streaming parser trips on this container, so local files
+  play through the optional `APlayExtras` library (`ExtAudioFile`) instead.
+- 🔌 **Inject** — Core Audio ships no decoder for it. Implement
+  `AudioDecoderCompatible` and supply it through `audioDecoderBuilder`.
+
+#### Lossy
+
+| Format | Common extensions | Status | Note |
+| --- | --- | --- | --- |
+| MP3 (MPEG-1/2 Layer III) | `.mp3` | ✅ | CBR and VBR; seek supported |
+| MP2 (Layer II) | `.mp2` | ✔ | |
+| MP1 (Layer I) | `.mp1` | ✔ | |
+| AAC (LC / HE-AAC v1 / v2 / ELD) | `.m4a` `.mp4` `.aac` `.adts` `.aacp` | ✅ | MP4 and raw ADTS verified |
+| Opus in OGG | `.opus` | ✅ | Core Audio parses the container on this platform |
+| Dolby Digital (AC-3) / Digital Plus (E-AC-3) | `.ac3` `.eac3` | ✔ | |
+| AMR-NB / AMR-WB | `.amr` | ✔ | 3GPP speech codec |
+| Vorbis in Ogg | `.ogg` | 🔌 | Core Audio has no Vorbis decoder |
+| Opus outside an OGG container | (raw) | 🔌 | containerless Opus is not parsed |
+| Windows Media Audio | `.wma` `.asf` | 🔌 | |
+| Musepack | `.mpc` `.mpp` `.mp+` | 🔌 | |
+| ATRAC3 / ATRAC9 | `.oma` `.at9` | 🔌 | Sony codecs |
+| Speex | `.spx` | 🔌 | speech codec |
+| Dolby AC-4 | `.ac4` | 🔌 | |
+
+#### Lossless
+
+| Format | Common extensions | Status | Note |
+| --- | --- | --- | --- |
+| FLAC | `.flac` | ✅ | seek supported (with a seek table) |
+| ALAC in MP4 | `.m4a` | ✅ | the magic cookie now reaches the converter (2.1.0) |
+| ALAC in CAF | `.caf` | ⚠️ | the packet table trails the audio data, so the streaming parser reports `optm`; local files play through `APlayExtras` |
+| WavPack | `.wv` | 🔌 | |
+| Monkey's Audio | `.ape` | 🔌 | |
+| True Audio | `.tta` | 🔌 | |
+| Dolby TrueHD / MLP | `.thd` `.mlp` | 🔌 | |
+| DSD (DSF / DFF) | `.dsf` `.dff` | 🔌 | 1-bit stream; no Core Audio decoder |
+| OptimFROG | `.ofr` `.ofs` | 🔌 | |
+| Shorten | `.shn` | 🔌 | |
+
+#### Uncompressed & block PCM
+
+| Format | Common extensions | Status | Note |
+| --- | --- | --- | --- |
+| WAVE PCM | `.wav` `.wave` | ✅ | tolerates extra chunks (`LIST`/`INFO`, `FLLR`) before `data`; seek supported |
+| AIFF / AIFF-C PCM | `.aiff` `.aifc` | ⚠️ | `AudioFileStream` reports a packet discontinuity (`dsc!`); local files play through `APlayExtras` |
+| WAVE ADPCM (IMA / Microsoft / DVI) | `.wav` | ✔ | block PCM inside a WAVE container |
+| NeXT / Sun AU | `.au` `.snd` | ✔ | µ-law, A-law and PCM payloads |
+| RF64 (Broadcast WAVE) | `.rf64` | ✔ | |
+| Sound Designer II | `.sd2` | ✔ | |
+| Sony Wave64 | `.w64` | 🔌 | |
+| Raw PCM | — | 🔌 | no header metadata to parse |
+
+#### Containers & audiobooks
+
+| Format | Common extensions | Status | Note |
+| --- | --- | --- | --- |
+| MP4 / MPEG-4 | `.mp4` `.mp4f` `.mpg4` | ✔ | typically an AAC or ALAC payload |
+| Audiobook MP4 | `.m4b` | ✔ | same MPEG-4 container, hinted separately so Core Audio takes the MP4 branch |
+| Core Audio Format | `.caf` `.caff` | ✔ | a container; see ALAC-in-CAF above |
+| 3GPP / 3GPP2 | `.3gp` `.3g2` | ✔ | AMR or AAC payload |
+| Matroska audio | `.mka` | 🔌 | |
+| MPEG-TS | `.ts` | 🔌 | |
+
+#### Not audio streams
+
+| Format | Common extensions | Status | Note |
+| --- | --- | --- | --- |
+| MIDI | `.mid` `.midi` | — | note sequences, not PCM; needs a synthesiser |
+| SoundFont | `.sf2` | — | instrument sample bank, not a stream |
+
+> An extension the hint table does not recognise falls back to `.mp3` and relies on
+> `AudioFileStream` to sniff the actual content, so an unknown extension is not
+> automatically a failure. Every format marked 🔌 has no Core Audio decoder — the
+> library cannot play it without an injected `AudioDecoderCompatible`; see
+> `audioDecoderBuilder` and the Todo list.
 
 ✅ Known issue (fixed)
 ---

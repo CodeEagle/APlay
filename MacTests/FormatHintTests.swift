@@ -39,14 +39,14 @@ final class FormatHintTests: XCTestCase {
             "aac": .aacADTS, "adts": .aacADTS, "aacp": .aacADTS,
             "audio/aac": .aacADTS, "audio/aacp": .aacADTS,
             // Dolby / speech / legacy containers Core Audio opens natively
-            "ac3": .ac3, "audio/ac3": .ac3,
+            "ac3": .ac3, "audio/ac3": .ac3, "eac3": .ac3,
             "amr": .amr,
             "3gp": .k3gp, "3gpp": .k3gp, "audio/3gpp": .k3gp,
             "3g2": .k3gp2, "3gp2": .k3gp2, "audio/3gpp2": .k3gp2,
             "au": .next, "snd": .next, "audio/basic": .next,
             "sd2": .soundDesigner2,
-            // Opus — the hint is recognised; on the macOS 14 SDK Core Audio
-            // decodes it, but iOS 15 may still need an injected decoder (#17).
+            // Opus — the hint is recognised and Core Audio decodes the OGG
+            // container on this platform (see the README format matrix).
             "opus": .opus, "audio/opus": .opus,
         ]
 

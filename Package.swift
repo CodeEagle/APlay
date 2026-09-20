@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "APlay", targets: ["APlay"]),
         .library(name: "APlayExtras", targets: ["APlayExtras"]),
         .library(name: "APlayWavPack", targets: ["APlayWavPack"]),
+        .library(name: "APlayVorbis", targets: ["APlayVorbis"]),
     ],
     targets: [
         .target(
@@ -45,6 +46,31 @@ let package = Package(
             dependencies: ["APlay", "CAPlayWavPack"],
             path: "Sources/APlayWavPack"
         ),
+        // Ogg page/framing layer, shared by every Ogg-carried codec. Pure
+        // ANSI C; `os_types.h` resolves its integer types per platform without
+        // a generated config header.
+        .target(
+            name: "CAPlayOgg",
+            path: "Sources/CAPlayOgg",
+            publicHeadersPath: "include"
+        ),
+        // Vorbis decoder, vendored. Only the decode side is compiled — the
+        // encoder (the sole user of `modes/`) is excluded, so no setup tables
+        // are needed. Reaches libogg through `<ogg/ogg.h>`.
+        .target(
+            name: "CAPlayVorbis",
+            dependencies: ["CAPlayOgg"],
+            path: "Sources/CAPlayVorbis",
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("."),
+            ]
+        ),
+        .target(
+            name: "APlayVorbis",
+            dependencies: ["APlay", "CAPlayOgg", "CAPlayVorbis"],
+            path: "Sources/APlayVorbis"
+        ),
         .executableTarget(
             name: "APlayMacPlayback",
             dependencies: ["APlay"],
@@ -52,7 +78,7 @@ let package = Package(
         ),
         .testTarget(
             name: "APlayTests",
-            dependencies: ["APlay", "APlayExtras", "APlayWavPack"],
+            dependencies: ["APlay", "APlayExtras", "APlayWavPack", "APlayVorbis"],
             path: "MacTests",
             resources: [.copy("Fixtures")]
         ),

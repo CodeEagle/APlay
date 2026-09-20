@@ -51,8 +51,8 @@ seamless.
 
 Supported formats
 ---
-Anything Core Audio can stream-decode, APlay can play. Formats fall into three
-buckets.
+Anything Core Audio can stream-decode, APlay can play. Formats fall into
+several buckets.
 
 ### Streaming playback (the default path)
 
@@ -112,7 +112,27 @@ let config = APlay.Configuration(
 | --- | --- | --- |
 | WavPack | `.wv` | decodes to canonical 16-bit stereo PCM; any channel count is down/up-mixed |
 
-The vendored C library is BSD-3 licensed (`Sources/CAPlayWavPack/LICENSE.txt`).
+### Ogg-carried codecs (via the optional `APlayVorbis` library)
+
+Core Audio recognises the Ogg container but ships no Vorbis decoder, so `.ogg`
+plays through a separate vendored product: `APlayVorbis` wraps libvorbis (with
+the Ogg framing layer in `CAPlayOgg`) on the same `audioDecoderBuilder` seam. A
+local file is buffered whole and is seekable; live streams are not — an Ogg page
+stream cannot be rewound, and Vorbis needs its three header packets before any
+audio appears. Add the product only when you need it; plain `APlay` is
+unchanged. Pinned by `MacTests/VorbisDecoderTests.swift`.
+
+```swift
+let config = APlay.Configuration(
+    audioDecoderBuilder: APlayVorbis.decoder(fallback: APlay.Configuration().audioDecoderBuilder))
+```
+
+| Format | Common extensions | Note |
+| --- | --- | --- |
+| Vorbis in Ogg | `.ogg` | decodes to canonical 16-bit stereo PCM; any channel count is down/up-mixed |
+
+The vendored C libraries are BSD-3 licensed (`Sources/CAPlayOgg/LICENSE.txt`,
+`Sources/CAPlayVorbis/LICENSE.txt`).
 
 ### Not supported
 
@@ -124,7 +144,7 @@ be added by implementing `AudioDecoderCompatible` and supplying it through
 | --- | --- | --- |
 | MP1 (MPEG Layer I) | `.mp1` | hint-table mapped, but no encoder was available to build a fixture — unverified |
 | AMR-NB / AMR-WB | `.amr` | hint-table mapped, but no encoder was available to build a fixture — unverified |
-| Vorbis in Ogg | `.ogg` | no Core Audio decoder |
+| Vorbis in Ogg | `.ogg` | see the optional `APlayVorbis` library below |
 | Opus outside an OGG container | (raw) | containerless Opus is not parsed |
 | Windows Media Audio | `.wma` `.asf` | no Core Audio decoder |
 | Monkey's Audio | `.ape` | no Core Audio decoder |

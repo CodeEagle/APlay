@@ -188,6 +188,9 @@ public struct AudioDecoder {
         /// WavPack — not a Core Audio type at all; owned by the optional
         /// `APlayWavPack` product.
         public static let wavpack = AudioFileType("wvpk")
+        /// Ogg — the container for Vorbis (and Speex); owned by the optional
+        /// `APlayVorbis` product. Not a Core Audio type.
+        public static let ogg = AudioFileType("Ogg ")
         public static let amr = AudioFileType("amrf")
         public static let flac = AudioFileType("flac")
         public static let opus = AudioFileType("opus")

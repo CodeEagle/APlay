@@ -175,6 +175,7 @@ public struct StreamProvider {
             case "3g2", "3gp2", "audio/3gpp2": return .k3gp2
             case "w64": return .w64
             case "wv": return .wavpack
+            case "ogg", "audio/ogg", "application/ogg": return .ogg
             case "au", "snd", "audio/basic": return .next
             case "rf64": return .rf64
             case "sd2": return .soundDesigner2

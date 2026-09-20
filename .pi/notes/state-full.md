@@ -1002,3 +1002,37 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - 回归：swift test --enable-code-coverage 226/226（断言并入已有表驱动测试，
   测试数不变）；APlayDemo iOS 模拟器 BUILD SUCCEEDED。
 - 提交 ded1bf4 已推：README + hint + 测试。
+
+## SF-0063
+- Revision: 63
+- 取代 SF-0062 的 README 四档状态表。
+
+### 三类划分（用户要求）+ 实测补齐 routed 格式
+- 用户要求：README 格式表改为「流式支持 / 本地播放支持 / 不支持」三类，
+  并补必要格式测试。
+- 本机 ffmpeg 8.0.1 + afconvert 生成 fixture（MacTests/Fixtures/）：
+  tone-mp2.mp2、tone.ac3、tone.eac3、tone-mp4.mp4、tone.m4b（复制 m4a 改后缀）、
+  tone-ima4.wav（ffmpeg adpcm_ima_wav）、tone.3gp/tone.3g2（AAC 装 3gp 容器）、
+  tone.au（afconvert NeXT ulaw）。本机无 mp1/amr 编码器。
+- 全部加入 FormatCompatibilityTests 表驱动测试，实测结论：
+  - 新晋流式 verified：MP2 ✅、AAC-in-MP4 ✅、M4B ✅、IMA4-in-WAVE ✅
+    （formatID 报 lpcm）、AC-3 ✅、E-AC-3 ✅（formatID='ec-3' 0x65632D33，
+    非预期 'ac-3'）。
+  - AIFF-C：streaming **完全无属性**（sampleRate=0），parses:false；
+    本地经 APlayExtras 可解（SeekableFileDecoderTests 已有）。
+  - **AU/µ-law：parses 但 decodes 失败**（6 errors，0 PCM），且 APlayExtras
+    handledHints 不含 .next → 实际不支持。
+  - **3GP/3G2：streaming 完全不 parse**（sampleRate=0）→ 不支持。
+- README 重写为三类表：
+  - Streaming playback（默认路径，全部 fixture 钉死，12 行）
+  - Local file playback via APlayExtras（caf/aiff/aifc，含失败原因 optm/dsc!/无属性）
+  - Not supported（AU、3GPP、RF64、SD2、MP1/AMR 未验证、Vorbis、裸Opus、WMA、
+    WavPack、APE、TTA、TrueHD、AC-4、DSD、Musepack、ATRAC、Speex、Wave64、
+    MKA、MPEG-TS、raw PCM）；MIDI/SF2 注明非音频流。
+  - AC-3/E-AC-3 注明 iOS 解码受 Dolby 授权、设备/系统而异。
+- ChangeLog 加「unreleased」第 1 条记录上述（含 eac3 曾漏映射的更正）。
+- 回归：swift test --enable-code-coverage 226/226（断言并入表驱动测试，
+  测试方法数不变）；APlayDemo iOS 模拟器 BUILD SUCCEEDED。
+- 提交 f474864 已推。
+- 教训：hint 表映射 ≠ 能播放；AudioFileStream 支持的容器子集远小于 AudioFile。
+  旧四档措辞「stream only」易误导读作"只支持流式"，三类划分已消除该歧义。

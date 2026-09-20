@@ -1,39 +1,40 @@
 State format: capsule-v2
-State revision: 62
+State revision: 63
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
 - Baseline: 2026-09-20；Xcode 27.0 / Swift 6.4。真机 iPhone 15 Pro Max
   （iOS 27.0，UDID 00008130-000E7959262B803A，Team L5W9FHSX92）。
-  HEAD ded1bf4 == origin/master；tag v2.1.0 已推且 Release 已发。
+  HEAD f474864 == origin/master；tag v2.1.0 已推且 Release 已发。
 
 ## Task
-- Goal: README 全格式对照表（市面所有音频格式 × 本库支持）——已完成。
-- Unit: README 文档 + hint 表。
-- Done when: README 含分组全格式表且源码/测试/文档一致（已达成）。
+- Goal: README 格式表改三类（流式/本地/不支持）+ 补 routed 格式实测——已完成。
+- Unit: README + MacTests fixtures/测试。
+- Done when: 每类有实测依据，测试全绿（已达成）。
 
 ## Progress
 - Done: v2.1.0 发布全套（tag/Release/5 issue 全关）。
-- Done: README「Supported formats」升级为分组大表（Lossy/Lossless/
-  Uncompressed/Containers/Not audio streams），状态四档：
-  ✅ verified / ✔ routed（无 fixture）/ ⚠️ stream-only（APlayExtras）
-  / 🔌 inject（Core Audio 无解码器）；MIDI/SF2 标 —。
-- Done: 修文档与源码不符——ChangeLog 称已映射 .eac3 实则无；
-  StreamProviderCompatible.swift:172 补 eac3→.ac3，FormatHintTests 加断言，
-  并更新过时 opus/#17 注释。
-- Open: 无。
-- Checks: swift test --enable-code-coverage 226/226；
-  APlayDemo iOS 模拟器 BUILD SUCCEEDED；README 表已渲染。
+- Done: README 改为三类表——Streaming playback（默认路径，12 行全 fixture
+  钉死）/ Local file playback via APlayExtras（caf/aiff/aifc，注明 streaming
+  失败原因）/ Not supported（AU/3GPP/RF64/SD2/MP1/AMR/Vorbis/裸Opus/WMA/
+  WavPack/APE/TTA/TrueHD/AC-4/DSD/Musepack/ATRAC/Speex/Wave64/MKA/MPEG-TS/
+  raw PCM）；MIDI/SF2 标非音频流。
+- Done: 新增 fixture（mp2/ac3/eac3/mp4/m4b/ima4-wav/3gp/3g2/au）并实测入表：
+  MP2/AAC-MP4/M4B/IMA4-WAVE/AC-3/E-AC-3 新晋流式 verified（E-AC-3 的
+  formatID='ec-3'）；AIFF-C streaming 完全无属性；AU 解码失败；3GP/3G2 不 parse。
+- Done: ChangeLog 加「unreleased」第 1 条。
+- Open: 无（MP1/AMR 本机无编码器，已诚实标「unverified」于不支持类）。
+- Checks: swift test --enable-code-coverage 226/226；APlayDemo iOS 模拟器
+  BUILD SUCCEEDED。
 - Pending: none。
 
 ## Rules
-- Constraints: README 状态口径须与 FormatCompatibilityTests 一致；
-  文档宣称的能力须在源码兑现（eac3 教训）。
-- 事实: hint 表 default 回退 .mp3 靠内容嗅探；APlayExtras handledHints
-  = [.caf,.aiff,.aifc]；Core Audio 无 Vorbis/裸Opus/WMA/WavPack/APE/TTA/
-  TrueHD/DSD/Musepack/ATRAC/Speex/AC-4 解码器。
+- Constraints: 状态分类须以实测为准；hint 映射不等于能播放。
+- 事实: AudioFileStream 支持的容器子集远小于 AudioFile（AU/3GP/RF64/SD2
+  均不解）；APlayExtras handledHints=[.caf,.aiff,.aifc]；iOS 上 AC-3/E-AC-3
+  解码受 Dolby 授权限制。
 
 ## Next
 - Action: 无待办；等用户下一步指令。
 - Verify: —
-- Refs: SF-0062（README 全格式表+eac3 补映射），SF-0061（Release+opus 更正）。
+- Refs: SF-0063（三类表+实测），SF-0062（README 全格式表+eac3 补映射）。

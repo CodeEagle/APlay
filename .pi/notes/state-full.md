@@ -1036,3 +1036,27 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - 提交 f474864 已推。
 - 教训：hint 表映射 ≠ 能播放；AudioFileStream 支持的容器子集远小于 AudioFile。
   旧四档措辞「stream only」易误导读作"只支持流式"，三类划分已消除该歧义。
+
+## SF-0064
+- Revision: 64
+- 取代 SF-0063 的「不支持类无方案」。
+
+### 不支持格式的「加上支持」方案——容器层先落地
+- 根源二分：(a) 容器解析不了（AudioFileStream 不收，但 AudioFile/ExtAudioFile
+  收）；(b) Core Audio 无解码器（codec 层，需注入第三方 C 库）。
+- (a) 已落地：afinfo 确认 3gpp/3gp2/NeXT 在 AudioFile 层可开；扩
+  `SeekableFileDecoder.handledHints` = [.caf,.aiff,.aifc,.next,.k3gp,.k3gp2,
+  .rf64,.soundDesigner2,.w64]，新增 `AudioFileType.w64`("W64 ")
+  + fileHint case "w64"（FormatHintTests 已加断言）。
+- 实测（SeekableFileDecoderTests +4 用例，fixture tone.au/tone.3gp/tone.3g2/
+  tone.w64）：AU/3GP/3G2/W64 经 APlayExtras 全部解码成功零错误。
+  RF64/SD2 无 muxer 造样本，按 ExtAudioFile 原生支持标「本地播放（无 fixture）」。
+- README：AU、3GPP/3GPP2、Wave64、RF64、SD2 从「不支持」移到「本地播放」。
+- 更新 SeekableFileDecoder/FileFallbackDecoder 文档注释（旧文案只提 CAF/AIFF）。
+- ChangeLog「unreleased」加第 2 条。
+- (b) 仍未做：Vorbis/裸Opus/WMA/WavPack/APE/TTA/TrueHD/AC-4/DSD/Musepack/
+  ATRAC/Speex/MP1/AMR——需经 audioDecoderBuilder 注入 libvorbis/opus/wavpack
+  等 C 库 wrapper（AudioDecoderCompatible），工作量在引依赖；MIDI/SF2 需合成器
+  非解码，定位不同。
+- 回归：swift test --enable-code-coverage 230/230（+4）；APlayDemo iOS 模拟器
+  BUILD SUCCEEDED。提交 c004a8d 已推。

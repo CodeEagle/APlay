@@ -211,8 +211,17 @@ private extension APlayer {
         // setup() can be called more than once (canonical format, then the decoded
         // format); re-initializing requires uninitializing first or the AU keeps its
         // previous render configuration and refuses to start (-10867).
+        // The uninitialize/init pair also *stops* a unit that was running, so the
+        // cached state has to follow it: without this, `resume()`'s "already
+        // running" guard skips `AudioOutputUnitStart`, and a track that takes over
+        // from a still-running one neither makes a sound nor reports a state
+        // change.
+        let wasRunning = (state == .running)
         AudioUnitUninitialize(unit)
         try AudioUnitInitialize(unit).throwCheck()
+        if wasRunning {
+            state = .paused
+        }
     }
 }
 

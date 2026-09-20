@@ -249,16 +249,25 @@ extension APlay.Configuration {
     }
 
     /// Default User-Agent for network streaming
+    ///
+    /// - Note: Deliberately main-actor-free. A configuration is constructed wherever
+    ///   a decoder builder runs, and the documented `APlayExtras` routing pattern
+    ///   (`APlay.Configuration().audioDecoderBuilder`) builds one on background
+    ///   queues — during gapless preloading, for instance. Reading the OS version
+    ///   through `ProcessInfo` keeps that safe from any thread.
     public static var defaultUA: String {
         var osStr = ""
         #if os(iOS) || os(tvOS) || os(visionOS)
-            let systemVersion = MainActor.assumeIsolated { UIDevice.current.systemVersion }
+            let v = ProcessInfo.processInfo.operatingSystemVersion
+            let version = v.patchVersion != 0
+                ? "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
+                : "\(v.majorVersion).\(v.minorVersion)"
             #if os(iOS)
-                osStr = "iOS \(systemVersion)"
+                osStr = "iOS \(version)"
             #elseif os(tvOS)
-                osStr = "tvOS \(systemVersion)"
+                osStr = "tvOS \(version)"
             #else
-                osStr = "visionOS \(systemVersion)"
+                osStr = "visionOS \(version)"
             #endif
         #elseif os(OSX)
             // No need to be so concervative with the cache sizes

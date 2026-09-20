@@ -542,7 +542,17 @@ private extension APlay {
         guard _isCalledDelayPaused == false else { return }
         _isCalledDelayPaused = true
         let delay = DispatchTimeInterval.milliseconds(Int(floor(time * 1000)))
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+        // Capture the track this end-of-track pause was scheduled for. If the
+        // user switches tracks before it fires, the stale pause must not stop
+        // the new track's output unit — the new composer resumes it on its own
+        // schedule — and must not advance the list either.
+        let scheduledFor = _currentComposer
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            guard self._currentComposer === scheduledFor else {
+                self._isCalledDelayPaused = false
+                return
+            }
             if let dur = self._currentComposer?.duration {
                 self.eventPipeline.call(.playback(dur))
             }

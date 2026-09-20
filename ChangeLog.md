@@ -99,6 +99,42 @@ v2.1.0
    the playing position, so `nextURL()`/`previousURL()` returned nil at the first
    track. The stop is now only taken on the last track, matching what the
    `.order` and `.random` branches already did
+20. The demo app is rebuilt in SwiftUI as a showcase of every library capability:
+   a live format matrix that plays each bundled container and badges the route
+   that serves it (native streaming decoder, or `APlayExtras` ExtAudioFile for
+   AIFF/AIFF-C/CAF), a Now Playing card with generated cover art injected into
+   the lock screen, an 8-band equalizer with the built-in presets, the four loop
+   patterns plus a gapless toggle, remote-URL streaming, a read-out of the
+   active configuration, and a live view of the event pipeline and the internal
+   logger. It also adopts the SwiftUI hosting lifecycle and the `audio`
+   background mode so background playback and remote commands work. `APlayExtras`
+   is now an Xcode framework target as well as an SPM product, so the Xcode
+   project builds the same library set the package does
+
+21. Fix the same class of off-main crash as 6 in a second place: the default
+   user-agent string read `UIDevice.current.systemVersion` through a
+   `MainActor.assumeIsolated` assertion, and a configuration is constructed
+   wherever a decoder builder runs — the documented `APlayExtras` routing
+   pattern builds one on background queues, which the gapless preloader hits.
+   The OS version now comes from `ProcessInfo` instead, which is safe from any
+   thread
+22. Fix switching tracks mid-playback going silent: `APlayer.updatePlayerConfig`
+   re-initializes the output audio unit (uninitialize, then initialize again so
+   a format change does not trip `-10867`), but that pair also *stops* a unit
+   that was running, while the cached player state stayed `.running`. The next
+   track's `resume()` therefore hit its "already running" guard and skipped
+   `AudioOutputUnitStart` altogether — the new track neither made a sound nor
+   reported a state change. The cached state now follows the unit: if it was
+   running before the re-init, it flips to `.paused` so the takeover resumes it
+   properly
+23. Fix a stale end-of-track pause clobbering the track the user switched to:
+   the delayed pause `APlay` schedules when a track finishes its cooldown ran
+   on a main-queue timer with no notion of *which* track it was scheduled for.
+   Switch tracks before it fired and the pause stopped the new track's output
+   unit on the old track's schedule and then advanced the playlist from the
+   wrong position. The pause now captures the composer it belongs to and
+   cancels itself (clearing its one-shot flag) if the active composer has moved
+   on, so a track change during the cooldown is clean
 
 v2.0.0
 ---

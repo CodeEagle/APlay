@@ -60,6 +60,37 @@ final class FormatCompatibilityTests: XCTestCase {
         // AIFF/AIFF-C PCM parse to lpcm but AudioFileStream reports discontinuity.
         .init(name: "tone", ext: "aiff", parses: true, decodes: false,
               formatID: CoreAudio.kAudioFormatLinearPCM, note: "AIFF PCM — dsc!, tracked separately"),
+        .init(name: "tone", ext: "aifc", parses: false, decodes: false,
+              formatID: CoreAudio.kAudioFormatLinearPCM, note: "AIFF-C PCM — streaming reports no properties at all; local files decode through APlayExtras"),
+        // AAC in a plain MP4 container (as opposed to .m4a): the hint table
+        // routes it separately, but the payload decoder is the same.
+        .init(name: "tone-mp4", ext: "mp4", parses: true, decodes: true,
+              formatID: AudioToolbox.kAudioFormatMPEG4AAC, note: "AAC in MP4"),
+        // Audiobook MP4: identical bytes to tone.m4a, but hinted as .m4b so
+        // Core Audio takes the MP4 branch instead of an MP3 fallback.
+        .init(name: "tone", ext: "m4b", parses: true, decodes: true,
+              formatID: AudioToolbox.kAudioFormatMPEG4AAC, note: "Audiobook MP4"),
+        // MPEG audio Layer II — same AudioFileStream path as MP3, one layer down.
+        .init(name: "tone-mp2", ext: "mp2", parses: true, decodes: true,
+              formatID: AudioToolbox.kAudioFormatMPEGLayer2, note: "MP2"),
+        // Dolby Digital in its own container.
+        .init(name: "tone", ext: "ac3", parses: true, decodes: true,
+              formatID: AudioToolbox.kAudioFormatAC3, note: "AC-3"),
+        .init(name: "tone", ext: "eac3", parses: true, decodes: true,
+              formatID: 0x65632D33 /* 'ec-3' */, note: "E-AC-3 (Dolby Digital Plus)"),
+        // NeXT/Sun AU carrying µ-law speech PCM.
+        .init(name: "tone", ext: "au", parses: true, decodes: false,
+              formatID: AudioToolbox.kAudioFormatULaw, note: "AU µ-law — parses the header, but the converter emits no PCM"),
+        // Block PCM (IMA ADPCM) inside a WAVE container: decodes to PCM,
+        // and Core Audio reports the source as plain linear PCM.
+        .init(name: "tone-ima4", ext: "wav", parses: true, decodes: true,
+              formatID: CoreAudio.kAudioFormatLinearPCM, note: "IMA ADPCM in WAVE"),
+        // 3GPP containers: the hint table maps the extensions, but
+        // AudioFileStream cannot parse the container at all.
+        .init(name: "tone", ext: "3gp", parses: false, decodes: false,
+              formatID: 0, note: "AAC in 3GPP — container not parsed by the streaming decoder"),
+        .init(name: "tone", ext: "3g2", parses: false, decodes: false,
+              formatID: 0, note: "AAC in 3GPP2 — container not parsed by the streaming decoder"),
     ]
 
     // MARK: - The whole matrix in one report

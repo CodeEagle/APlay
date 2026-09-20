@@ -1,3 +1,19 @@
+unreleased
+---
+
+1. The format matrix is now backed by fixtures for the formats that were previously
+   only routed: MP2, AAC in a plain MP4 container, audiobook MP4, IMA ADPCM in WAVE,
+   AC-3 and E-AC-3 all decode through the built-in streaming decoder and are pinned
+   by `FormatCompatibilityTests`. Dolby Digital Plus (`.eac3`) was claimed in 2.1.0
+   but was never actually mapped in the hint table (it fell back to `.mp3`); it is
+   now, and its test pins the `'ec-3'` format ID. AIFF-C was pinned only through the
+   optional library — the streaming decoder exposes no properties for it at all,
+   which the matrix now records. Two containers the hint table mapped turned out to
+   be unplayable in practice and moved to "not supported": NeXT/Sun AU parses its
+   header but decodes no PCM, and 3GPP/3GPP2 cannot be parsed by `AudioFileStream`
+   at all. The README now sorts every format into one of three buckets: streaming
+   playback, local playback via `APlayExtras`, or not supported
+
 v2.1.0
 ---
 >2026.09.20

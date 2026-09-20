@@ -220,6 +220,10 @@ final class APlayOrchestrationTests: XCTestCase {
         h.streamers.first?.emit(.endEncountered)
 
         XCTAssertEqual(h.streamers.count, 2, "the next track must be preloaded")
+        // The stream is opened off the main thread, so the open lands a hop
+        // after the composer is registered.
+        let opened = waitUntil { h.streamers.last?.openCalls.count == 1 }
+        XCTAssertTrue(opened, "the next track's stream must be opened")
         XCTAssertEqual(h.streamers.last?.openCalls.first?.url, url2)
         XCTAssertEqual(h.player.setupCount, 1, "the preload must not reconfigure the output")
         XCTAssertEqual(h.player.resumeCount, 0, "the preload must not start the output")

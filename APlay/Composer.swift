@@ -236,9 +236,19 @@ extension Composer {
         isPreloadAhead = true
         eventPipeline.toggle(enable: true)
         _decoder.resume()
-        _streamer.open(url: url, at: 0)
         isRunning = true
-        _config.startBackgroundTask(isToDownloadImage: false)
+        // The stream must not be opened on the caller's thread: `preload` is
+        // reached from the replayed end-of-stream event of the track that just
+        // took over, which lands on the main queue, and the open does
+        // synchronous file work plus a cross-queue close that would freeze the
+        // UI and block the very queue that has to finish the handoff tail. The
+        // flags above are set first, so every event the open produces already
+        // sees this composer as merely buffering ahead — its events are
+        // withheld and the output unit is left alone until `activate()`.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?._streamer.open(url: url, at: 0)
+            self?._config.startBackgroundTask(isToDownloadImage: false)
+        }
     }
 
     /// Takes over as the current track: installs this composer's ring buffer as

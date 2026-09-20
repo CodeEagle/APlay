@@ -49,6 +49,7 @@ public final class APlay: @unchecked Sendable {
     private lazy var __isSteamerEndEncounted = false
     private lazy var __isDecoderEndEncounted = false
     private lazy var __isCalledDelayPaused = false
+    private let __delayPausedLock = NSLock()
     private lazy var __isFlagReseted = false
     private lazy var __lastDelta: Float = -1
     private lazy var __lastDeltaHitCount: Int = 0
@@ -526,8 +527,12 @@ private extension APlay {
         // decoded, and `.stopWhenAllPlayed` has nothing after the last track.
         guard url != current.url else { return }
         let com = createComposer()
-        com.preload(url)
         _nextComposer = com
+        // `preload` marks the composer as buffering ahead synchronously and
+        // opens the stream off the main thread (see the comment there), so the
+        // track is visible as the buffered one — and its events are withheld —
+        // from the moment it is registered.
+        com.preload(url)
     }
 
     /// Drops the track buffering ahead of the current one. Called whenever the
@@ -702,8 +707,14 @@ extension APlay {
     }
 
     private var _isCalledDelayPaused: Bool {
-        get { return _propertiesQueue.sync { __isCalledDelayPaused } }
-        set { _propertiesQueue.async(flags: .barrier) { self.__isCalledDelayPaused = newValue } }
+        get { __delayPausedLock.lock(); defer { __delayPausedLock.unlock() }; return __isCalledDelayPaused }
+        // Synchronous, not a queued barrier: the end-of-track sequence is a
+        // check-then-act pair (read the flag, set it, schedule the pause), and an
+        // async write lets a second decoder tick read a stale `false` before the
+        // write lands, scheduling two end-of-track sequences for one track. The
+        // read also blocks on the properties queue's barrier, which the render
+        // thread can starve.
+        set { __delayPausedLock.lock(); __isCalledDelayPaused = newValue; __delayPausedLock.unlock() }
     }
 
     private var _isFlagReseted: Bool {

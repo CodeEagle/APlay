@@ -135,6 +135,18 @@ v2.1.0
    wrong position. The pause now captures the composer it belongs to and
    cancels itself (clearing its one-shot flag) if the active composer has moved
    on, so a track change during the cooldown is clean
+24. Fix gapless playback hanging a track or two into a playlist (reported as
+   gapless AAC-ADTS playback getting stuck, with the UI frozen and the track
+   never advancing): the preloader opened the next track's stream from the
+   main-queue tail of the end-of-track handoff, so while the very first preload
+   ran on a background queue, every subsequent one ran on the main thread. The
+   open does synchronous file work and a cross-queue close, which blocked the
+   very queue that had to finish the handoff — the end-of-track flag stayed
+   set, the next track never took over, and the render loop spun on silence
+   indefinitely. The stream is now opened off the main thread, and the
+   buffering-ahead flags are set synchronously before the open so a track
+   registered as the preload still has its events withheld and the output unit
+   left alone until the handoff
 
 v2.0.0
 ---

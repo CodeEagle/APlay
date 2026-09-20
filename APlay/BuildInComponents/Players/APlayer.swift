@@ -61,11 +61,12 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
 
     var startTime: Float = 0 {
         didSet {
-            _stateQueue.async(flags: .barrier) { self._progress = 0 }
+            _progressLock.lock(); _progress = 0; _progressLock.unlock()
         }
     }
 
-    fileprivate lazy var _progress: Float = 0
+    fileprivate var _progress: Float = 0
+    private let _progressLock = NSLock()
     private lazy var _volume: Float = 1
 
     private(set) lazy var asbd = AudioStreamBasicDescription()
@@ -261,7 +262,8 @@ extension APlayer {
     }
 
     func currentTime() -> Float {
-        return _stateQueue.sync { _progress / Float(asbd.mSampleRate) + startTime }
+        _progressLock.lock(); defer { _progressLock.unlock() }
+        return _progress / Float(asbd.mSampleRate) + startTime
     }
 
     var volume: Float {
@@ -324,7 +326,7 @@ extension APlayer {
                 sself.audioBufferList.mBuffers.mDataByteSize = size
 
                 let progress = sself._progress + Float(totalReadFrame)
-                sself._stateQueue.async(flags: .barrier) { sself._progress = progress }
+                sself._progressLock.lock(); sself._progress = progress; sself._progressLock.unlock()
                 return withUnsafePointer(to: &sself.audioBufferList, { $0 })
             }
 

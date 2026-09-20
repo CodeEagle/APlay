@@ -261,16 +261,34 @@ extension Composer {
         guard isPreloadAhead else { return }
         isPreloadAhead = false
         isPreloading = false
-        if needsAudioUnitReconfiguration, let player = _player {
-            player.setup(outputFormat)
+        guard needsAudioUnitReconfiguration, let player = _player else {
+            installReadSource()
+            // The unit is already rendering for an end-of-track handoff; only a
+            // handoff the user triggered while paused needs the output started. The
+            // guard keeps `resume()` — which touches main-actor APIs on iOS — off
+            // the realtime render thread.
+            if _player?.state != .running {
+                _player?.resume()
+            }
+            return
         }
-        installReadSource()
-        // The unit is already rendering for an end-of-track handoff; only a
-        // handoff the user triggered while paused needs the output started. The
-        // guard keeps `resume()` — which touches main-actor APIs on iOS — off
-        // the realtime render thread.
-        if _player?.state != .running {
-            _player?.resume()
+        // A change of sample format has to re-initialise the audio unit, which
+        // stops and restarts the AVAudioEngine render graph. That must never run
+        // on the render thread: `activate()` is reached from the render
+        // callback's end-of-track chain, and `setup` waits for the render in
+        // flight to finish — deadlocking against the very callback that called
+        // it, so the handoff tail never runs and the end-of-track flag stays
+        // set forever. Finish the swap on the main queue instead; the current
+        // track has already run dry, so the unit emits silence for the few
+        // milliseconds until the swap lands rather than stalling, and a
+        // cross-format transition was never seamless anyway.
+        DispatchQueue.main.async { [weak self] in
+            guard let sself = self else { return }
+            player.setup(sself.outputFormat)
+            sself.installReadSource()
+            if player.state != .running {
+                player.resume()
+            }
         }
     }
 

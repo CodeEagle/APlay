@@ -147,6 +147,27 @@ v2.1.0
    buffering-ahead flags are set synchronously before the open so a track
    registered as the preload still has its events withheld and the output unit
    left alone until the handoff
+25. Fix the gapless handoff still hanging when the next track needs an audio
+   unit reconfiguration (a cross-format transition, e.g. into AIFF/AIFF-C/CAF
+   in the demo): `Composer.activate()` reached `player.setup()` — which stops
+   and restarts the AVAudioEngine render graph — directly from the render
+   callback's end-of-track chain, and `setup` waits for the render in flight to
+   finish, deadlocking against the very callback that called it. The handoff
+   tail never ran, the end-of-track flag stayed set forever and the UI froze.
+   The reconfiguration is now dispatched to the main queue; the current track
+   has already run dry, so the unit emits silence for the few milliseconds
+   until the swap lands instead of stalling
+26. Fix the demo's format matrix never marking the AIFF-C and CAF rows as played:
+   two `TrackLibrary` entries had the file extension baked into
+   `resourceName` ("tone.m4a"/"tone.opus"), so `localURLs()` looked for
+   tone.m4a.m4a and tone.opus.opus, found nothing and silently dropped both
+   rows. The playlist ran two tracks short and every index above the gap was
+   off by two against the badge array, so the last two rows never lit up while
+   the audio itself played fine
+27. Demo: the equalizer swaps the rotated stock `Slider` for a purpose-built
+   vertical slider (gradient track, 0 dB tick, shadowed thumb that scales while
+   dragged, tap-to-jump), and the remote sample points at a URL that actually
+   serves the asset
 
 v2.0.0
 ---

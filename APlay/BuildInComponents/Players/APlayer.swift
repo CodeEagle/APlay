@@ -315,7 +315,6 @@ extension APlayer {
                 let size = bytesPerFrame * frameCount
 
                 let (readSize, _) = sself._readSlot.read(size, into: sself._buffers)
-                
                 var totalReadFrame: UInt32 = frameCount
                 if readSize != size {
                     totalReadFrame = readSize / bytesPerFrame

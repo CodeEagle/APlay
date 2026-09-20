@@ -59,11 +59,11 @@ enum TrackLibrary {
               detail: "The longest bundled file — watch Now Playing, seek and the lock screen.",
               route: .native, isShowcase: true),
 
-        Track(resourceName: "tone.m4a", resourceType: "m4a",
+        Track(resourceName: "tone", resourceType: "m4a",
               format: "AAC-LC",
               detail: "The bread-and-butter container: HTTP and local alike.",
               route: .native, isShowcase: false),
-        Track(resourceName: "tone.opus", resourceType: "opus",
+        Track(resourceName: "tone", resourceType: "opus",
               format: "Opus",
               detail: "Codec support is platform-dependent — this row tells you which.",
               route: .native, isShowcase: false),
@@ -107,7 +107,7 @@ enum TrackLibrary {
     ]
 
     /// Remote source shipped by the old demo, kept to show HTTP streaming.
-    static let remoteURL = URL(string: "https://umemore.shaunwill.cn/game/emotion/game_bgmusic.mp3")!
+    static let remoteURL = URL(string: "https://raw.githubusercontent.com/CodeEagle/APlay/master/APlayDemo/a.m4a")!
 
     /// Resolves the local samples to on-disk URLs, skipping anything missing
     /// from the bundle.

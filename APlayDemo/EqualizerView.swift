@@ -38,13 +38,13 @@ struct EqualizerView: View {
             HStack(alignment: .bottom, spacing: 6) {
                 ForEach(Array(player.bandFrequencies.enumerated()), id: \.offset) { index, hz in
                     VStack(spacing: 6) {
-                        Slider(value: Binding(
-                            get: { index < player.bandGains.count ? player.bandGains[index] : 0 },
-                            set: { player.setBandGain(at: index, to: $0) }
-                        ), in: -12...12)
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 30, height: 130)
-                        .tint(Color(uiColor: player.coverPalette.accent))
+                        VerticalEQSlider(
+                            value: index < player.bandGains.count ? player.bandGains[index] : 0,
+                            range: -12...12,
+                            accent: Color(uiColor: player.coverPalette.accent),
+                            onChanged: { player.setBandGain(at: index, to: $0) }
+                        )
+                        .frame(height: 130)
 
                         Text(TimeFormat.frequency(hz))
                             .font(.caption2.monospacedDigit())

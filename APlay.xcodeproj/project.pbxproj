@@ -67,6 +67,7 @@
 		A5E0A5000000000000001201 /* CoverArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000001101 /* CoverArt.swift */; };
 		A5E0A5000000000000001202 /* TrackLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000001102 /* TrackLibrary.swift */; };
 		A5E0A5000000000000001203 /* DemoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000001103 /* DemoPlayer.swift */; };
+120B /* VerticalEQSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A500000000000000110B /* VerticalEQSlider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -169,6 +170,7 @@
 		A5E0A5000000000000001108 /* EqualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EqualizerView.swift; sourceTree = "<group>"; };
 		A5E0A5000000000000001109 /* InfoSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoSections.swift; sourceTree = "<group>"; };
 		A5E0A500000000000000110A /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+A5E0A500000000000000110B /* VerticalEQSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerticalEQSlider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -211,6 +213,7 @@
 				A5E0A5000000000000001106 /* NowPlayingView.swift */,
 				A5E0A5000000000000001107 /* FormatMatrixView.swift */,
 				A5E0A5000000000000001108 /* EqualizerView.swift */,
+				A5E0A500000000000000110B /* VerticalEQSlider.swift */,
 				A5E0A5000000000000001109 /* InfoSections.swift */,
 				A5E0A500000000000000110A /* SceneDelegate.swift */,
 				1009026322785EE500BAA9BE /* a.m4a */,
@@ -576,6 +579,7 @@
 				1206 /* NowPlayingView.swift in Sources */,
 				1207 /* FormatMatrixView.swift in Sources */,
 				1208 /* EqualizerView.swift in Sources */,
+				120B /* VerticalEQSlider.swift in Sources */,
 				1209 /* InfoSections.swift in Sources */,
 				120A /* SceneDelegate.swift in Sources */,
 			);

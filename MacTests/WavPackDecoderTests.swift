@@ -58,6 +58,46 @@ final class WavPackDecoderTests: XCTestCase {
 
     // MARK: - Routing
 
+    /// Direct construction (no fallback) refuses a non-WavPack URL with a
+    /// parser error instead of mishandling it.
+    func testDirectConstructionRefusesAnMp3() throws {
+        let url = try fixture("tone-cbr", "mp3")
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = WavPackDecoder(config: config)
+
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .mp3)
+
+        XCTAssertThrowsError(try decoder.prepare(for: streamer, at: 0)) { error in
+            guard case .parser = error as? APlay.Error else {
+                XCTFail("expected a parser error, got \(error)"); return
+            }
+        }
+        XCTAssertFalse(decoder.seekable(), "nothing was opened, so the decoder is not seekable")
+    }
+    /// A file the library cannot open reports a parser error rather than
+    /// crashing.
+    func testCorruptFileReportsAnError() throws {
+        let url = try fixture("tone", "wv")
+        let corrupt = url.deletingLastPathComponent()
+            .appendingPathComponent("corrupt-\(UUID().uuidString).wv")
+        try Data([0x00, 0x01, 0x02, 0x03]).write(to: corrupt)
+        defer { try? FileManager.default.removeItem(at: corrupt) }
+
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlayWavPack.decoder(fallback: { DefaultAudioDecoder(config: $0) })(config)
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(corrupt, .wavpack)
+
+        XCTAssertThrowsError(try decoder.prepare(for: streamer, at: 0))
+        XCTAssertEqual(collector.errors.count, 1)
+    }
+
     /// A format the WavPack library does not own must still reach the fallback,
     /// so adding the product never regresses any other format. Routing only —
     /// whether the fallback actually decodes is its own test suite's job.

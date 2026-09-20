@@ -244,6 +244,44 @@ final class StreamerCoverageTests: XCTestCase {
         XCTAssertTrue(gotError, "a 404 must surface as .networkStatusCode(404)")
     }
 
+    /// A 401 arms the reconnect watchdog rather than ending the stream, so a
+    /// challenge answered by the session delegate can still recover.
+    func testRemote401ArmsTheReconnectWatchdog() throws {
+        let streamer = try makeRemoteStreamer(responses: [
+            Response(statusCode: 401, headers: [:], body: Data()),
+            Response(statusCode: 200, headers: ["Content-Length": "4"],
+                     body: Data([0x01, 0x02, 0x03, 0x04])),
+        ])
+
+        streamer.open(url: testURL, at: 0)
+
+        let recovered = waitUntil(timeout: 6) {
+            self.collector.events.contains(where: { event in
+                if case let .bytes(bytes, _) = event { return bytes == [0x01, 0x02, 0x03, 0x04] }
+                return false
+            })
+        }
+        XCTAssertTrue(recovered, "a 401 must be retried, not treated as end of stream")
+    }
+
+    /// A redirect-style status the streamer does not handle specially surfaces
+    /// as a network-status error rather than being silently ignored.
+    func testRemote302ReportsNetworkStatusCode() throws {
+        let streamer = try makeRemoteStreamer(responses: [
+            Response(statusCode: 302, headers: [:], body: Data()),
+        ])
+
+        streamer.open(url: testURL, at: 0)
+
+        let gotError = waitUntil(timeout: 3) {
+            self.collector.events.contains(where: { event in
+                if case let .error(error) = event, case let .networkStatusCode(code) = error { return code == 302 }
+                return false
+            })
+        }
+        XCTAssertTrue(gotError, "an unhandled status must surface as .networkStatusCode")
+    }
+
     // A persistent server error must keep the reconnect watchdog armed — the
     // task-completion handler no longer resets it — until the configured budget
     // is spent, then report the failure instead of a normal end of stream.

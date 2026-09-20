@@ -69,6 +69,18 @@ final class StreamerLocalTests: XCTestCase {
                 Thread.sleep(forTimeInterval: 0.01)
             }
         }
+
+        /// Blocks until the streamer has reported any error (or the test times out).
+        func waitForError(timeout: TimeInterval = 5) {
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline {
+                lock.lock()
+                let done = _events.contains { if case .error = $0 { return true }; return false }
+                lock.unlock()
+                if done { return }
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
     }
 
     let collector = Collector()
@@ -212,5 +224,51 @@ final class StreamerLocalTests: XCTestCase {
             return false
         }
         XCTAssertEqual(errors.count, 1, "a second open must be rejected with .openedAlready")
+    }
+
+    /// Pausing mid-stream stops the read loop; resuming it restarts the loop and
+    /// the file still arrives in full and in order.
+    func testPauseAndResumeTheLocalReadLoop() throws {
+        let payload = [UInt8](repeating: 0x09, count: 32_768)
+        let (streamer, url) = try makeStreamer(payload: payload)
+
+        streamer.open(url: url, at: 0)
+        streamer.pause()
+        // Give the queued pause a moment to land before resuming.
+        Thread.sleep(forTimeInterval: 0.1)
+        streamer.resume()
+        collector.waitForEnd()
+
+        let chunks = collector.events.compactMap { event -> [UInt8]? in
+            if case let .bytes(bytes, _) = event { return bytes }
+            return nil
+        }
+        XCTAssertEqual(chunks.flatMap { $0 }, payload,
+                       "pause then resume must still deliver the whole file")
+    }
+
+    /// Resuming before anything is open is a no-op rather than a crash.
+    func testResumeWithoutAnOpenFileIsHarmless() throws {
+        let (streamer, _) = try makeStreamer(payload: [0x01, 0x02])
+        streamer.resume()
+        streamer.pause()
+        XCTAssertEqual(collector.events.filter { if case .error = $0 { return true }; return false }.count, 0,
+                       "pause/resume on an unopened streamer must not report errors")
+    }
+
+    /// A missing file reports an open error instead of throwing out of the
+    /// async open path.
+    func testOpeningAMissingFileReportsAnError() throws {
+        let (streamer, _) = try makeStreamer(payload: [0x01])
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("APlayStreamerTest-missing-\(UUID().uuidString).bin")
+
+        streamer.open(url: url, at: 0)
+        collector.waitForError()
+
+        XCTAssertTrue(collector.events.contains { event in
+            if case let .error(error) = event, case .open = error { return true }
+            return false
+        }, "a nonexistent file must surface an .open error")
     }
 }

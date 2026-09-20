@@ -33,6 +33,14 @@ final class MetadataParserTests: XCTestCase {
 
     let collector = Collector()
     let config = APlay.Configuration()
+    /// The parser holds its config `unowned`, and a remote probe outlives the
+    /// helper that built it, so the config is held for the lifetime of the test.
+    private var heldConfig: APlay.Configuration?
+
+    override func tearDown() {
+        heldConfig = nil
+        super.tearDown()
+    }
 
     func testFlacParserDecodesStreamInfo() throws {
         let parser = FlacParser(config: config)
@@ -121,6 +129,11 @@ final class MetadataParserTests: XCTestCase {
     private func be32(_ value: Int) -> [UInt8] {
         [UInt8((value >> 24) & 0xFF), UInt8((value >> 16) & 0xFF),
          UInt8((value >> 8) & 0xFF), UInt8(value & 0xFF)]
+    }
+
+    /// Big-endian 8-byte length (FLAC seek points are 64-bit).
+    private func be64(_ value: UInt64) -> [UInt8] {
+        be32(Int(value >> 32)) + be32(Int(value & 0xFFFF_FFFF))
     }
 
     /// Little-endian 4-byte length (FLAC vorbis comments are LE).
@@ -387,6 +400,132 @@ final class MetadataParserTests: XCTestCase {
         XCTAssertEqual(cover, Data(jpeg))
     }
 
+    // MARK: - ID3v2 edge cases
+
+    private func makeID3Parser() -> ID3Parser {
+        let parser = ID3Parser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in
+            collector.append(event)
+        }
+        return parser
+    }
+
+    /// A zero-size frame is padding: the parser steps past it and keeps parsing.
+    /// Only v2.2 skips cleanly — the skip assumes a 6-byte header with no flags.
+    func testID3v22SkipsAPaddingFrame() throws {
+        let parser = makeID3Parser()
+        var bytes = v2Header(version: 0x02, flags: 0x00, tagSize: 18)
+        // A zero-size frame: 3-byte name + 3-byte size of 0.
+        bytes.append(contentsOf: Array("TT2".utf8) + [0x00, 0x00, 0x00])
+        bytes.append(contentsOf: v22Frame("TT2", body: textBody("Real Title")))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertEqual(stringItem(try waitForMetadata(), "title"), "Real Title")
+    }
+
+    /// A frame that declares more body than the buffer holds stops the parse.
+    /// An empty frame name makes the truncation look like the tag's padding
+    /// tail, so the parser settles; a named frame would wait for more data.
+    func testID3v23StopsOnATruncatedFrame() throws {
+        let parser = makeID3Parser()
+        var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: 8)
+        // An empty name claiming 100 bytes of body but carrying only a few.
+        bytes.append(contentsOf: [0x00, 0x00, 0x00, 0x00] + be32(100) + [0x00, 0x00] + Array("abcd".utf8))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertTrue(try waitForMetadata().isEmpty, "a truncated frame must not yield metadata")
+    }
+
+    /// A frame whose name is not UTF-8 ends the parse rather than crashing.
+    func testID3v23RejectsAFrameWithAnInvalidName() throws {
+        let parser = makeID3Parser()
+        var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: 30)
+        bytes.append(contentsOf: [0xFF, 0xFF, 0xFF, 0xFF] + be32(4) + [0x00, 0x00] + Array("body".utf8))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertTrue(try waitForMetadata().isEmpty, "a bad frame name must not yield metadata")
+    }
+
+    /// An APIC whose mime type never terminates is rejected.
+    func testID3v23RejectsAnApicWithAnUnterminatedMimeType() throws {
+        let parser = makeID3Parser()
+        let body: [UInt8] = [0x00] + Array("image/jpeg".utf8) // no terminator
+        var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: 10 + body.count)
+        bytes.append(contentsOf: v23Frame("APIC", body: body))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertTrue(try waitForMetadata().isEmpty, "an unterminated mime type must not yield a cover")
+    }
+
+    /// An APIC whose frame ends right after the mime type has no picture type.
+    func testID3v23RejectsAnApicWithoutAPictureType() throws {
+        let parser = makeID3Parser()
+        let body: [UInt8] = [0x00] + Array("image/jpeg".utf8) + [0x00]
+        var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: 10 + body.count)
+        bytes.append(contentsOf: v23Frame("APIC", body: body))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertTrue(try waitForMetadata().isEmpty, "a missing picture type must not yield a cover")
+    }
+
+    /// An APIC whose description never terminates is rejected.
+    func testID3v23RejectsAnApicWithAnUnterminatedDescription() throws {
+        let parser = makeID3Parser()
+        let body: [UInt8] = [0x00] + Array("image/jpeg".utf8) + [0x00, 0x03] + Array("no end".utf8)
+        var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: 10 + body.count)
+        bytes.append(contentsOf: v23Frame("APIC", body: body))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertTrue(try waitForMetadata().isEmpty, "an unterminated description must not yield a cover")
+    }
+
+    /// A frame whose text-encoding byte the parser does not know is skipped.
+    func testID3v23SkipsAFrameWithAnUnknownTextEncoding() throws {
+        let parser = makeID3Parser()
+        let body: [UInt8] = [0x09] + Array("Title".utf8) + [0x00]
+        var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: 10 + body.count)
+        bytes.append(contentsOf: v23Frame("TIT2", body: body))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertTrue(try waitForMetadata().isEmpty, "an unknown encoding must not yield metadata")
+    }
+
+    /// A UTF-16 text frame (encoding 1, external representation with a BOM)
+    /// decodes through its own encoding branch.
+    func testID3v23DecodesAUTF16TextFrame() throws {
+        let parser = makeID3Parser()
+        var body: [UInt8] = [0x01, 0xFE, 0xFF] // encoding 1 + big-endian BOM
+        for scalar in "Title".unicodeScalars { body += [0x00, UInt8(scalar.value)] }
+        body += [0x00, 0x00]
+        var bytes = v2Header(version: 0x03, flags: 0x00, tagSize: 10 + body.count)
+        bytes.append(contentsOf: v23Frame("TIT2", body: body))
+        feed(parser, bytes: bytes)
+        parser.parseID3V1Tag(at: missingFileURL())
+        XCTAssertEqual(stringItem(try waitForMetadata(), "title"), "Title")
+    }
+
+    /// The v2.2 compression flag and the v2.3 experimental indicator are read
+    /// without derailing the parse.
+    func testID3v22AndV23AcceptTheirHeaderFlags() throws {
+        for (version, flags) in [(0x02 as UInt8, 0x40 as UInt8), (0x03, 0x20)] {
+            let parser = makeID3Parser()
+            feed(parser, bytes: v2Header(version: version, flags: flags, tagSize: 8))
+            parser.parseID3V1Tag(at: missingFileURL())
+            _ = try waitForMetadata()
+        }
+    }
+
+    /// A v2.4 footer flag adds its 10 bytes to the announced tag size, and a
+    /// version the parser does not model falls back to v2.3.
+    func testID3v24FooterFlagAndUnknownVersionAreHandled() throws {
+        for (version, flags) in [(0x04 as UInt8, 0x10 as UInt8), (0x05, 0x00)] {
+            let parser = makeID3Parser()
+            feed(parser, bytes: v2Header(version: version, flags: flags, tagSize: 8))
+            parser.parseID3V1Tag(at: missingFileURL())
+            _ = try waitForMetadata()
+        }
+    }
+
     // MARK: - ID3v1
 
     func testID3v1TagDecodesLocalFile() throws {
@@ -427,6 +566,93 @@ final class MetadataParserTests: XCTestCase {
         XCTAssertEqual(stringItem(items, "title"), "V11Title")
         XCTAssertEqual(stringItem(items, "track"), "9")
         XCTAssertEqual(stringItem(items, "comment"), "V11Comment")
+    }
+
+    /// A v1.0 tag — the byte at 125 is non-zero, so there is no track field —
+    /// reads its comment from the full 30-byte field, and a genre byte outside
+    /// the table is reported as its raw number.
+    func testID3v10TagUsesTheFullCommentAndReportsAnUnknownGenre() throws {
+        let parser = makeID3Parser()
+        let url = URL(fileURLWithPath: "\(NSTemporaryDirectory())APlayTests-v10-\(UUID().uuidString).mp3")
+        var file = Array(repeating: UInt8(0x00), count: 4096)
+        // A 29-character comment fills the field up to byte 125; that non-zero
+        // byte is what distinguishes v1.0 from v1.1.
+        let comment = String(repeating: "C", count: 29)
+        file.append(contentsOf: v1Tag(title: "T", artist: "A", album: "Al", year: "1999",
+                                      comment: comment, genre: 200))
+        try Data(file).write(to: url)
+        settleV2WithError(parser)
+        parser.parseID3V1Tag(at: url)
+        let items = try waitForMetadata()
+        XCTAssertEqual(stringItem(items, "comment"), comment)
+        XCTAssertEqual(stringItem(items, "genre"), "200", "an out-of-table genre is its raw byte")
+        XCTAssertNil(stringItem(items, "track"), "a v1.0 tag carries no track field")
+    }
+
+    /// Serves a fixed body for every request the v1 probe makes.
+    final class V1ProbeProtocol: URLProtocol {
+        static var body: Data = Data()
+
+        override class func canInit(with request: URLRequest) -> Bool {
+            request.url?.scheme == "https"
+        }
+
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+            request
+        }
+
+        override func startLoading() {
+            guard let url = request.url else { return }
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+                                           headerFields: ["Content-Length": "\(Self.body.count)"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            if Self.body.isEmpty == false {
+                client?.urlProtocol(self, didLoad: Self.body)
+            }
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
+    }
+
+    /// A parser whose config session is intercepted by `V1ProbeProtocol`.
+    private func makeRemoteID3Parser(body: Data) -> ID3Parser {
+        V1ProbeProtocol.body = body
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [V1ProbeProtocol.self]
+        let config = APlay.Configuration(logPolicy: .disable,
+                                         sessionBuilder: { _ in URLSession(configuration: configuration) })
+        heldConfig = config
+        let parser = ID3Parser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in
+            collector.append(event)
+        }
+        return parser
+    }
+
+    /// A remote file's v1 tag is fetched with a Range request and decoded.
+    func testID3v1TagIsFetchedFromARemoteURL() throws {
+        let parser = makeRemoteID3Parser(body: Data(v1Tag(title: "RT", artist: "RA", album: "RL",
+                                                          year: "2020", comment: "RComment")))
+        settleV2WithError(parser)
+        parser.parseID3V1Tag(at: URL(string: "https://example.com/remote-\(UUID().uuidString).mp3")!)
+
+        let items = try waitForMetadata(timeout: 5)
+        XCTAssertEqual(stringItem(items, "title"), "RT")
+        XCTAssertEqual(stringItem(items, "comment"), "RComment")
+    }
+
+    /// A probe that comes back short of the 128-byte tag settles as invalid.
+    func testID3v1RejectsARemoteResponseShorterThanATag() throws {
+        let parser = makeRemoteID3Parser(body: Data(repeating: 0x41, count: 10))
+        settleV2WithError(parser)
+        parser.parseID3V1Tag(at: URL(string: "https://example.com/short-\(UUID().uuidString).mp3")!)
+
+        _ = try waitForMetadata(timeout: 5)
+        let metadataEvents = collector.events.filter { if case .metadata = $0 { return true }; return false }
+        XCTAssertEqual(metadataEvents.count, 1, "the parser must settle exactly once")
+        guard case let .metadata(items)? = metadataEvents.first else { return }
+        XCTAssertTrue(items.isEmpty, "a short response must not produce a v1 tag")
     }
 
     func testID3v23DeunsynchronisesFF00Padding() throws {
@@ -632,6 +858,46 @@ final class MetadataParserTests: XCTestCase {
         let flac = try waitForFlacEvent()
         XCTAssertEqual(flac.seekTable?.points.count, 1)
         XCTAssertEqual(flac.seekTable?.points.first?.frameSamples, 2880)
+    }
+
+    /// The seek table resolves a request time to the nearest point before it,
+    /// and a placeholder point describes itself rather than its raw number.
+    func testFlacSeekTableResolvesTheNearestOffset() throws {
+        func seekPoint(_ sample: UInt64, _ offset: UInt64) -> [UInt8] {
+            be64(sample) + be64(offset) + [0x0B, 0x40]
+        }
+        // Points at 1 s and 2 s, plus a placeholder that sorts last.
+        let body = seekPoint(44_100, 0) + seekPoint(88_200, 4_096) + seekPoint(0xFFFF_FFFF_FFFF_FFFF, 0)
+        var bytes: [UInt8] = [0x66, 0x4C, 0x61, 0x43]
+        bytes.append(contentsOf: flacHeader(isLast: false, type: 0, size: 34))
+        bytes.append(contentsOf: streamInfoBody())
+        bytes.append(contentsOf: flacHeader(isLast: true, type: 3, size: body.count))
+        bytes.append(contentsOf: body)
+
+        let parser = FlacParser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in collector.append(event) }
+        feed(parser, bytes: bytes)
+        let flac = try waitForFlacEvent()
+
+        XCTAssertEqual(flac.seekTable?.points.count, 3)
+        let nearest = flac.nearestOffset(for: 1.5)
+        XCTAssertEqual(nearest?.0, 1.0, "the point just before the request time wins")
+        XCTAssertEqual(nearest?.1, 0)
+        XCTAssertTrue(String(describing: flac.seekTable!.points.last!).contains("PlaceHolder"),
+                      "a placeholder point is reported by name")
+        XCTAssertFalse(String(describing: flac.seekTable!.points.first!).contains("PlaceHolder"))
+    }
+
+    /// Without a seek table there is no offset to report.
+    func testFlacWithoutASeekTableHasNoNearestOffset() throws {
+        let parser = FlacParser(config: config)
+        parser.outputStream.delegate(to: collector) { collector, event in collector.append(event) }
+        var bytes: [UInt8] = [0x66, 0x4C, 0x61, 0x43]
+        bytes.append(contentsOf: flacHeader(isLast: true, type: 0, size: 34))
+        bytes.append(contentsOf: streamInfoBody())
+        feed(parser, bytes: bytes)
+        let flac = try waitForFlacEvent()
+        XCTAssertNil(flac.nearestOffset(for: 1.0))
     }
 
     /// Waits for the parser's barrier queue to flush a `.flac` event.

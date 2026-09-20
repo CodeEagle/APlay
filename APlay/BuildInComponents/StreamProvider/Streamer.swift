@@ -408,14 +408,10 @@ private extension Streamer {
          */
         if let metaint = http.value(forHTTPHeaderField: Keys.icyMetaint.rawValue) {
             _icyCastInfo.isIcyStream = true
-            _icyCastInfo.isHeadersParsed = true
-            _icyCastInfo.isHeadersRead = true
             _icyCastInfo.metaDataInterval = Int(metaint) ?? 0
             _config.logger.log("\(Keys.icyMetaint.rawValue): \(_icyCastInfo.metaDataInterval)", to: .streamProvider)
         } else if let notice = http.value(forHTTPHeaderField: Keys.icyNotice1.rawValue) {
             _icyCastInfo.isIcyStream = true
-            _icyCastInfo.isHeadersParsed = true
-            _icyCastInfo.isHeadersRead = true
             _config.logger.log("\(Keys.icyNotice1.rawValue): \(notice)", to: .streamProvider)
         }
         if let name = http.value(forHTTPHeaderField: Keys.icyName.rawValue) {
@@ -627,26 +623,18 @@ private extension Streamer {
 
 private extension Streamer {
     final class IcyCastInfo {
-        lazy var name: String? = nil
-        lazy var isIcyStream = false
-        private lazy var isHeaderCR = false
-        lazy var isHeadersRead = false
-        lazy var isHeadersParsed = false
-        private lazy var headerLines: [String] = []
-        lazy var metaDataInterval = 0
-        lazy var dataByteReadCount = 0
-        lazy var metaDataBytesRemaining = 0
-        lazy var metadata: [UInt8] = []
-        lazy var buffer: [UInt8]? = nil
+        var name: String? = nil
+        var isIcyStream = false
+        var metaDataInterval = 0
+        var dataByteReadCount = 0
+        var metaDataBytesRemaining = 0
+        var metadata: [UInt8] = []
+        var buffer: [UInt8]? = nil
         init() {}
 
         func reset() {
             name = nil
             isIcyStream = false
-            isHeaderCR = false
-            isHeadersRead = false
-            isHeadersParsed = false
-            headerLines = []
             metaDataInterval = 0
             dataByteReadCount = 0
             metaDataBytesRemaining = 0
@@ -657,78 +645,9 @@ private extension Streamer {
         func parseICYStream(streamer: Streamer, buffers pointer: UnsafeMutablePointer<UInt8>, bufSize: Int) {
             streamer._config.logger.log("Parsing an IceCast stream, received \(bufSize) bytes", to: .streamProvider)
             var offset = 0
-            var bytesFound = 0
             let buffers = UnsafeMutablePointer.uint8Pointer(of: bufSize)
             defer { free(buffers) }
             memcpy(buffers, pointer, bufSize)
-            func readICYHeader() {
-                streamer._config.logger.log("ICY headers not read, reading", to: .streamProvider)
-                while offset < bufSize {
-                    let buffer = buffers.advanced(by: offset).pointee
-                    let bufferString = String(Character(UnicodeScalar(buffer)))
-                    if bufferString == "", isHeaderCR {
-                        if bytesFound > 0 {
-                            var bytes: [UInt8] = []
-                            let total = offset - bytesFound
-                            for i in 0 ..< total {
-                                bytes.append(buffers.advanced(by: i).pointee)
-                            }
-                            if let line = createMetaData(from: &bytes, numBytes: total) {
-                                headerLines.append(line)
-                                streamer._config.logger.log("icyHeaderLines:\(line)", to: .streamProvider)
-                            }
-                            bytesFound = 0
-                            offset += 1
-                            continue
-                        }
-                        isHeadersRead = true
-                        break
-                    }
-                    if bufferString == "\r" {
-                        isHeaderCR = true
-                        offset += 1
-                        continue
-                    } else {
-                        isHeaderCR = false
-                    }
-                    bytesFound += 1
-                    offset += 1
-                }
-            }
-
-            func parseICYHeader() {
-                let icyContentTypeHeader = Keys.contentType.rawValue + ":"
-                let icyMetaDataHeader = Keys.icyMetaint.rawValue + ":"
-                let icyNameHeader = Keys.icyName.rawValue + ":"
-                for line in headerLines {
-                    if line.isEmpty { continue }
-                    let l = line.lowercased()
-                    if l.hasPrefix(icyContentTypeHeader) {
-                        let contentType = line.replacingOccurrences(of: icyContentTypeHeader, with: "")
-                        if case let .remote(url, hint) = streamer.info {
-                            let newHint = StreamProvider.URLInfo.fileHint(from: contentType)
-                            if newHint != hint {
-                                streamer.info = .remote(url, newHint)
-                                streamer._tagParser = streamer.tagParser(for: streamer.info)
-                            }
-                        }
-                        streamer._config.logger.log("\(Keys.contentType.rawValue): \(contentType)", to: .streamProvider)
-                    }
-                    if l.hasPrefix(icyMetaDataHeader) {
-                        let raw = l.replacingOccurrences(of: icyMetaDataHeader, with: "")
-                        if let interval = Int(raw) {
-                            metaDataInterval = interval
-                        } else { metaDataInterval = 0 }
-                    }
-                    if l.hasPrefix(icyNameHeader) {
-                        name = l.replacingOccurrences(of: icyNameHeader, with: "")
-                    }
-                }
-                isHeadersParsed = true
-                offset += 1
-                streamer.outputPipeline.call(.readyForRead)
-            }
-
             func readICY() {
                 if buffer == nil {
                     buffer = Array(repeating: 0, count: 8192)
@@ -788,20 +707,26 @@ private extension Streamer {
                     i += 1
                     dataByteReadCount += 1
                     let count = buffer?.count ?? 0
-                    if i < count {
-                        buffer?[i] = buf
+                    // `i` counts data bytes seen so far; the byte at position i
+                    // is the i-th one, so it belongs at index i - 1. Writing it
+                    // at `i` instead shifts the whole slice: the delivered chunk
+                    // starts with the buffer's zero fill and drops its last
+                    // byte.
+                    if i <= count {
+                        buffer?[i - 1] = buf
                     }
                     offset += 1
                 }
                 if let buffer = buffer, i > 0 {
+                    // Bytes beyond the fixed-size buffer were dropped above;
+                    // report only the ones actually stored.
+                    let stored = min(i, buffer.count)
                     buffer.withUnsafeBufferPointer { bufferPtr in
-                        streamer.outputPipeline.call(.hasBytesAvailable(bufferPtr.baseAddress!, UInt32(i), streamer._isFirstPacket))
+                        streamer.outputPipeline.call(.hasBytesAvailable(bufferPtr.baseAddress!, UInt32(stored), streamer._isFirstPacket))
                     }
                     if streamer._isFirstPacket { streamer._isFirstPacket = false }
                 }
             }
-            if isHeadersRead == false { readICYHeader() }
-            else if isHeadersParsed == false { parseICYHeader() }
             readICY()
         }
 

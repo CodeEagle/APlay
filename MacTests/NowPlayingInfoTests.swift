@@ -137,4 +137,55 @@ final class NowPlayingInfoTests: XCTestCase {
         XCTAssertEqual(info.playbackTime, 5)
         XCTAssertEqual(info.info[MPNowPlayingInfoPropertyPlaybackRate] as? Double, 0)
     }
+
+    /// A cover the shared cache has never seen is fetched end to end: the
+    /// permission gate opens, the data task runs and the art work is stored
+    /// back in the shared cache. A unique path keeps the request off the warm
+    /// cache entry the other test leaves behind.
+    func testDownloadsACoverTheCacheHasNotSeen() throws {
+        let info = makeInfo()
+        let url = "https://example.com/cover-\(UUID().uuidString).png"
+
+        info.image(with: url)
+
+        let expectation = expectation(description: "the uncached cover is downloaded")
+        for _ in 0..<100 {
+            if info.artwork != nil {
+                expectation.fulfill()
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        wait(for: [expectation], timeout: 10)
+
+        XCTAssertNotNil(info.artwork, "the download must produce art work")
+        let request = URLRequest(url: URL(string: url)!)
+        XCTAssertNotNil(URLCache.shared.cachedResponse(for: request),
+                        "a fetched cover is stored back in the shared cache")
+        // Keep the test's litter out of the user's shared cache.
+        URLCache.shared.removeCachedResponse(for: request)
+    }
+
+    /// A denied permission gate never starts the data task.
+    func testADeniedPermissionSkipsTheDownload() {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CoverProtocol.self]
+        let config = APlay.Configuration(logPolicy: .disable,
+                                          networkPolicy: .requiredPermission({ _, handler in handler(false) }),
+                                          sessionBuilder: { _ in
+                                              URLSession(configuration: configuration)
+                                          })
+        self.config = config
+        let info = APlay.NowPlayingInfo(config: config)
+
+        info.image(with: "https://example.com/denied-\(UUID().uuidString).png")
+
+        let expectation = expectation(description: "the gate has been asked")
+        // Give the dispatch a moment to run before declaring nothing happened.
+        Thread.sleep(forTimeInterval: 0.3)
+        expectation.fulfill()
+        wait(for: [expectation], timeout: 1)
+
+        XCTAssertNil(info.artwork, "a denied request must not produce art work")
+    }
 }

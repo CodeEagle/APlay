@@ -46,15 +46,15 @@ public final class APlay: @unchecked Sendable {
     private var _playlist: PlayList
     private var _propertiesQueue = DispatchQueue(concurrentName: "APlay.properties")
 
-    private lazy var __isSteamerEndEncounted = false
-    private lazy var __isDecoderEndEncounted = false
-    private lazy var __isCalledDelayPaused = false
+    private var __isSteamerEndEncounted = false
+    private var __isDecoderEndEncounted = false
+    private var __isCalledDelayPaused = false
     private let __delayPausedLock = NSLock()
-    private lazy var __isFlagReseted = false
-    private lazy var __lastDelta: Float = -1
-    private lazy var __lastDeltaHitCount: Int = 0
-    private lazy var __lastFrozenTime: Float = -1
-    private lazy var __frozenHitCount: Int = 0
+    private var __isFlagReseted = false
+    private var __lastDelta: Float = -1
+    private var __lastDeltaHitCount: Int = 0
+    private var __lastFrozenTime: Float = -1
+    private var __frozenHitCount: Int = 0
     private let __frozenLock = NSLock()
     private var __currentComposer: Composer?
     /// The track buffering one step ahead of `__currentComposer`, so the
@@ -63,11 +63,11 @@ public final class APlay: @unchecked Sendable {
     /// Events collected while `__nextComposer` is only buffering ahead; they are
     /// replayed through the forwarder the moment the track takes over.
     private let __pendingNextEvents = PendingComposerEvents()
-    private lazy var __isPlayingBeforeInterrupt = false
+    private var __isPlayingBeforeInterrupt = false
     private let _maxOpenRestry = 5
-    private lazy var _currentOpenRestry = 0
+    private var _currentOpenRestry = 0
 
-    private lazy var _obs: [NSObjectProtocol] = []
+    private var _obs: [NSObjectProtocol] = []
 
     deinit {
         // deinit runs under exclusive access to self: no other strong reference

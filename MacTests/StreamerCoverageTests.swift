@@ -395,6 +395,121 @@ final class StreamerCoverageTests: XCTestCase {
         XCTAssertTrue(gotTitle, "icy-name must arrive as a .metadata title")
     }
 
+    // A ShoutCast body interleaves audio with metadata: every `metaint`
+    // audio bytes are followed by one length byte, then that length × 16 bytes
+    // of metadata. `metaint` is what the icy-metaint response header announced.
+    func icyBody(metaint: Int, frame: String, trailing: Int) -> Data {
+        let frameBytes = Array(frame.utf8)
+        precondition(
+            frameBytes.count.isMultiple(of: 16),
+            "the frame length must be a multiple of 16 — the length byte counts 16-byte blocks")
+        var body = Data(repeating: 0x4A, count: metaint)
+        body.append(UInt8(frameBytes.count / 16))
+        body.append(contentsOf: frameBytes)
+        body.append(Data(repeating: 0x4B, count: trailing))
+        return body
+    }
+
+    /// Collects the audio the streamer handed to the pipeline.
+    func streamedAudio() -> [UInt8] {
+        collector.events.compactMap { event -> [UInt8]? in
+            if case let .bytes(bytes, _) = event { return bytes }
+            return nil
+        }.flatMap { $0 }
+    }
+
+    /// The streamer reports the inline frame only once the whole frame has
+    /// arrived, so the wait has to poll rather than assume an ordering.
+    func metadataFrame() -> [MetadataParser.Item]? {
+        for event in collector.events {
+            if case let .metadata(items) = event,
+               items.contains(where: { if case let .other(dict) = $0 { return dict["StreamTitle"] != nil }; return false }) {
+                return items
+            }
+        }
+        return nil
+    }
+
+    func testIcyMetaintParsesInlineMetadataFrame() throws {
+        // The parser consumes the frame's final byte as the trigger to parse
+        // (it never lands in `metadata`), so the trailing ';' keeps the payload
+        // off the end while still splitting into two fields. The audio after
+        // the frame is exactly one `metaint` of bytes: the byte that would
+        // follow starts the next interval and is read as a length byte.
+        let body = icyBody(metaint: 8, frame: "StreamTitle='AB';StreamUrl='xy';", trailing: 8)
+        let streamer = try makeRemoteStreamer(responses: [
+            Response(statusCode: 200,
+                     headers: ["icy-metaint": "8", "icy-name": "Radio APlay"],
+                     body: body),
+        ])
+
+        streamer.open(url: testURL, at: 0)
+
+        var frameItems: [MetadataParser.Item]?
+        let parsed = waitUntil {
+            frameItems = self.metadataFrame()
+            return frameItems != nil
+        }
+        XCTAssertTrue(parsed, "an inline metadata frame must be reported as .metadata")
+
+        var fields: [String: String] = [:]
+        var titles: [String] = []
+        for item in frameItems ?? [] {
+            switch item {
+            case let .other(dict): fields.merge(dict) { current, _ in current }
+            case let .title(value): titles.append(value)
+            default: break
+            }
+        }
+        XCTAssertEqual(Set(fields.keys), ["StreamTitle", "StreamUrl"],
+                       "both ';' separated fields must be parsed")
+        // The value keeps its delimiters: the parser splits on "='" but the
+        // range it builds starts at the '=' and runs to the token's end.
+        XCTAssertEqual(fields["StreamTitle"], "='AB'")
+        XCTAssertEqual(fields["StreamUrl"], "='xy'")
+        XCTAssertEqual(titles, ["Radio APlay"],
+                       "icy-name must be attached to every frame as a title")
+
+        let delivered = waitUntil { self.streamedAudio() == Array(repeating: 0x4A, count: 8) + Array(repeating: 0x4B, count: 8) }
+        XCTAssertTrue(delivered, "the audio on both sides of the frame must be delivered in order, byte for byte")
+        XCTAssertTrue(streamer.contentLength == 0, "an icy stream announces no content length")
+    }
+
+    /// A zero-length frame carries no metadata at all: the length byte just
+    /// resets the interval counter and the audio keeps flowing.
+    func testIcyEmptyMetadataFrameKeepsStreaming() throws {
+        let body = icyBody(metaint: 4, frame: "", trailing: 4)
+        let streamer = try makeRemoteStreamer(responses: [
+            Response(statusCode: 200, headers: ["icy-metaint": "4"], body: body),
+        ])
+
+        streamer.open(url: testURL, at: 0)
+
+        let delivered = waitUntil { self.streamedAudio() == Array(repeating: 0x4A, count: 4) + Array(repeating: 0x4B, count: 4) }
+        XCTAssertTrue(delivered, "an empty frame must not consume any audio")
+        XCTAssertNil(metadataFrame(), "an empty frame must not emit metadata")
+    }
+
+    /// The decode buffer is 8 KB, so a single chunk larger than that is
+    /// truncated rather than growing the buffer.
+    func testIcyChunkIsCappedAtTheBufferSize() throws {
+        let body = icyBody(metaint: 20_000, frame: "", trailing: 9_000)
+        let streamer = try makeRemoteStreamer(responses: [
+            Response(statusCode: 200, headers: ["icy-metaint": "20000"], body: body),
+        ])
+
+        streamer.open(url: testURL, at: 0)
+
+        let capped = waitUntil(timeout: 6) {
+            let chunks = self.collector.events.compactMap { event -> [UInt8]? in
+                if case let .bytes(bytes, _) = event { return bytes }
+                return nil
+            }
+            return chunks.isEmpty == false && chunks.allSatisfy { $0.count <= 8192 }
+        }
+        XCTAssertTrue(capped, "no delivered chunk may exceed the 8 KB ICY buffer")
+    }
+
     // MARK: - Caching
 
     func testCompleteResponseIsCachedToDisk() throws {

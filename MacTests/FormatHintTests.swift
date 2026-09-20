@@ -120,6 +120,32 @@ final class FormatHintTests: XCTestCase {
     func testIsWaveDetection() {
         XCTAssertTrue(StreamProvider.URLInfo.isWave(for: URL(fileURLWithPath: "/tmp/a.wav")))
         XCTAssertFalse(StreamProvider.URLInfo.isWave(for: URL(fileURLWithPath: "/tmp/a.mp3")))
+
+        // The instance properties are hint-driven, so only a wave hint says yes.
+        let remoteWave = StreamProvider.URLInfo.remote(URL(string: "https://example.com/a.wav")!, .wave)
+        let localWave = StreamProvider.URLInfo.local(URL(fileURLWithPath: "/tmp/a.wav"), .wave)
+        let remoteMP3 = StreamProvider.URLInfo.remote(URL(string: "https://example.com/a.mp3")!, .mp3)
+        let localMP3 = StreamProvider.URLInfo.local(URL(fileURLWithPath: "/tmp/a.mp3"), .mp3)
+        let unknown = StreamProvider.URLInfo.unknown(URL(string: "https://example.com/a")!)
+
+        XCTAssertTrue(remoteWave.isWave, "fileHint reports the hint for any kind")
+        XCTAssertTrue(localWave.isWave)
+        XCTAssertFalse(remoteMP3.isWave)
+        XCTAssertFalse(localMP3.isWave)
+        XCTAssertFalse(unknown.isWave, "an unknown URL has no hint at all")
+
+        XCTAssertTrue(remoteWave.isRemoteWave)
+        XCTAssertFalse(localWave.isRemoteWave, "isRemoteWave ignores local URLs")
+        XCTAssertFalse(remoteMP3.isRemoteWave, "isRemoteWave still needs a wave hint")
+        XCTAssertFalse(unknown.isRemoteWave)
+
+        XCTAssertTrue(localWave.isLocalWave)
+        XCTAssertFalse(remoteWave.isLocalWave, "isLocalWave ignores remote URLs")
+        XCTAssertFalse(localMP3.isLocalWave, "isLocalWave still needs a wave hint")
+        XCTAssertFalse(unknown.isLocalWave)
+
+        XCTAssertEqual(remoteWave.fileHint, .wave)
+        XCTAssertEqual(unknown.fileHint, .mp3, "an unknown URL falls back to mp3")
     }
 
     // MARK: - Local content length

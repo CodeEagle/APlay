@@ -177,6 +177,24 @@ final class FileFallbackDecoderTests: XCTestCase {
         XCTAssertEqual(errors.count, 1, "the failure must also be published on the output stream")
     }
 
+    // MARK: - Public builder
+
+    /// The public entry point in APlayExtras must hand every URL to a
+    /// `FileFallbackDecoder` wrapping the fallback it was given.
+    func testFileDecoderBuilderWrapsTheFallback() {
+        let config = APlay.Configuration(logPolicy: .disable)
+        var fallbacks = 0
+        let builder = APlayExtras.fileDecoder(fallback: { _ in
+            fallbacks += 1
+            return FakeDecoder()
+        })
+
+        let decoder = builder(config)
+        XCTAssertTrue(decoder is FileFallbackDecoder,
+                      "the public builder must return the file fallback router")
+        XCTAssertEqual(fallbacks, 0, "the fallback is still built lazily through the router")
+    }
+
     // MARK: - Private
 
     private func push(_ decoder: FileFallbackDecoder, _ bytes: [UInt8]) {

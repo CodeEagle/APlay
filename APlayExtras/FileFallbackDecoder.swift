@@ -2,9 +2,10 @@
 //  FileFallbackDecoder.swift
 //  APlayExtras
 //
-//  Routes local CAF/AIFF/AIFF-C files to `SeekableFileDecoder` and leaves
-//  everything else on a decoder you supply (normally the framework's built-in
-//  streaming decoder).
+//  Routes local files in the containers the streaming decoder cannot open
+//  (CAF/AIFF/AIFF-C, NeXT/Sun AU, 3GPP/3GPP2, RF64, Sound Designer II,
+//  Sony Wave64) to `SeekableFileDecoder`, and leaves everything else on a
+//  decoder you supply (normally the framework's built-in streaming decoder).
 //
 
 import APlay

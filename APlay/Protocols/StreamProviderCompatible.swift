@@ -173,6 +173,7 @@ public struct StreamProvider {
             case "amr": return .amr
             case "3gp", "3gpp", "audio/3gpp": return .k3gp
             case "3g2", "3gp2", "audio/3gpp2": return .k3gp2
+            case "w64": return .w64
             case "au", "snd", "audio/basic": return .next
             case "rf64": return .rf64
             case "sd2": return .soundDesigner2

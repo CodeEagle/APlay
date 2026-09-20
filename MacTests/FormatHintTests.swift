@@ -45,6 +45,7 @@ final class FormatHintTests: XCTestCase {
             "3g2": .k3gp2, "3gp2": .k3gp2, "audio/3gpp2": .k3gp2,
             "au": .next, "snd": .next, "audio/basic": .next,
             "sd2": .soundDesigner2,
+            "w64": .w64,
             // Opus — the hint is recognised and Core Audio decodes the OGG
             // container on this platform (see the README format matrix).
             "opus": .opus, "audio/opus": .opus,

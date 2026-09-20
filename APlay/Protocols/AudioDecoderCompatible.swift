@@ -184,6 +184,7 @@ public struct AudioDecoder {
         public static let caf = AudioFileType("caff")
         public static let k3gp = AudioFileType("3gpp")
         public static let k3gp2 = AudioFileType("3gp2")
+        public static let w64 = AudioFileType("W64 ")
         public static let amr = AudioFileType("amrf")
         public static let flac = AudioFileType("flac")
         public static let opus = AudioFileType("opus")

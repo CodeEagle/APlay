@@ -14,25 +14,35 @@ import Foundation
 /// Decodes local files through the file-based `ExtAudioFile` API.
 ///
 /// The framework's built-in `DefaultAudioDecoder` is a *streaming* decoder: it
-/// drives `AudioFileStream`, which cannot cope with two container shapes even
-/// though Core Audio decodes their payload just fine:
+/// drives `AudioFileStream`, which cannot cope with several container shapes
+/// even though Core Audio decodes their payload just fine:
 ///
 /// - ALAC in a CAF container keeps its packet table after the audio data, so the
 ///   streaming parser reports `optm` ("not optimised") and never hands the
 ///   converter a usable packet description.
 /// - AIFF / AIFF-C PCM makes `AudioFileStream` report a packet discontinuity
-///   (`dsc!`) and decode nothing at all.
+///   (`dsc!`), or expose no properties at all for AIFF-C.
+/// - NeXT / Sun AU parses, but the streaming converter decodes no PCM.
+/// - 3GPP / 3GPP2 is not parsed by `AudioFileStream` at all.
+/// - RF64, Sound Designer II and Sony Wave64 are file-only containers.
 ///
 /// Opening the same file with `ExtAudioFileOpenURL` reads the packet table up
-/// front, so both shapes decode. The trade-off is in the name: it needs a
+/// front, so all of them decode. The trade-off is in the name: it needs a
 /// seekable local file and cannot work on a live stream. `FileFallbackDecoder`
-/// routes only local CAF/AIFF/AIFF-C URLs here and leaves everything else on the
-/// built-in streaming path.
+/// routes only local URLs whose hint is in `handledHints` below and leaves
+/// everything else on the built-in streaming path.
 public final class SeekableFileDecoder: @unchecked Sendable {
 
     /// Container hints this decoder handles. Everything else is a job for the
     /// built-in streaming decoder.
-    public static let handledHints: [AudioFileType] = [.caf, .aiff, .aifc]
+    public static let handledHints: [AudioFileType] = [
+        .caf, .aiff, .aifc,
+        .next,          // NeXT / Sun AU
+        .k3gp, .k3gp2,  // 3GPP / 3GPP2
+        .rf64,          // RF64 (Broadcast WAVE)
+        .soundDesigner2, // Sound Designer II
+        .w64,           // Sony Wave64
+    ]
 
     private unowned let _config: ConfigurationCompatible
     private var _info = AudioDecoder.Info()

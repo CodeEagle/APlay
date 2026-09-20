@@ -83,11 +83,16 @@ remote URL cannot be seeked, so streaming stays on the built-in decoder and will
 far with these. Add the product only when you need it; plain `APlay` is unchanged. Each
 row is pinned by `MacTests/SeekableFileDecoderTests.swift`.
 
-| Format | Common extensions | Why streaming fails |
-| --- | --- | --- |
-| ALAC in CAF | `.caf` `.caff` | the packet table trails the audio data, so the parser reports `optm` |
-| AIFF PCM | `.aiff` | `AudioFileStream` reports a packet discontinuity (`dsc!`) |
-| AIFF-C PCM | `.aifc` | the stream exposes no properties at all |
+| Format | Common extensions | Why streaming fails | Note |
+| --- | --- | --- | --- |
+| ALAC in CAF | `.caf` `.caff` | the packet table trails the audio data, so the parser reports `optm` | |
+| AIFF PCM | `.aiff` | `AudioFileStream` reports a packet discontinuity (`dsc!`) | |
+| AIFF-C PCM | `.aifc` | the stream exposes no properties at all | |
+| NeXT / Sun AU | `.au` `.snd` | parses the header but the converter decodes no PCM | µ-law, A-law and PCM payloads |
+| 3GPP / 3GPP2 | `.3gp` `.3g2` | the streaming parser cannot open the container at all | typically an AAC or AMR payload |
+| Sony Wave64 | `.w64` | file-only container | |
+| RF64 (Broadcast WAVE) | `.rf64` | file-only container | no fixture ships — no RF64 muxer was available to build one |
+| Sound Designer II | `.sd2` | file-only container | no fixture ships — no SD2 encoder was available to build one |
 
 ### Not supported
 
@@ -97,10 +102,6 @@ be added by implementing `AudioDecoderCompatible` and supplying it through
 
 | Format | Common extensions | Why |
 | --- | --- | --- |
-| NeXT / Sun AU | `.au` `.snd` | parses the header but decodes no PCM — µ-law/A-law speech PCM is not stream-decoded |
-| 3GPP / 3GPP2 | `.3gp` `.3g2` | the streaming parser cannot open the container at all |
-| RF64 (Broadcast WAVE) | `.rf64` | container not parsed by `AudioFileStream` |
-| Sound Designer II | `.sd2` | container not parsed by `AudioFileStream` |
 | MP1 (MPEG Layer I) | `.mp1` | hint-table mapped, but no encoder was available to build a fixture — unverified |
 | AMR-NB / AMR-WB | `.amr` | hint-table mapped, but no encoder was available to build a fixture — unverified |
 | Vorbis in Ogg | `.ogg` | no Core Audio decoder |
@@ -115,7 +116,6 @@ be added by implementing `AudioDecoderCompatible` and supplying it through
 | Musepack | `.mpc` `.mpp` `.mp+` | no Core Audio decoder |
 | ATRAC3 / ATRAC9 | `.oma` `.at9` | Sony codecs; no Core Audio decoder |
 | Speex | `.spx` | no Core Audio decoder |
-| Sony Wave64 | `.w64` | no Core Audio decoder |
 | Matroska audio | `.mka` | no Core Audio decoder |
 | MPEG-TS | `.ts` | no Core Audio decoder |
 | Raw PCM | — | no header metadata to parse |

@@ -74,6 +74,48 @@ final class SeekableFileDecoderTests: XCTestCase {
         XCTAssertTrue(collector.errors.isEmpty, "AIFF-C emitted \(collector.errors.count) errors")
     }
 
+    // The streaming decoder parses AU but decodes no PCM; ExtAudioFile opens it.
+    func testRouterDecodesAu() throws {
+        let url = try fixture("tone", "au")
+        let config = makeConfig()
+        let (router, collector) = playThroughRouter(url, hint: .next, config: config) { DefaultAudioDecoder(config: $0) }
+        _ = router
+
+        XCTAssertTrue(wait(for: collector, minBytes: 1000), "AU decoded no PCM")
+        XCTAssertTrue(collector.errors.isEmpty, "AU emitted \(collector.errors.count) errors")
+    }
+
+    // The streaming decoder cannot open the 3GPP container at all.
+    func testRouterDecodes3gp() throws {
+        let url = try fixture("tone", "3gp")
+        let config = makeConfig()
+        let (router, collector) = playThroughRouter(url, hint: .k3gp, config: config) { DefaultAudioDecoder(config: $0) }
+        _ = router
+
+        XCTAssertTrue(wait(for: collector, minBytes: 1000), "3GP decoded no PCM")
+        XCTAssertTrue(collector.errors.isEmpty, "3GP emitted \(collector.errors.count) errors")
+    }
+
+    func testRouterDecodes3g2() throws {
+        let url = try fixture("tone", "3g2")
+        let config = makeConfig()
+        let (router, collector) = playThroughRouter(url, hint: .k3gp2, config: config) { DefaultAudioDecoder(config: $0) }
+        _ = router
+
+        XCTAssertTrue(wait(for: collector, minBytes: 1000), "3G2 decoded no PCM")
+        XCTAssertTrue(collector.errors.isEmpty, "3G2 emitted \(collector.errors.count) errors")
+    }
+
+    func testRouterDecodesW64() throws {
+        let url = try fixture("tone", "w64")
+        let config = makeConfig()
+        let (router, collector) = playThroughRouter(url, hint: .w64, config: config) { DefaultAudioDecoder(config: $0) }
+        _ = router
+
+        XCTAssertTrue(wait(for: collector, minBytes: 1000), "W64 decoded no PCM")
+        XCTAssertTrue(collector.errors.isEmpty, "W64 emitted \(collector.errors.count) errors")
+    }
+
     /// Decoded compressed audio lands in the pipeline's canonical format, so the
     /// ring buffer and the audio unit see what they were configured for.
     func testCompressedOutputIsCanonicalPCM() throws {

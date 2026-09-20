@@ -296,3 +296,10 @@ v0.0.1
 >2018.07.09
 
 First Release.
+1. `APlayExtras` now decodes the containers the streaming parser refuses, not
+   just CAF/AIFF/AIFF-C: NeXT/Sun AU (`.au`/`.snd`), 3GPP/3GPP2 (`.3gp`/`.3g2`),
+   Sony Wave64 (`.w64`) — a new file type in the hint table — plus RF64 and
+   Sound Designer II. Each is routed through `ExtAudioFile` for local files
+   and pinned by `SeekableFileDecoderTests`; RF64 and SD2 have no fixture
+   because no muxer was available to build one. The README moves all of them
+   from "not supported" to "local file playback"

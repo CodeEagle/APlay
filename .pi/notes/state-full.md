@@ -976,3 +976,29 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   Platforms & demo / Quality），草稿存 /tmp/aplay_v210_notes.md。
 - 发布收尾全部完成：master 已推、tag v2.1.0 已推、5 个 open issue 全关、
   Release 已发。
+
+## SF-0062
+- Revision: 62
+- 取代 SF-0061 的「发布收尾完毕」。
+
+### README 全格式对照表
+- 用户要求：列出市面所有音频格式 + 本库支持情况，一个表放 README。
+- 做法：把「Supported formats」段从 9 行 verified 小表升级为分组大表
+  （Lossy / Lossless / Uncompressed & block PCM / Containers & audiobooks /
+  Not audio streams），约 40 行，覆盖 MP3/MP2/MP1、AAC 全家族、Opus-in-OGG、
+  AC-3/E-AC-3、AMR、Vorbis、WMA、Musepack、ATRAC、Speex、AC-4、FLAC、ALAC
+  (MP4/CAF)、WavPack、APE、TTA、TrueHD、DSD、OptimFROG、Shorten、WAVE/AIFF、
+  ADPCM、AU/RF64/SD2/W64、raw PCM、MP4/M4B/CAF/3GP/MKA/MPEG-TS、MIDI/SF2。
+- 状态四档：✅ verified（FormatCompatibilityTests 钉死）/ ✔ routed
+  （fileHint 映射 Core Audio 但无 fixture）/ ⚠️ stream-only（本地走 APlayExtras）
+  / 🔌 inject（Core Audio 无解码器，须 audioDecoderBuilder）。MIDI/SF2 标 —。
+- 表下注明：未识别扩展名回退 .mp3 靠 AudioFileStream 嗅探。
+
+### 顺带修源码与文档不符
+- ChangeLog v2.1.0 第 4 条宣称映射 .ac3/.eac3，但源码只有 case "ac3"；
+  已补为 `case "ac3","eac3","audio/ac3": return .ac3`
+  （StreamProviderCompatible.swift:172），并给 FormatHintTests 加 "eac3": .ac3
+  断言；同时更新该测试里过时的 opus/#17 注释（#17 已关，opus 已支持）。
+- 回归：swift test --enable-code-coverage 226/226（断言并入已有表驱动测试，
+  测试数不变）；APlayDemo iOS 模拟器 BUILD SUCCEEDED。
+- 提交 ded1bf4 已推：README + hint + 测试。

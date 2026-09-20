@@ -1,38 +1,39 @@
 State format: capsule-v2
-State revision: 61
+State revision: 62
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
 - Baseline: 2026-09-20；Xcode 27.0 / Swift 6.4。真机 iPhone 15 Pro Max
   （iOS 27.0，UDID 00008130-000E7959262B803A，Team L5W9FHSX92）。
-  HEAD 24ca563 == origin/master；tag v2.1.0 已推且 Release 已发。
+  HEAD ded1bf4 == origin/master；tag v2.1.0 已推且 Release 已发。
 
 ## Task
-- Goal: v2.1.0 发布收尾——全部完成（代码/Tag/Issues/Release）。
-- Unit: 仓库发布。
-- Done when: tag 在远端、Release 已发布、open issue 清空（均已达成）。
+- Goal: README 全格式对照表（市面所有音频格式 × 本库支持）——已完成。
+- Unit: README 文档 + hint 表。
+- Done when: README 含分组全格式表且源码/测试/文档一致（已达成）。
 
 ## Progress
-- Done: 批 D 推送（f3969fe 强推）；AirPlay 路由按钮（4f3e1d6）。
-- Done: tag v2.1.0（annotated → 24ca563）已推，远端 3b4b2d7。
-- Done: 5 个 open issue 全部关闭（#19/#10/#14/#3/#17），各附依据。
-  #17 曾误保留，已更正：标准 .opus（OGG 封装）实已支持
-  （FormatCompatibilityTests.swift:46 tone.opus 全绿；demo 自带样本）；
-  仅裸 opus 与 Vorbis 不支持。
-- Done: GitHub Release v2.1.0 已发布（非 draft/prerelease）：
-  https://github.com/CodeEagle/APlay/releases/tag/v2.1.0
+- Done: v2.1.0 发布全套（tag/Release/5 issue 全关）。
+- Done: README「Supported formats」升级为分组大表（Lossy/Lossless/
+  Uncompressed/Containers/Not audio streams），状态四档：
+  ✅ verified / ✔ routed（无 fixture）/ ⚠️ stream-only（APlayExtras）
+  / 🔌 inject（Core Audio 无解码器）；MIDI/SF2 标 —。
+- Done: 修文档与源码不符——ChangeLog 称已映射 .eac3 实则无；
+  StreamProviderCompatible.swift:172 补 eac3→.ac3，FormatHintTests 加断言，
+  并更新过时 opus/#17 注释。
 - Open: 无。
-- Checks: gh release view v2.1.0 isDraft=false isPrerelease=false；
-  gh issue list --state open 为空。
+- Checks: swift test --enable-code-coverage 226/226；
+  APlayDemo iOS 模拟器 BUILD SUCCEEDED；README 表已渲染。
 - Pending: none。
 
 ## Rules
-- Constraints: 关 issue 须有代码/版本依据；未解决的不关闭。
-- 事实: .opus（OGG 封装）已支持，走 streaming decoder 而非 ExtAudioFile；
-  裸 opus / Vorbis 需 audioDecoderBuilder 注入。
+- Constraints: README 状态口径须与 FormatCompatibilityTests 一致；
+  文档宣称的能力须在源码兑现（eac3 教训）。
+- 事实: hint 表 default 回退 .mp3 靠内容嗅探；APlayExtras handledHints
+  = [.caf,.aiff,.aifc]；Core Audio 无 Vorbis/裸Opus/WMA/WavPack/APE/TTA/
+  TrueHD/DSD/Musepack/ATRAC/Speex/AC-4 解码器。
 
 ## Next
-- Action: 无待办；发布收尾完毕，等用户下一步指令。
+- Action: 无待办；等用户下一步指令。
 - Verify: —
-- Refs: SF-0061（Release+opus 更正），SF-0060（tag+关 issue），
-  SF-0059（AirPlay 按钮）。
+- Refs: SF-0062（README 全格式表+eac3 补映射），SF-0061（Release+opus 更正）。

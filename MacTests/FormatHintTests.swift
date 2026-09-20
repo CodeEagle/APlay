@@ -46,10 +46,9 @@ final class FormatHintTests: XCTestCase {
             "au": .next, "snd": .next, "audio/basic": .next,
             "sd2": .soundDesigner2,
             "w64": .w64,
-            // Codec containers Core Audio cannot decode at all; the optional
-            // libraries own them (see the README format matrix).
-            "wv": .wavpack,
             "ogg": .ogg, "audio/ogg": .ogg, "application/ogg": .ogg,
+            "spx": .speex, "audio/speex": .speex,
+            "wv": .wavpack,
             // Opus — the hint is recognised and Core Audio decodes the OGG
             // container on this platform (see the README format matrix).
             "opus": .opus, "audio/opus": .opus,

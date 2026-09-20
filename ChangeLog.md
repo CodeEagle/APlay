@@ -1,7 +1,16 @@
 unreleased
 ---
 
-1. New: optional Vorbis (`.ogg`) playback. Core Audio recognises the Ogg
+1. New: optional Speex (`.spx`) playback. Core Audio has no Speex decoder, so
+   it plays through a separate `APlaySpeex` product that wraps libspeex on the
+   same `audioDecoderBuilder` seam, sharing the `CAPlayOgg` framing target with
+   `APlayVorbis`. A local file is buffered whole and its Ogg pages are demuxed
+   with libogg before the packets reach `speex_decode_int`, so the decoder is
+   seekable; any channel count is down/up-mixed to the pipeline's canonical
+   16-bit stereo PCM. Live streams are not supported. Speex moves out of "not
+   supported" in the format matrix. Pinned by `MacTests/SpeexDecoderTests.swift`
+
+2. New: optional Vorbis (`.ogg`) playback. Core Audio recognises the Ogg
    container but ships no Vorbis decoder, so it plays through a separate
    `APlayVorbis` product that wraps libvorbis (with the Ogg framing layer
    factored into a shared `CAPlayOgg` target) behind the same
@@ -12,7 +21,7 @@ unreleased
    Ogg-carried codecs, and Vorbis moves out of "not supported". Pinned by
    `MacTests/VorbisDecoderTests.swift`
 
-2. New: optional WavPack (`.wv`) playback. WavPack has no Core Audio decoder, so it
+3. New: optional WavPack (`.wv`) playback. WavPack has no Core Audio decoder, so it
    ships as a separate `APlayWavPack` product that wraps the reference C library
    (vendored as `CAPlayWavPack`) behind the same `audioDecoderBuilder` seam as
    `APlayExtras`. A local file is buffered whole and is seekable, and any channel
@@ -22,7 +31,7 @@ unreleased
    WavPack moves from "not supported" into it. Pinned by
    `MacTests/WavPackDecoderTests.swift`
 
-3. The format matrix is now backed by fixtures for the formats that were previously
+4. The format matrix is now backed by fixtures for the formats that were previously
    only routed: MP2, AAC in a plain MP4 container, audiobook MP4, IMA ADPCM in WAVE,
    AC-3 and E-AC-3 all decode through the built-in streaming decoder and are pinned
    by `FormatCompatibilityTests`. Dolby Digital Plus (`.eac3`) was claimed in 2.1.0

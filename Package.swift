@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "APlayExtras", targets: ["APlayExtras"]),
         .library(name: "APlayWavPack", targets: ["APlayWavPack"]),
         .library(name: "APlayVorbis", targets: ["APlayVorbis"]),
+        .library(name: "APlaySpeex", targets: ["APlaySpeex"]),
     ],
     targets: [
         .target(
@@ -71,6 +72,27 @@ let package = Package(
             dependencies: ["APlay", "CAPlayOgg", "CAPlayVorbis"],
             path: "Sources/APlayVorbis"
         ),
+        // Speex decoder, vendored. Only the decode side is compiled — the
+        // encoders and the psychoacoustic model (its sole consumer) are
+        // excluded. Reaches libogg through `<ogg/ogg.h>`. `FLOATING_POINT` is
+        // the configuration the reference `speexdec` uses.
+        .target(
+            name: "CAPlaySpeex",
+            dependencies: ["CAPlayOgg"],
+            path: "Sources/CAPlaySpeex",
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("."),
+                .define("FLOATING_POINT"),
+                .define("HAVE_CONFIG_H"),
+                .define("USE_KISS_FFT"),
+            ]
+        ),
+        .target(
+            name: "APlaySpeex",
+            dependencies: ["APlay", "CAPlayOgg", "CAPlaySpeex"],
+            path: "Sources/APlaySpeex"
+        ),
         .executableTarget(
             name: "APlayMacPlayback",
             dependencies: ["APlay"],
@@ -78,7 +100,7 @@ let package = Package(
         ),
         .testTarget(
             name: "APlayTests",
-            dependencies: ["APlay", "APlayExtras", "APlayWavPack", "APlayVorbis"],
+            dependencies: ["APlay", "APlayExtras", "APlayWavPack", "APlayVorbis", "APlaySpeex"],
             path: "MacTests",
             resources: [.copy("Fixtures")]
         ),

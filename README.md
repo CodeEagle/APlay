@@ -134,6 +134,28 @@ let config = APlay.Configuration(
 The vendored C libraries are BSD-3 licensed (`Sources/CAPlayOgg/LICENSE.txt`,
 `Sources/CAPlayVorbis/LICENSE.txt`).
 
+### Speech codecs (via the optional `APlaySpeex` library)
+
+Core Audio has no Speex decoder, so `.spx` plays through a separate vendored
+product: `APlaySpeex` wraps libspeex (sharing the `CAPlayOgg` framing layer) on
+the same `audioDecoderBuilder` seam. A local file is buffered whole, its Ogg
+pages are demuxed with libogg, and the packets are handed to `speex_decode_int`;
+the decoder is seekable. Live streams are not supported — an Ogg page stream
+cannot be rewound, and Speex needs its header packet first. Add the product
+only when you need it; plain `APlay` is unchanged. Pinned by
+`MacTests/SpeexDecoderTests.swift`.
+
+```swift
+let config = APlay.Configuration(
+    audioDecoderBuilder: APlaySpeex.decoder(fallback: APlay.Configuration().audioDecoderBuilder))
+```
+
+| Format | Common extensions | Note |
+| --- | --- | --- |
+| Speex | `.spx` | decodes to canonical 16-bit stereo PCM; any channel count is down/up-mixed |
+
+The vendored C library is BSD-3 licensed (`Sources/CAPlaySpeex/LICENSE.txt`).
+
 ### Not supported
 
 Core Audio ships no decoder for these, or the container cannot be parsed. Any of them can
@@ -154,7 +176,7 @@ be added by implementing `AudioDecoderCompatible` and supplying it through
 | DSD (DSF / DFF) | `.dsf` `.dff` | 1-bit stream; no Core Audio decoder |
 | Musepack | `.mpc` `.mpp` `.mp+` | no Core Audio decoder |
 | ATRAC3 / ATRAC9 | `.oma` `.at9` | Sony codecs; no Core Audio decoder |
-| Speex | `.spx` | no Core Audio decoder |
+| Speex | `.spx` | see the optional `APlaySpeex` library below |
 | Matroska audio | `.mka` | no Core Audio decoder |
 | MPEG-TS | `.ts` | no Core Audio decoder |
 | Raw PCM | — | no header metadata to parse |

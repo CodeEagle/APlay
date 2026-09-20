@@ -149,23 +149,27 @@ final class PlayListTests: XCTestCase {
     func testPreviousInStopWhenAllPlayedDelegatesToTheInnerPattern() {
         let pipeline = Delegated<APlay.Event, Void>()
         let single = makeList(.stopWhenAllPlayed(.single), pipeline: pipeline)
-        XCTAssertNil(single.previousURL(),
-                     "a single loop under stopWhenAllPlayed stops right away, even away from the last track")
+        XCTAssertEqual(single.previousURL(), urls[0],
+                       "a single loop under stopWhenAllPlayed repeats the track away from the end")
 
         let ordered = makeList(.stopWhenAllPlayed(.order), pipeline: pipeline)
         XCTAssertEqual(ordered.previousURL(), urls[2], "the inner order pattern still wraps backwards")
     }
 
-    /// Documented quirk: `.stopWhenAllPlayed(.single)` never yields a next or
-    /// previous URL, because `_peekNext(.single)` consults the outer stop flag
-    /// without looking at the playing position. Pinned so a later fix is a
-    /// deliberate behaviour change rather than an accident.
-    func testStopWhenAllPlayedSingleNeverAdvances() {
+    /// `.stopWhenAllPlayed(.single)` repeats the current track and only stops
+    /// at the last one: the stop flag is consulted per position, not
+    /// unconditionally, or the list would stall at the first track.
+    func testStopWhenAllPlayedSingleRepeatsUntilTheLastTrack() {
         let pipeline = Delegated<APlay.Event, Void>()
         let list = makeList(.stopWhenAllPlayed(.single), pipeline: pipeline)
-        XCTAssertNil(list.nextURL())
-        XCTAssertNil(list.previousURL())
+        XCTAssertEqual(list.nextURL(), urls[0], "the single loop repeats the current track")
+        XCTAssertEqual(list.previousURL(), urls[0])
         XCTAssertEqual(list.playingIndex, 0)
+
+        // Skip to the last track: the loop must stop there.
+        XCTAssertEqual(list.play(at: urls.count - 1), urls.last)
+        XCTAssertNil(list.nextURL(), "the loop stops once the last track is reached")
+        XCTAssertNil(list.previousURL())
     }
 
     // MARK: - play(at:)

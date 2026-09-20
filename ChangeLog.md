@@ -94,6 +94,11 @@ v2.1.0
    clamps, `APlay`'s player-facing API, the `InternalLogger`, and the
    `APlayExtras` container router's rebuild/pause/destroy bookkeeping. Package
    line coverage rose from 74.8% to 81% (226 tests, was 94)
+19. Fix `.stopWhenAllPlayed(.single)`: a playlist in that mode never advanced,
+   because `_peekNext(.single)` consulted the outer stop flag without looking at
+   the playing position, so `nextURL()`/`previousURL()` returned nil at the first
+   track. The stop is now only taken on the last track, matching what the
+   `.order` and `.random` branches already did
 
 v2.0.0
 ---

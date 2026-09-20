@@ -107,7 +107,11 @@ public final class PlayList: @unchecked Sendable {
             guard let url = _randomList[ap_safe: index] else { return nil }
             return (index, url)
         case .single:
-            if loopPattern.isGonnaStopAtEndOfList {
+            // A single loop wrapped in stopWhenAllPlayed only stops once the
+            // last track is reached; until then it repeats the current one.
+            // Checking the flag without the position stops the list at the
+            // first track instead of the last.
+            if loopPattern.isGonnaStopAtEndOfList, playingIndex == list.count - 1 {
                 return nil
             }
             if let idx = playingIndex { index = idx }

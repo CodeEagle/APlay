@@ -54,5 +54,10 @@ gen tone.opus    "sine=frequency=440:duration=2:sample_rate=48000" -c:a libopus 
 python3 "$(dirname "$0")/generate-midi.py" "$OUT/melody.mid"
 python3 "$(dirname "$0")/generate-soundfont.py" "$OUT/APlayTestSine.sf2"
 
+# The demo bundles the same two files so its format matrix has a MIDI row and
+# a SoundFont for the sampler to load.
+cp "$OUT/melody.mid"          APlayDemo/Samples/melody.mid
+cp "$OUT/APlayTestSine.sf2"   APlayDemo/Samples/APlayTestSine.sf2
+
 echo
 echo "fixtures written to $OUT"

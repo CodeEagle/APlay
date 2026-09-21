@@ -16,8 +16,17 @@ enum DecodeRoute: String, Hashable, Sendable {
     /// Routed through `APlayExtras` + ExtAudioFile for containers the streaming
     /// decoder cannot open.
     case fileFallback = "APlayExtras · ExtAudioFile"
+    /// Rendered by `APlayMidi` through a SoundFont — a `.mid` is a note
+    /// sequence, not an audio stream, so there is nothing to decode.
+    case midi = "APlayMidi · SoundFont sampler"
 
-    var badge: String { self == .native ? "APlay" : "APlayExtras" }
+    var badge: String {
+        switch self {
+        case .native: return "APlay"
+        case .fileFallback: return "APlayExtras"
+        case .midi: return "APlayMidi"
+        }
+    }
 }
 
 /// A playable entry in the demo.
@@ -50,9 +59,9 @@ enum TrackLibrary {
     /// The bundled sample that exercises a format end to end.
     static let showcase = local[0]
 
-    /// All local samples, ordered as the demo plays them. The three containers
-    /// the streaming decoder cannot open come last so their `APlayExtras` badge
-    /// lands right after the native ones.
+    /// All local samples, ordered as the demo plays them. The containers the
+    /// streaming decoder cannot open come last so their badges land right after
+    /// the native ones — first the `APlayExtras` rows, then the MIDI sequence.
     static let local: [Track] = [
         Track(resourceName: "a", resourceType: "m4a",
               format: "AAC · M4A",
@@ -104,6 +113,11 @@ enum TrackLibrary {
               format: "CAF",
               detail: "Core Audio Format, also routed via APlayExtras.",
               route: .fileFallback, isShowcase: false),
+
+        Track(resourceName: "melody", resourceType: "mid",
+              format: "MIDI",
+              detail: "A note sequence rather than an audio stream, rendered through the bundled SoundFont.",
+              route: .midi, isShowcase: false),
     ]
 
     /// Remote source shipped by the old demo, kept to show HTTP streaming.

@@ -13,6 +13,7 @@
 
 import APlay
 import APlayExtras
+import APlayMidi
 import Combine
 import UIKit
 
@@ -234,8 +235,11 @@ final class DemoPlayer: ObservableObject {
     /// decoder is chained in front of the built-in streaming decoder so the
     /// three containers that one cannot open (AIFF/AIFF-C/CAF) still play —
     /// and so the demo can badge those rows with the route that serves them.
+    /// `APlayMidi` sits one step further in: a `.mid` is a note sequence, not
+    /// an audio stream, so it is rendered through the bundled SoundFont.
     private static func makeConfig(gapless: Bool, logSink: ((String) -> Void)?) -> APlay.Configuration {
-        APlay.Configuration(
+        let soundfont = Bundle.main.url(forResource: "APlayTestSine", withExtension: "sf2")
+        return APlay.Configuration(
             cachePolicy: .disable,
             autoHandlingInterruptEvent: true,
             gaplessPlaybackEnabled: gapless,
@@ -244,12 +248,14 @@ final class DemoPlayer: ObservableObject {
             loggerBuilder: { policy in
                 DemoLogger(policy: policy, sink: logSink ?? { _ in })
             },
-            audioDecoderBuilder: APlayExtras.fileDecoder(fallback: { config in
-                // A fresh default configuration is the only public way to reach
-                // the built-in decoder builder; building one here also keeps the
-                // chain from recursing into this router.
-                APlay.Configuration().audioDecoderBuilder(config)
-            })
+            audioDecoderBuilder: APlayExtras.fileDecoder(fallback: APlayMidi.decoder(
+                fallback: { config in
+                    // A fresh default configuration is the only public way to reach
+                    // the built-in decoder builder; building one here also keeps the
+                    // chain from recursing into this router.
+                    APlay.Configuration().audioDecoderBuilder(config)
+                },
+                soundfont: .init(url: soundfont)))
         )
     }
 
@@ -417,7 +423,9 @@ final class DemoPlayer: ObservableObject {
     private func adoptTrack(_ track: Track) {
         nowPlayingTitle = track.displayName
         nowPlayingArtist = track.format
-        nowPlayingAlbum = track.route == .native ? "APlay · native decoder" : "APlayExtras · ExtAudioFile"
+        nowPlayingAlbum = track.route == .native
+            ? "APlay · native decoder"
+            : track.route == .midi ? "APlayMidi · SoundFont sampler" : "APlayExtras · ExtAudioFile"
         let seed = track.resourceName + "." + track.resourceType
         cover = CoverArt.image(forSeed: seed)
         coverPalette = CoverArt.palette(forSeed: seed)

@@ -124,7 +124,7 @@ metadata *and* decodes to canonical PCM.
 | WAVE PCM | `.wav` `.wave` | tolerates extra chunks before `data`; seek supported |
 | IMA ADPCM in WAVE | `.wav` | Core Audio reports it as linear PCM |
 | ALAC in MP4 | `.m4a` | the magic cookie reaches the converter (2.1.0) |
-| Dolby Digital / Plus | `.ac3` `.eac3` | verified on macOS; iOS decoding is Dolby-licensed and varies by device |
+| Dolby Digital / Plus | `.ac3` `.eac3` | decodes on macOS; iOS does not expose the Dolby decoders to third-party apps — AVPlayer can still play them from an MP4/MOV track |
 
 **Optional libraries** — the products above plug into one seam and claim only their own
 extensions; everything else falls through to the built-in decoder:

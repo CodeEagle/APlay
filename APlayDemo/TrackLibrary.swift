@@ -123,11 +123,11 @@ enum TrackLibrary {
               route: .native, isShowcase: false),
         Track(resourceName: "tone", resourceType: "ac3",
               format: "AC-3",
-              detail: "Dolby Digital — iOS decoding is licensed and varies by device.",
+              detail: "Decodes on macOS; iOS keeps the Dolby decoder away from third-party apps.",
               route: .native, isShowcase: false),
         Track(resourceName: "tone", resourceType: "eac3",
               format: "E-AC-3",
-              detail: "Dolby Digital Plus, with the same licensing caveat as AC-3.",
+              detail: "Dolby Digital Plus — the same licensing wall as AC-3 on iOS.",
               route: .native, isShowcase: false),
 
         Track(resourceName: "tone", resourceType: "aiff",
@@ -173,6 +173,12 @@ enum TrackLibrary {
               detail: "A note sequence rather than an audio stream, rendered through the bundled SoundFont.",
               route: .midi, isShowcase: false),
     ]
+
+    /// Formats Core Audio will not decode on iOS — the Dolby decoders are
+    /// licensed and not exposed to third-party apps, so the matrix reports
+    /// them as unsupported rather than failed. Verified on an iPhone 15 Pro
+    /// Max / iOS 27.0; the same rows decode on macOS.
+    static let iosUnsupportedFormats: Set<String> = ["AC-3", "E-AC-3"]
 
     /// Remote source shipped by the old demo, kept to show HTTP streaming.
     static let remoteURL = URL(string: "https://raw.githubusercontent.com/CodeEagle/APlay/master/APlayDemo/a.m4a")!

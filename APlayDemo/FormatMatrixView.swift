@@ -87,15 +87,33 @@ struct FormatMatrixView: View {
 
                 Spacer()
 
-                Text(status.rawValue)
+                Text(statusLabel(for: track, status: status))
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(color(for: status))
+                    .foregroundStyle(statusColor(for: track, status: status))
                     .frame(width: 52, alignment: .trailing)
             }
             .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// A format iOS cannot decode is not a framework bug — the matrix shows it
+    /// as unsupported instead of letting the red `failed` badge mislead.
+    private func statusLabel(for track: Track, status: TrackLibrary.Status) -> String {
+        if status == .failed,
+           TrackLibrary.iosUnsupportedFormats.contains(track.format) {
+            return "iOS ✗"
+        }
+        return status.rawValue
+    }
+
+    private func statusColor(for track: Track, status: TrackLibrary.Status) -> Color {
+        if status == .failed,
+           TrackLibrary.iosUnsupportedFormats.contains(track.format) {
+            return .white.opacity(0.4)
+        }
+        return color(for: status)
     }
 
     private func color(for status: TrackLibrary.Status) -> Color {

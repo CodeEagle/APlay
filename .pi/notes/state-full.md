@@ -2165,3 +2165,21 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - ChangeLog.md 的 unreleased 段对的是已发版本（Speex/Vorbis/WavPack +
   format matrix fixtures），头没改成 v2.1.1；本次改动也未入 ChangeLog。
   若要整理需另议。
+
+## SF-0089
+- Revision: 89
+- 取代: SF-0088「Pending」——ac3/eac3 真机结果已回来。
+- 实证: 用户在 iPhone 15 Pro Max / iOS 27.0 上点 demo 的 AC-3 行，
+  failed、没有声音。结论: iOS 不向第三方开放 AC-3/E-AC-3 → PCM 解码。
+  本机实测 macOS 上 AudioConverterNew('ac-3'/'ec-3' → lpcm) 均 noErr，
+  故 FormatCompatibilityTests 的 decodes:true 只代表 macOS。
+- 依据: Apple TN2429 只承诺 Apple TV 经 AVFoundation 播 .mov/.m4v 里的
+  AC-3/E-AC-3 音轨，并警告特殊编码未必所有平台可用;Infuse/Kodi 等第三
+  方播放器能播是走 Dolby「Dolby Audio for Applications」授权解码器
+  (professional.dolby.com)，Apple 与 Dolby 的交叉授权不传导给 app 自解码。
+- 改动: TrackLibrary 加 iosUnsupportedFormats = ["AC-3","E-AC-3"]，
+  FormatMatrixView 对 failed 且在集合内的行显示「iOS ✗」灰字而非红色
+  failed;两行 detail 改写为平台事实。README 流式表 AC-3/E-AC-3 note
+  改为「decodes on macOS; iOS 不开放 Dolby 解码器，但 AVPlayer 仍可从
+  MP4/MOV 音轨播放」。
+- 构建+装机启动成功。未改任何解码逻辑。

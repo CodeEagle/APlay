@@ -19,6 +19,10 @@ let package = Package(
         // vendored C — because AVAudioSequencer + AVAudioUnitSampler already
         // render Standard MIDI Files to PCM.
         .library(name: "APlayMidi", targets: ["APlayMidi"]),
+        // Opus inside WebM/Matroska. Core Audio has the codec but no AudioFileStream
+        // parser for the EBML container, so this product demuxes the track in Swift
+        // and hands the packets to AudioConverter — no vendored C.
+        .library(name: "APlayOpus", targets: ["APlayOpus"]),
     ],
     targets: [
         .target(
@@ -108,6 +112,16 @@ let package = Package(
             dependencies: ["APlay"],
             path: "Sources/APlayMidi"
         ),
+        // WebM/Matroska Opus decoder. The container is demuxed in pure Swift
+        // (`WebMDemuxer`) and the packets are decoded through Core Audio's Opus
+        // converter, so no C library is vendored. The wrapper implements
+        // `AudioDecoderCompatible` and is wired through the same
+        // `audioDecoderBuilder` seam as the vendored codecs.
+        .target(
+            name: "APlayOpus",
+            dependencies: ["APlay"],
+            path: "Sources/APlayOpus"
+        ),
         .executableTarget(
             name: "APlayMacPlayback",
             dependencies: ["APlay"],
@@ -115,7 +129,7 @@ let package = Package(
         ),
         .testTarget(
             name: "APlayTests",
-            dependencies: ["APlay", "APlayExtras", "APlayWavPack", "APlayVorbis", "APlaySpeex", "APlayMidi"],
+            dependencies: ["APlay", "APlayExtras", "APlayWavPack", "APlayVorbis", "APlaySpeex", "APlayMidi", "APlayOpus"],
             path: "MacTests",
             resources: [.copy("Fixtures")]
         ),

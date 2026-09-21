@@ -55,6 +55,9 @@ final class FormatHintTests: XCTestCase {
             // Opus — the hint is recognised and Core Audio decodes the OGG
             // container on this platform (see the README format matrix).
             "opus": .opus, "audio/opus": .opus,
+            // WebM / Matroska — the EBML container `APlayOpus` demuxes.
+            "webm": .webm, "video/webm": .webm, "audio/webm": .webm,
+            "mka": .mka, "audio/x-matroska": .mka, "video/x-matroska": .mka,
         ]
 
         for (value, expected) in table.sorted(by: { $0.key < $1.key }) {

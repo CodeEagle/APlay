@@ -1,62 +1,70 @@
 State format: capsule-v2
-State revision: 78
+State revision: 81
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
-- Baseline: 2026-09-21；Xcode 27.0 / Swift 6.4。HEAD c12c613（已推送）。
-  v2.1.0 已 tag/Release。
-- 真机: lincoln-phone = 00008130-000E7959262B803A (iPhone 15 Pro Max)。
-  签名只能用本机已登录团队 L5W9FHSX92 的通配 profile；构建须带
-  -allowProvisioningUpdates。
-- Goal d867b7b7 仍 active: 三 codec 库 + MIDI 已提交；元数据完成；
-  **SF-0078 修了三库「装库即坏其他格式」的高危缺陷**。覆盖率 90.47%。
-  余: Opus 裸流（前提不成立，待用户定夺）。
+- Baseline: 2026-09-21；Xcode 27.0 / Swift 6.4。HEAD ca54cdc（已推送）。
+  v2.1.0 已 tag/Release。真机 lincoln-phone = 00008130-000E7959262B803A
+  (iPhone 15 Pro Max)；签名只用本机团队 L5W9FHSX92 通配 profile，
+  构建带 -allowProvisioningUpdates。
+  Goal d867b7b7 仍 active: 三 codec 库+MIDI+元数据已提交；
+  **APlayOpus 亦已落地收尾：库+测试全绿，APlayOpus 覆盖 100%、
+  TOTAL 91.14%，待提交推送**。
 
 ## Task
-- Goal: 收尾 d867b7b7。Opus 裸流经评估**前提不成立**（无裸 opus 容器/
-  夹具/帧同步标准）；真正的缺口是 Opus-in-WebM/Matroska，非 goal 字面项。
-- Unit: 三库 fallback 事件流中继已修 + 测；295/295 全绿。
-- Done when: 三库出元数据、不回归其他格式、swift test 全绿（已达成）。
+- Goal: APlayOpus（Opus-in-WebM/Matroska）落地+测试覆盖尽量高。
+- Unit: 代码、夹具、测试、覆盖率皆完；最后一步是提交推送。
+- Done when: swift test 全绿、Scripts/coverage.py TOTAL≥90%、提交推送。
 
 ## Progress
-- Done: c12c613 元数据（含 WavPack 崩溃真因=timer 早于 _unpackBuffer）。
-- Done（SF-0078）: 三 wrapper 照 FileFallbackDecoder 模式中继
-  fallback 的 outputStream/inputStream，info/seekable 代理到 fallback，
-  `_handedOff` 状态切换；Vorbis 对 OggS+OV_ENOTVORBIS（Opus-in-Ogg）
-  交还 fallback，垃圾文件仍报错。
-- Done: +5 测试（三库事件/字节中继、Vorbis 的 Opus-in-Ogg 移交、
-  mp3 端到端解码）；夹具 tone-opus.ogg。
-- Checks: swift test 295/295（20.6s）；覆盖率 90.47%（6 模块）。
-- Open: Opus 裸流——评估见 SF-0078：**前提不成立**，改做 Opus-in-WebM
-  需 EBML demuxer + libopus vendoring，过大且非 goal 字面项。待用户定夺。
-- Pending: 工作区未提交（SF-0078 全部改动 + tone-opus.ogg）。
+- Done: SF-0080 建库（纯 Swift EBML + AudioConverter 一步出 canonical PCM
+  + SF-0078 中继）；SF-0081 覆盖率收尾——新增 MacTests/EBMLTestBuilders
+  共享构建器；WebMDemuxerTests +7 测（metadataItem 全 case、opusTrack
+  坏头、Lacing.raw 钉 splitBlock 十一守卫、截断元素、空 Title/TagString、
+  Duration 无 scale/<8B、双 TrackEntry 取首个 Opus）；OpusDecoderTests
+  +5 测（不存在文件、有轨无包、非法采样率致 AudioConverterNew 失败、
+  24 包随机垃圾恰 1 decode error 后停止、prepare 前 pause/resume 与
+  未中转字节丢弃、destroy 转发 fallback）+2 扩充（结束后 resume no-op、
+  UnhandledDecoder 生命周期）。
+  326/326 通过；APlayOpus 535/535 = 100.00%、TOTAL 91.14%。
+- Open: 仅剩提交推送（工作区全部为本次 APlayOpus 变更，待一次提交）。
+- Checks: swift test --enable-code-coverage 326/326；
+  Scripts/coverage.py TOTAL 91.14%、APlayOpus 100.00%。
+- Pending: none（提交后此 Goal 可结）。
 
 ## Rules
-- Constraints: 覆盖率口径=Scripts/coverage.py（6 产品 swift 模块）。
-  任一测试失败使 SwiftPM 不合并 profdata。session 是 let，注入用
-  sessionBuilder。ID3Parser 闭包持 config unowned。
-- 事实: APlay.xcodeproj 无 SPM 包引用——三 target 编译本地源；
-  APlayMidi 已按 APlayExtras 模板镜像（ID 段 A5E0A5000000000000002）。
-  **可选库 wrapper 必须中继 fallback 的 outputStream/inputStream 并代理
-  info/seekable**（样板=APlayExtras/FileFallbackDecoder；SF-0078 教训）。
-  **WavPack 计时器须在 _unpackBuffer/_info 就绪后启动**（SF-0077）。
-  Vorbis hand-off 只认 "OggS" magic + OV_ENOTVORBIS；否则报 parser error。
-  WavpackGetTagItem 不可用（NULL ape_tag_data）→ APEv2 自解析。
-  Speex 注释包无 [3]"vorbis" 前缀；ffmpeg libspeex 不写 -metadata。
-  Vorbis comment: [3]"vorbis" 前缀(可省)+LE32 vendorLen+vendor+
-  count+每条 LE32 len+bytes；字段名大小写不敏感。
-  AVAudioUnitSampler bankMSB=121(0x79) 选中 SF2 bank 0；
-  CFNetwork 对 `ICY 200 OK` 剥全部响应头→本机流须答
-  `HTTP/1.1 200 OK`。tagParser 只接 .mp3(ID3)/.flac。
-  本机 ffmpeg 8.0.1 无 libvorbis/libspeex 编码器，**也无裸 opus muxer**；
-  ogg 用 `-c:a vorbis -strict -2`；speex 旧夹具靠注入器补标签。
-  Core Audio 对 Opus: OGG✅ CAF✅ MP4⚠️('pck?') WebM/Matroska❌。
-  edit 工具 oldText 须与缩进(4 空格)完全一致；同文件多 edit 分开发
-  （批量中一个失败会回滚整批）。
+- Constraints: 覆盖率口径=Scripts/coverage.py（7 产品 swift 模块）。
+  任一测试失败使 SwiftPM 不合并 profdata，故改完源要
+  swift test --enable-code-coverage 重取再
+  python3 Scripts/coverage.py
+  .build/out/Products/Debug/codecov/default.profdata
+  .build/out/Products/Debug/APlayTests.xctest [--gaps]。
+  可选库 wrapper 必须中继 fallback 的 outputStream/inputStream 并代理
+  info/seekable（样板=APlayExtras/FileFallbackDecoder；SF-0078 教训）。
+  WavPack/MIDI 计时器在 buffer/info 后启动；AudioConverter 的 input proc
+  须 class 盒子+Unmanaged，「无包」返 noErr 且 count=0，每包稳定存储。
+  OpusHead 在 CodecPrivate，rate/channels 以它为准；Core Audio 自处理
+  Opus 预跳。非法 rate（0xFFFFFFFF）会使 AudioConverterNew 失败，
+  可在开文件时钉错。
+- 事实（EBML）: 元素 ID=原始字节(含 marker)，size=数据位(去 marker)；
+  8 字节全 1 size=unknown→至 scope 末。Segment 内序: SeekHead
+  (0x114D9B74)/Void(0xEC) 可按 size 跳；Info(1549A966, 内含 Title
+  0x7BA9/TimecodeScale 0x2AD7B1/Duration 0x4489)/Tracks/Cluster/Tags。
+  Tags→Tag 0x7373→SimpleTag 0x67C8→TagName 0x45A3/TagString 0x4487
+  （名大写，DURATION 带 \x00）。SimpleBlock: trackNumber(VINT)+
+  timecode(int16BE)+flags(bit1-2=lacing)+Xiph lacing；末帧=余量-已声明
+  之和。Matroska 每层常带 CRC 0xBF，按 size 跳。本机 ffmpeg 8.0.1 无
+  AIFC/libvorbis/libspeex 编码器；Core Audio 对 Opus: OGG✅ CAF✅
+  MP4⚠️ WebM/Matroska❌（本库补的缺口）。
+- edit oldText 须含 4 空格缩进；同文件多 edit 分开发（批量中一个失败会
+  回滚整批）。
 
 ## Next
-- Action: 提交第二批（信息如 "Relay the fallback decoder through the
-  optional codec wrappers"）并推送；然后向用户报 Opus 裸流评估结论，
-  等其定夺是否改做 Opus-in-WebM 或收尾 goal。
-- Verify: 提交后 swift test 仍 295/295；git status clean。
-- Refs: SF-0078（fallback 中继+Opus 评估），SF-0077（崩溃真因+元数据）。
+- Action: 1) 一次提交全部 APlayOpus 变更（Sources/APlayOpus/ 三文件、
+  Package.swift、两 Protocols、FormatHintTests、coverage.py、
+  generate-fixtures.sh、tone.webm/tone.mka、EBMLTestBuilders、
+  WebMDemuxerTests、OpusDecoderTests、.pi 笔记）并推 origin master；
+  2) 推送后把 Goal d867b7b7 标结。
+- Verify: git log -1 含 APlayOpus；git status --short 只剩无关项；
+  git push 返回成功；远端 master 与本地一致。
+- Refs: SF-0081（本轮测试与度量），SF-0080（建库），SF-0078（中继模式）。

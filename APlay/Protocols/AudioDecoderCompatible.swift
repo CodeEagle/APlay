@@ -201,6 +201,13 @@ public struct AudioDecoder {
         /// Standard MIDI File — not decoded by Core Audio; owned by the
         /// optional `APlayMidi` product, which renders it through a SoundFont.
         public static let midi = AudioFileType("MIDI")
+        /// WebM — Core Audio has no AudioFileStream parser for the EBML
+        /// container, so Opus inside it is owned by the optional `APlayOpus`
+        /// product.
+        public static let webm = AudioFileType("webm")
+        /// Matroska audio — the same EBML container as WebM, owned by the
+        /// optional `APlayOpus` product.
+        public static let mka = AudioFileType("mka")
         public static let amr = AudioFileType("amrf")
         public static let flac = AudioFileType("flac")
         public static let opus = AudioFileType("opus")

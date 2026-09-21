@@ -1744,3 +1744,158 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - 真正的缺口是 **Opus-in-WebM/Matroska**（.webm/.mka），需 EBML demuxer
   + vendoring libopus（autotools，需 config.h，114 文件含之），工作量远
   超(goal 描述的)「裸流」，且非 goal 字面所列。→ 报用户定夺。
+
+## SF-0079
+- Revision: 79
+- 取代 SF-0078 的「Opus 裸流待用户定夺」——已探明**完全可行且无需
+  vendoring C**，改为落地「Opus-in-WebM/Matroska」（真正的缺口）。
+
+### 可行性已证（两条探针均过）
+1. **AudioConverter 直解裸 Opus 包**: /tmp/opusprobe/probe.swift 读
+   tone.opus，自解 Ogg 页取包，`AudioConverterNew(kAudioFormatOpus
+   → lpcm 48k)` 返回 0；`AudioConverterFillComplexBuffer` + 自写
+   AudioConverterComplexInputDataProc（包经 UnsafeMutablePointer 稳定
+   存储 + AudioStreamPacketDescription）逐包喂入——**整段 2 秒
+   96840 帧 PCM 全出**。结论: Core Audio 的 Opus 解码器不经
+   AudioFileStream 也能独立解码裸包 → **APlayOpus 不用引 libopus**。
+   （proc 内须用 class 盒子 + Unmanaged，struct+inout 会触发 Swift
+   排他性 fatal；「无包」返 noErr 且 packetsCount=0。）
+2. **EBML/WebM 解包**: /tmp 探针解 /tmp/op.webm 得 Segment@0x24
+   (hdr=12B)、Tracks→TrackEntry CodecID="A_OPUS"、CodecPrivate=
+   `OpusHead\x01\x01\x38\x01…`、Cluster(1F43B675) 内 SimpleBlock
+   (0xA3) Xiph lacing → 首 Cluster 取出 **100 个 Opus 包**（长度
+   115/70/75/71/81/78，VBR 合理）。
+   OpusHead 在 CodecPrivate 中，rate/channels 以它为准。
+- 夹具已造（**未提交**）: MacTests/Fixtures/tone.webm(12177B)、
+  tone.mka(12295B，带 title/artist/album)。.mka 的 Matroska Tags
+  元数据已见字符串（ARTIST 大写）。
+
+### 落地清单（下一窗照此做）
+- Sources/APlayOpus/ 三文件: APlayOpus.swift(enum+decoder(fallback:)+
+  handledHints)、OpusDecoder.swift(wrapper，计时器+AudioConverter，
+  **照 SF-0078 的 fallback 中继模式**从开始就接好)、
+  WebMDemuxer.swift(纯 Swift EBML)。
+- Package.swift: product+target APlayOpus(dep APlay)；
+  APlayTests 依赖加 APlayOpus。
+- AudioDecoderCompatible.AudioFileType 加 .webm/.mka；
+  StreamProviderCompatible.fileHint 加 "webm","mka" 映射。
+- 测试: WebMDemuxer 解析（A_OPUS/OpusHead/包数）、OpusDecoder 解码
+  出 PCM、路由、fallback 中继、坏文件报错；generate-fixtures.sh 加
+  tone.webm/tone.mka。
+- 元数据（可选）: Matroska Tags 0x1254C367 → SimpleTag 0x67C8 →
+  TagName 0x45A3 / TagString 0x4487（名称大写，如 ARTIST）。
+- 元素 ID 速查: EBML 1A45DFA3 / Segment 18538067 / Info 1549A966 /
+  Tracks 1654AE6B / TrackEntry AE / TrackNumber D7 / CodecID 86 /
+  CodecPrivate 63A2 / Audio E1 / SamplingFreq B5 / Channels 9F /
+  Cluster 1F43B675 / Timestamp E7 / SimpleBlock A3 / BlockGroup A0 /
+  Block A1。
+- SimpleBlock 体: trackNumber(VINT)+timecode(int16BE)+flags(1B，
+  bit1-2=lacing)+帧; Xiph lacing: nsizes 字节后每尺寸为 0xFF 递进+
+  末字节，最后一帧=余量。VINT: 前导零计数定长 n，值=首字节&(mask-1)
+  再接后续字节。Segment size 常为「unknown」(8 字节全零长 VINT)，
+  遍历须进 Segment 体走到文件尾，勿按 size 跳过（SF-0079 探针的
+  Tags 查找无输出即因未下钻 Segment）。
+
+### 现状
+- swift test 295/295；覆盖率 90.47%；HEAD ca54cdc 已推。
+- 工作区仅两个新夹具 tone.webm/tone.mka 未提交。
+
+## SF-0080
+- Revision: 80
+- 取代 SF-0079 的落地清单——**APlayOpus 已建成并全绿**，本轮在收覆盖率。
+
+### 已成（可验）
+- Sources/APlayOpus/{APlayOpus.swift,OpusDecoder.swift,WebMDemuxer.swift}：
+  纯 Swift EBML 解包 + AudioConverter(kAudioFormatOpus→canonical 44.1k
+  立体声 16bit) 一步出 PCM；fallback 中继照 SF-0078 从 init 起接好。
+  计时器 20ms、每 tick 4096 帧；fillInput 用 class 盒子+Unmanaged，
+  每包 alloc 稳定存储、tick 结束统一 dealloc。
+- Package.swift: product+target APlayOpus(dep APlay)；APlayTests 依赖加
+  APlayOpus。AudioFileType 加 .webm("webm")/.mka("mka")；
+  fileHint 加 webm/video/webm/audio/webm、mka/audio/x-matroska/
+  video/x-matroska。FormatHintTests 已登记。
+- 夹具 tone.webm(12177B)/tone.mka(12300B)。mka 带 title/artist/album
+  （title 在 Info/Title 0x7BA9，artist/album 在 Tags/Tag 0x7373/
+  SimpleTag 0x67C8；DURATION 带 \x00 需截尾）。已入
+  generate-fixtures.sh（`-f webm` / `-f matroska -metadata ...`）。
+  顺手修了脚本既有的 aifc 坏行（ffmpeg 8.x 无 AIFC muxer，改调
+  Scripts/generate-aifc.py），脚本现可整跑；重跑会改动 tone.ogg/
+  tone.opus/tone-opus.ogg 三个已提交夹具，**已 git checkout 还原**。
+- Scripts/coverage.py: MODULES/ROOTS 加 APlayOpus（7 模块）。
+- swift test 313/313 通过；覆盖率 TOTAL 90.81%，APlayOpus 95.33%。
+- 刚做完一轮「去不可达分支」: readID 合并 `first != 0, let length =
+  vintLength`（vintLength 的 nil 只剩零字节一条路）、Xiph reduce 的
+  `size>=0` 守卫改为 invariant 直采（sizes 之和=余量）、fixed lacing
+  去掉恒真的 `frameCount > 0`、trackEntry 处 `entryCodecID ?? ""` 改
+  `if let codecID`。**这些编辑后只 swift build 过，尚未重跑测试。**
+
+### 本轮剩余（覆盖率收尾，具体到行）
+- WebMDemuxer 未覆盖（/tmp/cov.json 为准，行号在上述去分支编辑前）:
+  ①静态可直接钉: metadataItem 全 case(79,82-85)、opusTrack 坏头
+  (64 短/65 错 magic/71 零 channels|rate)；
+  ②块边界(splitBlock): 219 空 body、221 body<4B、227 unlaced 无 payload、
+  230 xiph 无尺寸、240 尺寸链以 0xFF 收尾、248 声明尺寸>余量、
+  256 fixed 无 payload、260 fixed 不可整除(frameCount=2, payload=7B)；
+  ③walk/原语: 149/150 截断元素、275 ID 在 scope 末、277/278 零字节 ID、
+  279 ID 尾截断(0x40 收尾)、292 size 在 scope 末、293 零字节 size、
+  294 size 尾截断、306 vintLength(0x00)、312 空 string body、
+  327 Duration<8B(float64 守卫)；
+  ④多 TrackEntry 作用域: 第二轨是 A_OPUS 时 169+还原行，先 Opus 后
+  Opus 时 track!=nil 分支。
+- OpusDecoder 未覆盖: 95 非中转时输入字节应丢弃；136 文件不存在；
+  151 有 A_OPUS 轨但无包；169 AudioConverterNew 失败(无 seam，不可测，
+  认)、210 decodeTick 守卫(计时器生命周期下不可达，认)、235 解码中
+  converter 报错——**已探针证实可达**: 全随机垃圾包，喂到第 15 包
+  AudioConverterFillComplexBuffer 返 1650549857、总 0 帧，故可造临时
+  webm(轨真、包内容随机) 钉「恰好 1 个 parser error」；306 pause 二次
+  (已 stop)；340/348 prepare 前直接构造的 pause/resume 走 fallback；
+  350 destroy 后 resume；354 destroy；377-379 UnhandledDecoder 的
+  pause/resume/destroy；394 trampoline userdata nil(不可达，认)。
+- 测完: swift test 全绿 + Scripts/coverage.py TOTAL≥90% 且 APlayOpus
+  尽量高，然后提交推送（工作区还有两个新夹具+脚本草稿未提交）。
+
+## SF-0081
+- Revision: 81
+- 取代 SF-0080 的收尾清单——**覆盖率收尾完成**，APlayOpus 100%、
+  TOTAL 91.14%，326/326 全绿，已可提交。
+
+### 已成（本轮新增测试，全部通过）
+- MacTests/EBMLTestBuilders.swift（新）: 共享 EBML 构建器
+  （ebmlHeader/ebmlSegment/ebmlTracks(codecID:head:)/ebmlCluster/
+  ebmlElement/ebmlElementID/ebmlElementSize + temporaryFile 写临时
+  URL + testOpusHead 常量）。OpusDecoderTests 用它造合成容器；
+  WebMDemuxerTests 保持自己的私有构建器未动。
+- WebMDemuxerTests 新增 7 测: metadataItem 全 case（含 ENCODER/
+  DURATION 落 other、大小写不敏感）；opusTrack 坏头（nil/18B/错 magic/
+  零 channels/零 rate/合法）；Lacing 加 .raw([UInt8]) 钉 splitBlock
+  十一守卫（空 body/零 track/ID 尾截断/timecode+flags 不足/unlaced 无
+  payload/xiph 无尺寸/0xFF 链收尾/声明超余量/fixed 无 payload/不可整除）；
+  截断元素（零字节 ID、ID 后无 size、零字节 size、size 尾截断）钉
+  walk/readID/readSize 守卫；空 Title+空 TagString 跳过；Duration
+  无 scale / <8B 归零、合法 scale+1e9 ticks 得 1s；双 TrackEntry
+  （Vorbis→Opus 取 Opus、Opus×2 取首个，用 24kHz mono 第二头佐证）。
+- OpusDecoderTests 新增 5 测 + 2 处扩充: 不存在文件（Data 读取失败）、
+  有轨无包（parse 过、packets 空抛错）、**非法采样率**（OpusHead
+  rate=0xFFFFFFFF → AudioConverterNew 失败，即原先认定不可测的 169，
+  实测本机可复现）、24 包随机垃圾 → 恰 1 个 decode error 且停止再无
+  输出（LCG 定种子可复现）、prepare 前 pause/resume 走 fallback 且
+  未中转的输入字节被丢弃、destroy 停解码并转发 fallback（pause 后
+  destroy 顺带钉 stop 二次守卫）；扩充 testReachesEndOfTheFile
+  （结束后 resume 为 no-op）、testDirectConstructionRefusesAnMp3
+  （UnhandledDecoder 的 pause/resume/destroy no-op）。
+- 剩余不可达（认定）: decodeTick 守卫（计时器已 suspend 后的 in-flight
+  tick，竞态）与 opusInputProc 的 userdata nil（恒传 self）——llvm-cov
+  已把 APlayOpus 记为 535/535 = 100%。
+
+### 度量（本轮最终）
+- swift test --enable-code-coverage: 326/326 通过。
+- Scripts/coverage.py: APlayOpus 100.00%（535/535）、TOTAL 91.14%
+  （6906/7577）。其余模块: APlay 90.29、APlayExtras 88.60、
+  APlayWavPack 89.38、APlayVorbis 89.68、APlaySpeex 93.08、
+  APlayMidi 93.68。
+
+### 提交
+- 一次提交: Sources/APlayOpus/ 三文件 + Package/类型/hint/coverage.py/
+  generate-fixtures.sh + tone.webm/tone.mka 夹具 + 四个测试文件
+  （EBMLTestBuilders/WebMDemuxerTests/OpusDecoderTests/FormatHintTests）
+  + .pi 笔记；推 origin master。

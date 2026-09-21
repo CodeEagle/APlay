@@ -34,8 +34,11 @@ gen tone.aac     "sine=frequency=440:duration=2:sample_rate=44100" -c:a aac -b:a
 # --- WAVE / AIFF family (PCM, big- and little-endian) ---------------------
 gen tone.wav     "sine=frequency=440:duration=2:sample_rate=22050" -c:a pcm_s16le -ac 1
 gen tone.aiff    "sine=frequency=440:duration=2:sample_rate=22050" -c:a pcm_s16be -ac 1
-# AIFF-C carrying ALAC (extension hint is .aifc).
-gen tone.aifc    "sine=frequency=440:duration=2:sample_rate=44100" -c:a alac -ac 1 -f aifc
+# AIFF-C carrying ALAC (extension hint is .aifc). FFmpeg 8.x ships no AIFC
+# muxer, so the file is written directly — an AIFF with a FORM type of AIFC.
+# gen tone.aifc "sine=frequency=440:duration=2:sample_rate=44100" -c:a alac -ac 1 -f aifc
+python3 "$(dirname "$0")/generate-aifc.py" "$OUT/tone.aifc"
+printf '%-14s %8s bytes\n' "tone.aifc" "$(stat -f%z "$OUT/tone.aifc")"
 
 # --- Core Audio Format ----------------------------------------------------
 gen tone.caf     "sine=frequency=440:duration=2:sample_rate=44100" -c:a alac -ac 1 -f caf
@@ -69,6 +72,14 @@ gen tone.wv     "sine=frequency=440:duration=2:sample_rate=22050" -c:a wavpack -
 # Opus in OGG: the .opus hint is recognised but Core Audio has no AudioFileStream
 # opus parser, so decode must fail until an injected decoder is supplied.
 gen tone.opus    "sine=frequency=440:duration=2:sample_rate=48000" -c:a libopus -b:a 32k -ac 1 -f opus
+
+# --- WebM / Matroska (APlayOpus) -----------------------------------------
+# Opus inside the EBML container Core Audio has no AudioFileStream parser
+# for. The Matroska variant carries the same scripted tags the other tagged
+# fixtures do; the WebM one stays untagged so the decode path is covered with
+# no metadata noise.
+gen tone.webm "sine=frequency=440:duration=2:sample_rate=48000" -c:a libopus -b:a 32k -ac 2 -f webm
+gen tone.mka  "sine=frequency=440:duration=2:sample_rate=48000" -c:a libopus -b:a 32k -ac 2 -f matroska -metadata title="APlay WebM/Opus tone" -metadata artist="APlay" -metadata album="Fixtures"
 
 # --- MIDI + SoundFont (APlayMidi) ----------------------------------------
 # Plain Python generators, no ffmpeg needed. melody.mid is the fixture the

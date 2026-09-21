@@ -180,6 +180,10 @@ public struct StreamProvider {
             // Standard MIDI Files — rendered by the optional `APlayMidi`
             // product through a SoundFont, never by Core Audio.
             case "mid", "midi", "kar", "audio/midi", "audio/x-midi": return .midi
+            // WebM and Matroska — the EBML container Core Audio has no parser
+            // for, so the optional `APlayOpus` product demuxes it in Swift.
+            case "webm", "video/webm", "audio/webm": return .webm
+            case "mka", "audio/x-matroska", "video/x-matroska": return .mka
             case "au", "snd", "audio/basic": return .next
             case "rf64": return .rf64
             case "sd2": return .soundDesigner2

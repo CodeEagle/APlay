@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 MODULES = ("APlay", "APlayExtras", "APlayWavPack", "APlayVorbis", "APlaySpeex",
-           "APlayMidi")
+           "APlayMidi", "APlayOpus")
 
 # Product source roots, relative to the repository root. Anything outside these
 # roots (tests, MacTests, APlayDemo, derived files, vendored C) is ignored.
@@ -22,6 +22,7 @@ ROOTS = (
     ("APlayVorbis", "Sources/APlayVorbis/"),
     ("APlaySpeex", "Sources/APlaySpeex/"),
     ("APlayMidi", "Sources/APlayMidi/"),
+    ("APlayOpus", "Sources/APlayOpus/"),
 )
 
 

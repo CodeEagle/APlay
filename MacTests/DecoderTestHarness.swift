@@ -21,6 +21,7 @@ final class OutputCollector {
     private(set) var bitrateEvents: UInt32 = 0
     private(set) var emptyCount = 0
     private(set) var errors: [APlay.Error] = []
+    private var _metadata: [MetadataParser.Item] = []
 
     func append(_ pointer: UnsafeRawPointer, _ count: UInt32) {
         let buffer = UnsafeBufferPointer(start: pointer.assumingMemoryBound(to: UInt8.self), count: Int(count))
@@ -33,12 +34,24 @@ final class OutputCollector {
         case .bitrate: lock.lock(); bitrateEvents &+= 1; lock.unlock()
         case .empty: lock.lock(); emptyCount &+= 1; lock.unlock()
         case let .error(error): lock.lock(); errors.append(error); lock.unlock()
+        case let .metadata(items): lock.lock(); _metadata.append(contentsOf: items); lock.unlock()
         case .seekable: break
         }
     }
 
     var bytes: Data { lock.lock(); defer { lock.unlock() }; return _bytes }
     var totalBytes: Int { bytes.count }
+    /// Every metadata item the decoder emitted, in arrival order.
+    var metadata: [MetadataParser.Item] {
+        lock.lock(); defer { lock.unlock() }; return _metadata
+    }
+    /// The text of every title item, in arrival order.
+    var titles: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return _metadata.compactMap { item in
+            if case let .title(value) = item { return value } else { return nil }
+        }
+    }
 }
 
 /// Owns the configuration the decoder references `unowned`, and wires decoders

@@ -93,6 +93,8 @@ final class Composer: @unchecked Sendable {
             switch value {
             case let .seekable(value):
                 sself.eventPipeline.call(.seekable(value))
+            case let .metadata(items):
+                sself.modifyMetadata(of: items)
             case .empty:
                 sself.eventPipeline.call(.decoderEmptyEncountered)
             case let .output(item):

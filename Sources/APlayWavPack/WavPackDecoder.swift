@@ -175,10 +175,6 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
             throw error
         }
         _context = context
-        if _pendingResume {
-            _pendingResume = false
-            startTimer()
-        }
 
         let sampleRate = WavpackGetSampleRate(context)
         let channels = max(Int(WavpackGetNumChannels(context)), 1)
@@ -197,6 +193,27 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
         _info.audioDataByteCount = UInt(data.count)
         _info.dataOffset = 0
         _info.fileHint = .wavpack
+
+        // The APEv2 trailer is read straight off the buffered file; the library
+        // exposes it through WavpackGetTagItem, but that touches a NULL
+        // ape_tag_data on files without a tag, so the bytes are parsed here.
+        // Emitted before the timer starts so Now Playing data precedes the PCM.
+        emitMetadata()
+
+        // The timer is started last: `decodeTick` unpacks into
+        // `_unpackBuffer` and reads `_info`, so both must exist first — an
+        // earlier start had the library write 16 KB into an empty array.
+        if _pendingResume {
+            _pendingResume = false
+            startTimer()
+        }
+    }
+
+    /// The APEv2 trailer (where FFmpeg writes title/artist/album) is parsed
+    /// out of the buffered file and surfaced before any audio.
+    private func emitMetadata() {
+        guard let items = APEv2TagParser.parse(_fileData), !items.isEmpty else { return }
+        outputStream.call(.metadata(items))
     }
 
     // MARK: - Decoding

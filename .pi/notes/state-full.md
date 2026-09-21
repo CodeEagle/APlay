@@ -1587,3 +1587,112 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - 新格式元数据: tagParser 只接 .mp3(ID3)/.flac；.mid/.ogg/.spx/.wv 空分支。
 - Opus 裸流、ICY stop 延迟。
 - 推送: efce7eb + ddd3640 两个本地提交未推。
+
+## SF-0076
+- Revision: 76
+- 取代 SF-0075。做 Goal d867b7b7 的"新格式元数据"项；**未完成，WavPack 崩溃未解**。
+
+### 设计（路径 B: decoder 发元数据事件）
+- Player 层 APlay.Event 早有 .metadata；缺的是 AudioDecoder 层。故:
+  APlay/Protocols/AudioDecoderCompatible.swift 的 Event 加
+  `case metadata([MetadataParser.Item])`；APlay/Composer.swift 的
+  decoder outputStream switch 加 `case let .metadata(items):
+  sself.modifyMetadata(of: items)`（与 Streamer 的 tagParser 路径汇合，
+  demo 的 applyParsedMetadata 无需改）。swift build 通过（exhaustive OK）。
+
+### 已成
+- VorbisDecoder: openFile 在 ov_info 后 emitMetadata()——用
+  ov_comment(&_vorbisFile,-1)?.pointee 遍历 user_comments/
+  comment_lengths（非 0 结尾，按 length 截，UTF-8 失败跳过），
+  + static metadataItem(for:) 映射 KEY=value（大小写不敏感）。
+  **VorbisDecoderTests 4/4 通过。**
+- SpeexDecoder: decodeTick 里 `_packetsSeen < firstAudioPacket`(=2)
+  分支内，`_packetsSeen == 2` 时 emitMetadata(from:length:) 手动解
+  Vorbis comment 包（[3]"vorbis" 前缀可省、LE32 vendorLen+vendor+
+  count+每条 LE32 len+bytes），映射同式。**SpeexDecoderTests 4/4 通过。**
+- OutputCollector(DecoderTestHarness) 加 `_metadata` 收集 +
+  `var metadata`；record 加 metadata case。
+- 夹具: generate-fixtures.sh 加 ogg/spx/wv 三行（带
+  title/artist/album）。**本机 ffmpeg 8.0.1 无 libvorbis/libspeex
+  编码器**，故 ogg 改 `-c:a vorbis -strict -2`（实验性内置），
+  spx 仍 libspeex（本机无法重生成，旧 tone.spx 无标签保留）；
+  wv 用内置 wavpack。tone.ogg/tone.wv 已重生成带标签
+  （hexdump 确认 "title=APlay Ogg/Vorbis tone" 字节）。
+  **既有坑: ffmpeg 8 不认 `-f aifc`，脚本跑到 aifc 行就 exit，
+  三格式是单独按同款命令生成的（脚本可复现性仍差 aifc 一项）。**
+- WavPack: 新建 Sources/APlayWavPack/APEv2TagParser.swift（纯 Swift
+  enum，parse(_ data: Data) -> [MetadataParser.Item]?，含
+  littleEndian32/metadataItem）。WavPackDecoder.openFile 在
+  _context 赋值后 emitMetadata()（极简: guard parse 结果非空则
+  outputStream.call(.metadata(items))）。
+
+### WavPack 崩溃（**未解，卡在这**）
+- testDecodesWavPack SIGSEGV(11)/SIGBUS(10) 交替，平凡代码处崩。
+- 排除: OPEN_TAGS(0x2) 无关（注释 emitMetadata 后 OPEN_TAGS 下通过）；
+  parse 本身安全——新增 testParsesFixtureTag 直接 parse 真实 tone.wv
+  得 4 项（title/artist/album/other ENCODER）不崩；Vorbis/Speex 也
+  发 .metadata 且测试通过 → outputStream.call(.metadata) 与
+  collector.record 均正常。
+- 定位手段: mark() 写 /tmp/wvtag.log（FileHandle(forWritingTo:) 对
+  不存在文件抛错，须先 FileManager.fileExists 判定再 write/create）。
+  日志: after-open ✓ pre-emit ✓，旧版 emitMetadata 内 "enter" 未执行
+  → 函数 prologue 即崩。**怀疑 Xcode27 beta 工具链对 WavPackDecoder.swift
+  该函数布局的代码生成 bug**（SF-0073 记过同类：CoreAudio. 前缀绕过）。
+- **下一步计划（未试）**: 把 emitMetadata 调用从 openFile 移到
+  decodeTick 首次输出前（加 `_metadataEmitted` 标志，closeFile 重置），
+  验证是否 openFile 同步栈时序所致；若仍崩，把 emitMetadata 体再拆/
+  换文件。极简版调用替换为 APEv2TagParser 后**仍未验证 testDecodesWavPack**
+  （最后一次全量 WavPackDecoderTests 跑在极简版前）。
+
+### 测试现状
+- WavPackDecoderTests 新增 testParsesSyntheticAPEv2Tag（合成 APEv2；
+  曾因 "SelfStudio" 数成 9 字节(实为 10) 断言失败，已修 appendLE32 10）
+  + testParsesFixtureTag（断言 4 项，已过解析部分）。
+  MetadataParser.Item 非 Equatable，用 if case let 提取断言。
+- testParsesFixtureTag/synthetic 已通过；**testDecodesWavPack 仍崩**。
+- swift test 全量在 WavPackDecoderTests 处 signal 11 中断，未跑完。
+
+### 提交状态
+- 已提交并推送: efce7eb(MIDI 库+README)、ddd3640(demo 接 MIDI)、
+  84ec805(ICY stop 修复)。
+- **工作区未提交**: 本轮元数据全部改动（Event/Composer/三库/
+  OutputCollector/夹具 tone.ogg+tone.wv/脚本/APEv2TagParser 新文件）。
+
+## SF-0077
+- Revision: 77
+- 取代 SF-0076 的「WavPack 崩溃未解」——真因找到并修复，元数据项收尾完成。
+
+### WavPack SIGSEGV 真因（不是工具链 bug）
+- 根因: `openFile` 在 `_context` 赋值后**先 `startTimer()`（当
+  `_pendingResume`）再分配 `_unpackBuffer`/填 `_info`**。测试顺序是
+  `decoder.resume()`（此时 `_context==nil` → 置 `_pendingResume=true`）
+  然后 `prepare` → openFile。timer 一旦 resume 就在 `_decodeQueue`
+  立即触发 `decodeTick()`，而 `_unpackBuffer` 仍是空 Swift 数组——
+  `WavpackUnpackSamples(context, &_unpackBuffer, 4096)` 往空数组指针
+  写 16KB → 堆破坏，表现为跳到垃圾 PC（lldb 见 `0xaff00000975` /
+  `0x0`，非确定性，故误判为代码生成 bug）。
+- 修复: `startTimer()` 移到 openFile 末尾（_unpackBuffer 与 _info 就绪
+  之后），`emitMetadata()` 仍在 timer 启动前（元数据先于首帧 PCM）。
+  testDecodesWavPack 立即由 SIGSEGV 变通过。
+
+### Speex 元数据缺口（之前「已完成」其实未通）
+- 旧 tone.spx 的注释包只有 vendor（"Encoded with Speex 1.2.1"）+
+  fieldCount=0——**ffmpeg 的 libspeex 编码器忽略 -metadata**，故
+  SpeexDecoder.emitMetadata 从无字段可发；此前无端到端断言所以没暴露。
+- 新增 Scripts/inject-speex-comment.py: 重写 Ogg 第 2 页（注释包）为
+  带字段的 Vorbis comment（保留原 vendor，无 [3]"vorbis" 前缀，符合
+  Speex 约定），重算 Ogg CRC32(poly 0x04c11db7)。
+  验证: 对原文件 8 页 CRC 全部复算一致（实现正确）；build_page 对
+  注释页字节级身份；注入后页序 0..7 保留、头页与音频尾字节级相同、
+  幂等（两次注入 MD5 一致）。
+- generate-fixtures.sh: speex 行改为 `if ffmpeg -encoders | grep -q
+  libspeex` 守护（本机无该编码器则保留旧文件），随后**总是**跑注入器。
+
+### 测试
+- testParsesFixtureTag 期望由 3 项改 4 项的真相: 夹具实际 4 项
+  （title/artist/album + ffmpeg 自加的 ENCODER=Lavf62.3.100），
+  改为钉死脚本写的前 3 项（文件序），容忍 ENCODER。
+- OutputCollector 加 `var titles`（title 项文本数组）；三个 decode
+  测试（WavPack/Vorbis/Speex）各加端到端 titles 断言。
+- **swift test 全量 290/290 通过（20.6s）**——此前在 WavPack 处
+  signal 11 中断，首次跑完整套。

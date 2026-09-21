@@ -198,6 +198,9 @@ public final class VorbisDecoder: @unchecked Sendable, AudioDecoderCompatible {
             outputStream.call(.error(error))
             throw error
         }
+        // libvorbis has already parsed the Ogg comment packet; surface its
+        // fields before any audio so Now Playing is populated up front.
+        emitMetadata()
         let sampleRate = Double(info.rate)
         let channels = max(Int(info.channels), 1)
         _floatBuffer = Array(repeating: 0, count: _decodeChunk * channels)
@@ -243,6 +246,46 @@ public final class VorbisDecoder: @unchecked Sendable, AudioDecoderCompatible {
         }
         _outputBuffer.withUnsafeBytes { rawBuffer in
             outputStream.call(.output((rawBuffer.baseAddress!, UInt32(rawBuffer.count))))
+        }
+    }
+
+    /// libvorbis has already parsed the Ogg comment packet; hand its fields to
+    /// the pipeline as metadata so a `.ogg` shows the same Now Playing info an
+    /// MP3 would. The vendor string is skipped — it carries the encoder, not
+    /// anything a listener wants on the lock screen.
+    private func emitMetadata() {
+        guard let comment = ov_comment(&_vorbisFile, -1)?.pointee else { return }
+        let count = max(Int(comment.comments), 0)
+        guard count > 0 else { return }
+        var items: [MetadataParser.Item] = []
+        for index in 0..<count {
+            guard let field = comment.user_comments?[index] else { continue }
+            let length = max(Int(comment.comment_lengths?[index] ?? 0), 0)
+            guard length > 0 else { continue }
+            guard let text = String(bytes: UnsafeRawBufferPointer(start: field, count: length),
+                                    encoding: .utf8) else { continue }
+            if let item = Self.metadataItem(for: text) { items.append(item) }
+        }
+        if !items.isEmpty {
+            outputStream.call(.metadata(items))
+        }
+    }
+
+    /// Maps one `KEY=value` Vorbis comment field onto a metadata item. Field
+    /// names are case-insensitive in the spec (and FFmpeg writes them lower).
+    static func metadataItem(for field: String) -> MetadataParser.Item? {
+        guard let equal = field.firstIndex(of: "=") else { return nil }
+        let key = field[..<equal].uppercased()
+        let value = String(field[field.index(after: equal)...])
+        switch key {
+        case "TITLE": return .title(value)
+        case "ARTIST": return .artist(value)
+        case "ALBUM": return .album(value)
+        case "GENRE": return .genre(value)
+        case "TRACKNUMBER", "TRACK": return .track(value)
+        case "DATE", "YEAR": return .year(value)
+        case "COMMENT", "DESCRIPTION": return .comment(value)
+        default: return .other([key: value])
         }
     }
 

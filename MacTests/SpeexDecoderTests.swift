@@ -50,6 +50,8 @@ final class SpeexDecoderTests: XCTestCase {
 
         XCTAssertTrue(wait(for: collector, minBytes: 1000), "Speex decoded no PCM")
         XCTAssertTrue(collector.errors.isEmpty, "Speex emitted \(collector.errors.count) errors")
+        XCTAssertEqual(collector.titles, ["APlay Speex tone"],
+                       "the Speex comment must surface as Now Playing metadata")
         XCTAssertEqual(decoder.info.dstFormat.mSampleRate, 44100, accuracy: 1,
                        "the wrapper delivers canonical PCM")
         XCTAssertEqual(decoder.info.dstFormat.mChannelsPerFrame, 2)

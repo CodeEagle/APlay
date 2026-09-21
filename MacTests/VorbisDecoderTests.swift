@@ -50,6 +50,8 @@ final class VorbisDecoderTests: XCTestCase {
 
         XCTAssertTrue(wait(for: collector, minBytes: 1000), "Vorbis decoded no PCM")
         XCTAssertTrue(collector.errors.isEmpty, "Vorbis emitted \(collector.errors.count) errors")
+        XCTAssertEqual(collector.titles, ["APlay Ogg/Vorbis tone"],
+                       "the Vorbis comment must surface as Now Playing metadata")
         XCTAssertEqual(decoder.info.dstFormat.mSampleRate, 44100, accuracy: 1,
                        "the wrapper delivers canonical PCM")
         XCTAssertEqual(decoder.info.dstFormat.mChannelsPerFrame, 2)

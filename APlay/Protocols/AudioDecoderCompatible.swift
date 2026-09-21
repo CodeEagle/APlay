@@ -40,6 +40,10 @@ public struct AudioDecoder {
         case output(AudioOutput)
         case bitrate(UInt32)
         case seekable(Bool)
+        /// Metadata the decoder itself parsed (Vorbis comment packets, WavPack
+        /// tags, MIDI sequence names). Routed through the same
+        /// `modifyMetadata` path as the streamer's tag parsers.
+        case metadata([MetadataParser.Item])
         case empty
     }
 

@@ -43,6 +43,24 @@ gen tone.caf     "sine=frequency=440:duration=2:sample_rate=44100" -c:a alac -ac
 # --- FLAC -----------------------------------------------------------------
 gen tone.flac    "sine=frequency=440:duration=2:sample_rate=44100" -c:a flac -ac 1
 
+# --- Optional codec libraries (APlayVorbis / APlaySpeex / APlayWavPack) ----
+# Tagged so the decoders can exercise their metadata paths: the two Ogg
+# files carry a Vorbis comment packet and the WavPack file an APEv2 block.
+# The built-in experimental Vorbis encoder is used instead of libvorbis so the
+# script runs on a stock FFmpeg; these fixtures exist for metadata and decode
+# path coverage, not sound quality. libspeex still needs a full FFmpeg build.
+gen tone.ogg    "sine=frequency=440:duration=2:sample_rate=44100" -c:a vorbis -strict -2 -ac 2 -metadata title="APlay Ogg/Vorbis tone" -metadata artist="APlay" -metadata album="Fixtures"
+if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libspeex; then
+  gen tone.spx  "sine=frequency=440:duration=2:sample_rate=44100" -c:a libspeex -b:a 32k -ac 2 -metadata title="APlay Speex tone" -metadata artist="APlay" -metadata album="Fixtures"
+else
+  echo "tone.spx: this FFmpeg has no libspeex encoder; keeping the bundled file"
+fi
+# FFmpeg's libspeex encoder ignores -metadata and writes an empty comment
+# packet, so the fields are injected straight into the Ogg pages.
+python3 Scripts/inject-speex-comment.py "$OUT/tone.spx" \
+  "title=APlay Speex tone" "artist=APlay" "album=Fixtures"
+gen tone.wv     "sine=frequency=440:duration=2:sample_rate=22050" -c:a wavpack -ac 1 -metadata title="APlay WavPack tone" -metadata artist="APlay" -metadata album="Fixtures"
+
 # --- Expected-unsupported -------------------------------------------------
 # Opus in OGG: the .opus hint is recognised but Core Audio has no AudioFileStream
 # opus parser, so decode must fail until an injected decoder is supplied.

@@ -274,6 +274,11 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
             // audio starts from the third packet.
             if _packetsSeen < SpeexDecoder.firstAudioPacket {
                 _packetsSeen += 1
+                // The packet after the header is the Ogg comment packet; parse it
+                // on the way past — Speex audio starts from the next packet.
+                if _packetsSeen == 2 {
+                    emitMetadata(from: packetBuffer, length: Int(_packet.bytes))
+                }
                 continue
             }
             speex_bits_read_from(&_bits, packetBuffer, Int32(_packet.bytes))
@@ -296,6 +301,62 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
         }
         _outputBuffer.withUnsafeBytes { rawBuffer in
             outputStream.call(.output((rawBuffer.baseAddress!, UInt32(rawBuffer.count))))
+        }
+    }
+
+    /// The Ogg comment packet uses the Vorbis comment layout: an optional
+    /// `[3]["vorbis"]` prefix, a vendor string, then `KEY=value` fields. Speex
+    /// has no library call for it, so it is read by hand on the way past.
+    private func emitMetadata(from pointer: UnsafeMutablePointer<UInt8>, length: Int) {
+        guard length > 0 else { return }
+        let buffer = UnsafeBufferPointer(start: pointer, count: length)
+        var offset = 0
+        if length >= 7, buffer[0] == 3, "vorbis".utf8.elementsEqual(buffer[1..<7]) {
+            offset = 7
+        }
+        func littleEndian32() -> UInt32? {
+            guard offset + 4 <= length else { return nil }
+            let value = UInt32(buffer[offset])
+                | (UInt32(buffer[offset + 1]) << 8)
+                | (UInt32(buffer[offset + 2]) << 16)
+                | (UInt32(buffer[offset + 3]) << 24)
+            offset += 4
+            return value
+        }
+        guard let vendorLength = littleEndian32(),
+              offset + Int(vendorLength) <= length else { return }
+        offset += Int(vendorLength)
+        guard let fieldCount = littleEndian32() else { return }
+        var items: [MetadataParser.Item] = []
+        for _ in 0..<fieldCount {
+            guard let fieldLength = littleEndian32(),
+                  offset + Int(fieldLength) <= length else { return }
+            if let field = String(bytes: buffer[offset..<offset + Int(fieldLength)], encoding: .utf8),
+               let item = Self.metadataItem(for: field) {
+                items.append(item)
+            }
+            offset += Int(fieldLength)
+        }
+        if !items.isEmpty {
+            outputStream.call(.metadata(items))
+        }
+    }
+
+    /// Maps one `KEY=value` Vorbis comment field onto a metadata item. Field
+    /// names are case-insensitive in the spec (and FFmpeg writes them lower).
+    static func metadataItem(for field: String) -> MetadataParser.Item? {
+        guard let equal = field.firstIndex(of: "=") else { return nil }
+        let key = field[..<equal].uppercased()
+        let value = String(field[field.index(after: equal)...])
+        switch key {
+        case "TITLE": return .title(value)
+        case "ARTIST": return .artist(value)
+        case "ALBUM": return .album(value)
+        case "GENRE": return .genre(value)
+        case "TRACKNUMBER", "TRACK": return .track(value)
+        case "DATE", "YEAR": return .year(value)
+        case "COMMENT", "DESCRIPTION": return .comment(value)
+        default: return .other([key: value])
         }
     }
 

@@ -7,6 +7,31 @@ Requirements
 - iOS 15.0+
 - Swift 6.0+ (Xcode 16+ toolchain)
 
+Installation
+---
+[Swift Package Manager](https://swift.org/package-manager/) is the only supported way to
+add APlay — there is no CocoaPods spec and no Carthage support:
+
+```Swift
+.package(url: "https://github.com/CodeEagle/APlay.git", from: "2.1.2")
+```
+
+Add the `APlay` product to your app target. Supported platforms: macOS 12+, iOS 15+,
+tvOS 15+, visionOS 1+. The same `Package.swift` also builds the `APlayMacPlayback`
+end-to-end validation target and the `APlayTests` suite on macOS, so `swift build` and
+`swift test` are the single source of truth for the framework.
+
+Optional codec libraries ship as separate products — add them only when you need the
+formats they bring; plain `APlay` is unchanged:
+
+```Swift
+.product(name: "APlayExtras", package: "APlay")   // CAF / AIFF / AU / 3GP / Wave64
+.product(name: "APlayWavPack", package: "APlay")  // .wv
+.product(name: "APlayVorbis", package: "APlay")   // .ogg
+.product(name: "APlaySpeex", package: "APlay")    // .spx
+.product(name: "APlayOpus", package: "APlay")   // .webm / .mka
+.product(name: "APlayMidi", package: "APlay")     // .mid / .midi / .kar
+```
 
 Usage
 ---
@@ -22,359 +47,27 @@ player.play(url)
 ...
 ```
 
-Equalizer
----
-The built-in player wires an `NBandEQ` into its audio graph when `equalizerBandFrequencies` is
-configured (the default is `[50, 100, 200, 400, 800, 1600, 2600, 16000]`). Band gains can be
-adjusted at any time:
-
-```Swift
-// boost the low band by 6 dB (index order matches Configuration.equalizerBandFrequencies)
-player.setEqualizerBandGain(6, at: 0)
-```
-
-Gapless playback
----
-Play a list with `gaplessPlaybackEnabled` turned on and the next track is preloaded while the
-current one is still playing; at the end of the track the output audio unit swaps in the
-buffered source without stopping, so consecutive tracks of the same format play without a gap:
-
-```Swift
-let player = APlay(configuration: APlay.Configuration(gaplessPlaybackEnabled: true))
-player.loopPattern = .stopWhenAllPlayed(.order)
-player.play([first, second, third])
-```
-
-The default is off, so single-track playback behaves exactly as before. A handoff between
-different audio formats (for example MP3 → FLAC) still re-initializes the graph and is not
-seamless.
-
-Supported formats
----
-Anything Core Audio can stream-decode, APlay can play. Formats fall into
-several buckets.
-
-### Streaming playback (the default path)
-
-Every row here is **pinned by a test**: `MacTests/FormatCompatibilityTests.swift` drives a
-bundled fixture through the real decoder (`AudioFileStream` + `AudioConverter`) and asserts
-it both parses its metadata *and* decodes to canonical PCM.
-
-| Format | Common extensions | Note |
-| --- | --- | --- |
-| AAC (LC / HE-AAC v1 / v2 / ELD) in MP4 | `.m4a` `.mp4` `.mp4f` `.mpg4` | MP4 and raw ADTS verified |
-| AAC raw ADTS | `.aac` `.adts` `.aacp` | |
-| Audiobook MP4 | `.m4b` | same MPEG-4 container as `.m4a`, hinted separately so Core Audio takes the MP4 branch |
-| MP3 (MPEG-1/2 Layer III) | `.mp3` | CBR and VBR; seek supported |
-| MP2 (MPEG Layer II) | `.mp2` | |
-| FLAC | `.flac` | seek supported (with a seek table) |
-| Opus in OGG | `.opus` | Core Audio parses the container |
-| WAVE PCM | `.wav` `.wave` | tolerates extra chunks (`LIST`/`INFO`, `FLLR`) before `data`; seek supported |
-| IMA ADPCM in WAVE | `.wav` | block PCM; Core Audio reports it as linear PCM |
-| ALAC in MP4 | `.m4a` | the magic cookie now reaches the converter (2.1.0) |
-| Dolby Digital (AC-3) | `.ac3` | verified on macOS; iOS decoding is Dolby-licensed and varies by device and system version |
-| Dolby Digital Plus (E-AC-3) | `.eac3` | same licensing caveat as AC-3 |
-
-### Local file playback (via the optional `APlayExtras` library)
-
-These containers trip the streaming parser, so a local file plays through `APlayExtras`
-instead — an `ExtAudioFile`-backed decoder on the same `audioDecoderBuilder` seam. A
-remote URL cannot be seeked, so streaming stays on the built-in decoder and will not get
-far with these. Add the product only when you need it; plain `APlay` is unchanged. Each
-row is pinned by `MacTests/SeekableFileDecoderTests.swift`.
-
-| Format | Common extensions | Why streaming fails | Note |
-| --- | --- | --- | --- |
-| ALAC in CAF | `.caf` `.caff` | the packet table trails the audio data, so the parser reports `optm` | |
-| AIFF PCM | `.aiff` | `AudioFileStream` reports a packet discontinuity (`dsc!`) | |
-| AIFF-C PCM | `.aifc` | the stream exposes no properties at all | |
-| NeXT / Sun AU | `.au` `.snd` | parses the header but the converter decodes no PCM | µ-law, A-law and PCM payloads |
-| 3GPP / 3GPP2 | `.3gp` `.3g2` | the streaming parser cannot open the container at all | typically an AAC or AMR payload |
-| Sony Wave64 | `.w64` | file-only container | |
-| RF64 (Broadcast WAVE) | `.rf64` | file-only container | no fixture ships — no RF64 muxer was available to build one |
-| Sound Designer II | `.sd2` | file-only container | no fixture ships — no SD2 encoder was available to build one |
-
-### Lossless codecs (via the optional `APlayWavPack` library)
-
-WavPack has no Core Audio decoder, so `.wv` ships as a separate vendored product:
-`APlayWavPack` wraps the reference C library and implements the same
-`audioDecoderBuilder` seam. A local file is buffered whole and is seekable; live
-streams are not (the framing is not a streaming format). Add the product only
-when you need it; plain `APlay` is unchanged. Pinned by
-`MacTests/WavPackDecoderTests.swift`.
-
-```swift
-let config = APlay.Configuration(
-    audioDecoderBuilder: APlayWavPack.decoder(fallback: APlay.Configuration().audioDecoderBuilder))
-```
-
-| Format | Common extensions | Note |
-| --- | --- | --- |
-| WavPack | `.wv` | decodes to canonical 16-bit stereo PCM; any channel count is down/up-mixed |
-
-### Ogg-carried codecs (via the optional `APlayVorbis` library)
-
-Core Audio recognises the Ogg container but ships no Vorbis decoder, so `.ogg`
-plays through a separate vendored product: `APlayVorbis` wraps libvorbis (with
-the Ogg framing layer in `CAPlayOgg`) on the same `audioDecoderBuilder` seam. A
-local file is buffered whole and is seekable; live streams are not — an Ogg page
-stream cannot be rewound, and Vorbis needs its three header packets before any
-audio appears. Add the product only when you need it; plain `APlay` is
-unchanged. Pinned by `MacTests/VorbisDecoderTests.swift`.
-
-```swift
-let config = APlay.Configuration(
-    audioDecoderBuilder: APlayVorbis.decoder(fallback: APlay.Configuration().audioDecoderBuilder))
-```
-
-| Format | Common extensions | Note |
-| --- | --- | --- |
-| Vorbis in Ogg | `.ogg` | decodes to canonical 16-bit stereo PCM; any channel count is down/up-mixed |
-
-The vendored C libraries are BSD-3 licensed (`Sources/CAPlayOgg/LICENSE.txt`,
-`Sources/CAPlayVorbis/LICENSE.txt`).
-
-### Speech codecs (via the optional `APlaySpeex` library)
-
-Core Audio has no Speex decoder, so `.spx` plays through a separate vendored
-product: `APlaySpeex` wraps libspeex (sharing the `CAPlayOgg` framing layer) on
-the same `audioDecoderBuilder` seam. A local file is buffered whole, its Ogg
-pages are demuxed with libogg, and the packets are handed to `speex_decode_int`;
-the decoder is seekable. Live streams are not supported — an Ogg page stream
-cannot be rewound, and Speex needs its header packet first. Add the product
-only when you need it; plain `APlay` is unchanged. Pinned by
-`MacTests/SpeexDecoderTests.swift`.
-
-```swift
-let config = APlay.Configuration(
-    audioDecoderBuilder: APlaySpeex.decoder(fallback: APlay.Configuration().audioDecoderBuilder))
-```
-
-| Format | Common extensions | Note |
-| --- | --- | --- |
-| Speex | `.spx` | decodes to canonical 16-bit stereo PCM; any channel count is down/up-mixed |
-
-The vendored C library is BSD-3 licensed (`Sources/CAPlaySpeex/LICENSE.txt`).
-
-### MIDI and SoundFont (via the optional `APlayMidi` library)
-
-A `.mid` file is a note sequence rather than an audio stream, so `AudioFileStream`
-cannot decode it. `APlayMidi` synthesises it instead: `AVAudioSequencer` reads the
-Standard MIDI File, `AVAudioUnitSampler` loads a `.sf2` or `.dls` instrument bank,
-and an `AVAudioEngine` renders offline straight into the pipeline's canonical
-16-bit/44.1 kHz stereo PCM. No third-party synthesiser is vendored and no audio
-device is touched — the work happens on the decode queue like every other decoder.
-The same `audioDecoderBuilder` seam is used: only `.mid` / `.midi` / `.kar` are
-claimed, and everything else falls through unchanged. A local file is buffered
-whole and is seekable; live streams are not (a SMF is not a streaming format).
-Pinned by `MacTests/MidiDecoderTests.swift`.
-
-```swift
-let config = APlay.Configuration(
-    audioDecoderBuilder: APlayMidi.decoder(
-        fallback: APlay.Configuration().audioDecoderBuilder,
-        soundfont: .init(url: soundfontURL)))
-```
-
-| Format | Common extensions | Note |
-| --- | --- | --- |
-| Standard MIDI File | `.mid` `.midi` `.kar` | renders to canonical 16-bit stereo PCM; any channel count is up-mixed |
-
-Core Audio ships no default `.sf2`, so pass a `Soundfont` URL you ship with your
-app; leave `.default` and the sampler falls back to its built-in single tone. The
-`bank` selects the SoundFont bank (`0` is the General MIDI melodic set, selected
-internally as bank MSB `0x79`) and `program` the instrument number.
-
-### Not supported
-
-Core Audio ships no decoder for these, or the container cannot be parsed. Any of them can
-be added by implementing `AudioDecoderCompatible` and supplying it through
-`audioDecoderBuilder`.
-
-| Format | Common extensions | Why |
-| --- | --- | --- |
-| MP1 (MPEG Layer I) | `.mp1` | hint-table mapped, but no encoder was available to build a fixture — unverified |
-| AMR-NB / AMR-WB | `.amr` | hint-table mapped, but no encoder was available to build a fixture — unverified |
-| Vorbis in Ogg | `.ogg` | see the optional `APlayVorbis` library below |
-| Opus outside an OGG container | (raw) | containerless Opus is not parsed |
-| Windows Media Audio | `.wma` `.asf` | no Core Audio decoder |
-| Monkey's Audio | `.ape` | no Core Audio decoder |
-| True Audio | `.tta` | no Core Audio decoder |
-| Dolby TrueHD / MLP | `.thd` `.mlp` | no Core Audio decoder |
-| Dolby AC-4 | `.ac4` | no Core Audio decoder |
-| DSD (DSF / DFF) | `.dsf` `.dff` | 1-bit stream; no Core Audio decoder |
-| Musepack | `.mpc` `.mpp` `.mp+` | no Core Audio decoder |
-| ATRAC3 / ATRAC9 | `.oma` `.at9` | Sony codecs; no Core Audio decoder |
-| Speex | `.spx` | see the optional `APlaySpeex` library below |
-| Matroska audio | `.mka` | no Core Audio decoder |
-| MPEG-TS | `.ts` | no Core Audio decoder |
-| Raw PCM | — | no header metadata to parse |
-
-A `.mid` / `.midi` / `.kar` file is a note sequence rather than an audio stream, but it
-plays through the optional `APlayMidi` library above.
-
-> An extension the hint table does not recognise falls back to `.mp3` and relies on
-> `AudioFileStream` to sniff the actual content, so an unknown extension is not
-> automatically a failure.
-
-✅ Known issue (fixed)
----
-Earlier releases could only run in `DEBUG` mode: with optimization enabled (`-O`) the audio
-path would go silent. Two separate pointer-lifetime bugs were involved, both invisible in
-`Debug` and both only reproducible in an optimized build:
-
-1. **The decode loop** (fixed in 2.1.0): `outDataPacketDescription` pointed at a stack-local
-   `AudioStreamPacketDescription` that the audio converter dereferences *after* the input
-   callback returns, and the decode/output buffers were handed to Core Audio through unscoped
-   `inout` references. These are backed by stable, object-owned storage and scoped pointer
-   access.
-2. **The render loop** (fixed after 2.1.0 — the residual `-O` silence): the
-   `AVAudioEngine` manual-rendering input block returned its `AudioBufferList` via
-   `withUnsafePointer(to: &property)`. That API only guarantees the pointer for the *duration
-   of the call*, but the engine reads the returned list *after* the block returns. Under `-O`
-   the compiler is free to hand back the address of a temporary, so the render pulled
-   freed/reused memory and emitted silence — `AudioOutputUnitStart` succeeded, the decode
-   buffers were full, playback state reported `.playing`, and not a sample reached the
-   output. The list is now stable, object-owned storage (`_inputBufferList`) that outlives the
-   render.
-
-Both are the same class of bug — a Core Audio/AVFoundation pointer escaping the scope that
-owns it — and both only surfaced once the optimizer stopped keeping temporaries alive by
-accident. If playback is silent in a `Release` build again, look for a pointer crossing an
-API boundary before checking anything else.
-
-> ℹ️ Plain `http://` streams: iOS blocks non-HTTPS URLs via App Transport Security by default.
-> If your stream URL is `http://...`, add an `NSAllowsArbitraryLoads` (or a per-domain) exception
-> to your app's `Info.plist`, otherwise the open will fail with a permission error. This is the
-> most common cause of "cannot play HTTP stream".
-
-Docs
----
-Run `./generate_docs.sh`
-
-Features
----
-- [x] CPU-friendly design to avoid excessive peaks
-
-- [x] Support seek on WAVE, and FLAC(with seektable)
-
-- [x] Support all type of audio format(MP3, WAVE, FLAC, etc...) that iOS already support(Not fully tested)
-
-- [x] Digest(Tested), Basic(not tested) proxy support
-
-- [x] Multiple protocols supported: ShoutCast, standard HTTP, local files
-
-- [x] Prepared for tough network conditions: restart on failures，restart on not full content streamed when end of stream
-
-- [x] Metadata support: ShoutCast metadata, ID3V1, ID3v1.1, ID3v2.2, ID3v2.3, ID3v2.4, FLAC metadata
-
-- [x] Local disk storing: user can add folders for local resource loading
-
-- [x] Playback can start immediately without needing to wait for buffering
-
-- [x] Pre-load a track with `prepare(_:)`: the streamer and decoder buffer the audio
-      without starting the output audio unit, so a later `play(_:)` of the same URL
-      starts instantly from the filled ring buffer
-
-- [x] Gapless playlist playback: with `Configuration(gaplessPlaybackEnabled: true)` the
-      next track is preloaded while the current one plays, and the output audio unit
-      switches sources at the end of the track without stopping — no gap and no `.paused`
-      state at the handoff (same format only; a format change still re-initializes)
-
-- [x] Support cached the stream contents to a file
-
-- [x] Built-in `NBandEQ` equalizer wired into the `AUPlayer` audio graph (band frequencies
-      configurable via `Configuration.equalizerBandFrequencies`; band gains adjustable at runtime
-      via `setEqualizerBandGain(_:at:)`)
-
-- [x] Custom logging module and logging into file supported
-
-- [x] Open protocols to support customizing. `AudioDecoderCompatible`, `ConfigurationCompatible`, `LoggerCompatible`...
-
-- [x] Swift 6 language mode with strict concurrency checking enabled
-
-Installation
----
-[Swift Package Manager](https://swift.org/package-manager/) is the only supported way to
-add APlay — there is no CocoaPods spec and no Carthage support anymore:
-
-```Swift
-.package(url: "https://github.com/CodeEagle/APlay.git", from: "2.0.0")
-```
-
-Add the `APlay` product to your app target. The package declares macOS 12+, iOS 15+,
-tvOS 15+ and visionOS 1+ as supported platforms. The same `Package.swift` also builds
-the `APlayMacPlayback` end-to-end validation target and the `APlayTests` suite on
-macOS, so `swift build` and `swift test` are the single source of truth for the
-framework.
-
-Platform notes: on iOS and visionOS the audio session is configured with the
-`.playback` category and the long-form-audio route sharing policy, and the lock screen
-/ AirPlay 2 remote commands are wired (see *AirPlay 2 and remote control* below). tvOS
-has no `AVAudioSession`, `MPNowPlayingInfoCenter` or background-task concept, so those
-stay compiled out there — the decoder, ring buffer and render path work unchanged.
-
-Optional formats: `APlayExtras`
----
-The two rows above marked `⚠️ stream only` are seekable file formats whose layout a
-streaming parser cannot handle — the packet table sits after the audio data, or the
-container reports a discontinuity. Local files in those formats still play, but only
-through a seekable file decoder.
-
-`APlayExtras` is an optional companion library that adds exactly that. Add the product
-only when you need it; apps that never touch CAF/AIFF/AIFF-C stay on `APlay` alone with
-no extra code:
-
-```Swift
-.product(name: "APlayExtras", package: "APlay")
-```
-
-```Swift
-import APlay
-import APlayExtras
-
-// `audioDecoderBuilder` is read-only after init, so the builder goes through the
-// configuration initializer. The fallback keeps every other format unchanged.
-let player = APlay(configuration: APlay.Configuration(
-    audioDecoderBuilder: APlayExtras.fileDecoder(fallback: APlay.Configuration().audioDecoderBuilder)))
-```
-
-Local CAF/AIFF/AIFF-C files route through an `ExtAudioFile`-backed decoder; everything
-else goes to the fallback you supply. An app that already injects its own decoder (a
-custom codec, for example) can wrap it instead of the built-in one.
-
-AirPlay 2 and remote control
----
-The audio session runs the `.playback` category with the `longFormAudio` route sharing
-policy — the combination AirPlay 2 expects for long-form audio — and the lock screen,
-Control Center and AirPlay 2 remote commands are wired to the player by default, so a
-HomePod, an Apple TV or the iOS lock screen can control playback without extra app
-code: play / pause / toggle, next / previous track, change position (when the track is
-seekable) and ±15 s skip:
-
-```Swift
-let player = APlay()  // remote commands already installed
-```
-
-Pass `Configuration(enableRemoteCommandHandling: false)` to opt out.
-
-To let the user *pick* an AirPlay route, add an `AVRoutePickerView` (or an `MPVolumeView`
-with its route button) to your UI — that is app-level UI the framework deliberately does
-not ship. Now-playing metadata (title / artist / album / artwork / elapsed time) is
-already published to `MPNowPlayingInfoCenter` via `metadataUpdate`.
+A track can be preloaded with `prepare(_:)` — the streamer and decoder buffer the audio
+without starting the output audio unit, so a later `play(_:)` of the same URL starts
+instantly from the filled ring buffer.
+
+> ℹ️ Plain `http://` streams: iOS blocks non-HTTPS URLs via App Transport Security by
+> default. Add an `NSAllowsArbitraryLoads` (or a per-domain) exception to your app's
+> `Info.plist` if your stream URL is `http://...` — this is the most common cause of
+> "cannot play HTTP stream".
 
 Equalizer
 ---
-The player runs an `AVAudioUnitEQ` in its render chain, one band per entry of
+An `AVAudioUnitEQ` runs in the render chain, one band per entry of
 `Configuration.equalizerBandFrequencies` (8 by default: 50 / 100 / 200 / 400 / 800 /
-1600 / 2600 / 16000 Hz). The first band is a low shelf, the last a high shelf and the
-rest parametric, so a single curve shapes the whole spectrum.
+1600 / 2600 / 16000 Hz). The first band is a low shelf, the last a high shelf, the rest
+parametric. Gains apply at runtime without restarting playback:
 
 ```Swift
 let player = APlay()
 
-// A preset is plain data — one gain in dB per band, in the same order as the
-// configured frequencies. It takes effect immediately; playback is not restarted.
+// A bundled preset — flat / rock / pop / jazz / classical / bassBoost /
+// trebleBoost / vocal / electronic / acoustic.
 player.applyEqualizerPreset(.rock)
 
 // Or a single band, clamped to the audio unit's -96...24 dB range.
@@ -382,34 +75,178 @@ player.setEqualizerBandGain(3.5, at: 2)
 
 // Read the current curve back.
 let gains: [Float] = player.equalizerGains
-```
 
-Ten curves are bundled — `flat`, `rock`, `pop`, `jazz`, `classical`, `bassBoost`,
-`trebleBoost`, `vocal`, `electronic`, `acoustic` — or build your own:
-
-```Swift
+// Or your own curve — a band count that differs from the configuration's
+// frequencies is ignored (and logged), never silently shifted.
 let curve = EqualizerPreset(name: "My Curve", gains: [4, 3, 2, 1, 0, 1, 2, 3])
 player.applyEqualizerPreset(curve)
 ```
 
-A preset whose band count differs from the configuration's frequencies is ignored
-(and logged), so a saved curve never silently shifts the wrong frequencies after a
-configuration change.
-
-Todo
+Gapless playback
 ---
-- [x] AirPlay 2 support: the session runs the `longFormAudio` route sharing policy and
-      the lock screen / Control Center / AirPlay 2 remote commands
-      (play / pause / next / previous / seek / ±15 s skip) are wired in by default via
-      `MPRemoteCommandCenter`; route picking stays app-level UI (`AVRoutePickerView`)
-- [x] AudioEffectUnit support: band **frequencies** and **gains** are configurable, and
-      gains apply at runtime either per band or as a whole preset — see "Equalizer" above.
-- [x] Custom decoder formats (see issue #17): the `audioDecoderBuilder` seam hands an
-      injected decoder the stream's file hint, and the optional `APlayWavPack`,
-      `APlayVorbis`, `APlaySpeex` and `APlayMidi` libraries each bundle a reference
-      implementation for a format Core Audio does not ship — see *Supported formats* above.
+With `gaplessPlaybackEnabled` the next track is preloaded while the current one still
+plays, and at the end of the track the output audio unit swaps in the buffered source
+without stopping — no gap and no `.paused` state at the handoff:
 
-Sponsor 
+```Swift
+let player = APlay(configuration: APlay.Configuration(gaplessPlaybackEnabled: true))
+player.loopPattern = .stopWhenAllPlayed(.order)
+player.play([first, second, third])
+```
+
+A handoff between *different* audio formats (MP3 → FLAC, say) still re-initializes the
+graph and is not seamless.
+
+AirPlay 2 and remote control
+---
+The audio session runs the `.playback` category with the `longFormAudio` route sharing
+policy — the combination AirPlay 2 expects — and the lock screen, Control Center and
+AirPlay 2 remote commands (play / pause / next / previous / seek / ±15 s skip) are wired
+to the player by default, with now-playing metadata published to `MPNowPlayingInfoCenter`:
+
+```Swift
+let player = APlay()  // remote commands already installed
+// Pass Configuration(enableRemoteCommandHandling: false) to opt out.
+```
+
+Route *picking* stays app-level UI the framework deliberately does not ship — add an
+`AVRoutePickerView` (or an `MPVolumeView` with its route button) to let the user choose
+an AirPlay route.
+
+Supported formats
+---
+Anything Core Audio can stream-decode, APlay can play. Formats fall into several buckets.
+
+**Streaming playback (the default path)** — every row is pinned by a test:
+`MacTests/FormatCompatibilityTests.swift` drives a bundled fixture through the real
+decoder (`AudioFileStream` + `AudioConverter`) and asserts it both parses its metadata
+*and* decodes to canonical PCM.
+
+| Format | Common extensions | Note |
+| --- | --- | --- |
+| AAC (LC / HE-AAC v1 / v2 / ELD) in MP4 | `.m4a` `.mp4` `.mp4f` `.mpg4` | MP4 and raw ADTS verified |
+| AAC raw ADTS | `.aac` `.adts` `.aacp` | |
+| Audiobook MP4 | `.m4b` | hinted so Core Audio takes the MP4 branch |
+| MP3 (MPEG-1/2 Layer III) | `.mp3` | CBR and VBR; seek supported |
+| MP2 (MPEG Layer II) | `.mp2` | |
+| FLAC | `.flac` | seek supported (with a seek table) |
+| Opus in OGG | `.opus` | Core Audio parses the container |
+| WAVE PCM | `.wav` `.wave` | tolerates extra chunks before `data`; seek supported |
+| IMA ADPCM in WAVE | `.wav` | block PCM; Core Audio reports it as linear PCM |
+| ALAC in MP4 | `.m4a` | the magic cookie now reaches the converter (2.1.0) |
+| Dolby Digital (AC-3) | `.ac3` | verified on macOS; iOS decoding is Dolby-licensed and varies by device |
+| Dolby Digital Plus (E-AC-3) | `.eac3` | same licensing caveat as AC-3 |
+
+**Formats behind the optional libraries** — Core Audio ships no decoder for these, or
+the container cannot be parsed by a streaming parser. Each optional product plugs into
+the same `audioDecoderBuilder` seam and claims only its own extensions; everything else
+falls through to the fallback unchanged:
+
+```Swift
+// One seam, one pattern per product. Plain APlay alone stays on the built-in decoder.
+let config = APlay.Configuration(
+    audioDecoderBuilder: APlayMidi.decoder(
+        fallback: APlayExtras.fileDecoder(
+            fallback: APlay.Configuration().audioDecoderBuilder),
+        soundfont: .init(url: soundfontURL)))
+```
+
+not (the framing cannot be rewound, and the codec needs its header packets first).
+Each row is pinned by a test: `MacTests/OpusDecoderTests` (`APlayOpus`),
+`SeekableFileDecoderTests` (APlayExtras), `WavPackDecoderTests`,
+`VorbisDecoderTests`, `SpeexDecoderTests`, `MidiDecoderTests`.
+`VorbisDecoderTests`, `SpeexDecoderTests`, `MidiDecoderTests`.
+
+| Library | Format | Extensions | Note |
+| --- | --- | --- | --- |
+| `APlayExtras` | ALAC in CAF | `.caf` `.caff` | packet table trails the audio data |
+| `APlayExtras` | AIFF / AIFF-C PCM | `.aiff` `.aifc` | discontinuity / no stream properties |
+| `APlayExtras` | NeXT / Sun AU | `.au` `.snd` | µ-law, A-law and PCM payloads |
+| `APlayExtras` | 3GPP / 3GPP2 | `.3gp` `.3g2` | typically an AAC or AMR payload |
+| `APlayExtras` | Sony Wave64 | `.w64` | file-only container |
+| `APlayWavPack` | WavPack | `.wv` | vendored reference C library, BSD-3 |
+| `APlayVorbis` | Vorbis in Ogg | `.ogg` | vendored libvorbis + `CAPlayOgg`, BSD-3 |
+| `APlaySpeex` | Speex | `.spx` | vendored libspeex + libogg, BSD-3 |
+| `APlayOpus` | Opus in WebM / Matroska | `.webm` `.mka` | pure-Swift EBML demuxer, then Core Audio's Opus converter |
+| `APlayMidi` | Standard MIDI File | `.mid` `.midi` `.kar` | `AVAudioSequencer` + `AVAudioUnitSampler` renders offline to canonical PCM |
+| — | RF64 / Sound Designer II | `.rf64` `.sd2` | mapped but no fixture could be built |
+
+`APlayMidi` needs a SoundFont — Core Audio ships none, so pass a `.sf2` / `.dls` URL you
+ship with your app; leave `.default` and the sampler falls back to its built-in single
+tone.
+
+**Not supported** — Core Audio ships no decoder for these, or the container cannot be
+parsed. Any of them can still be added by implementing `AudioDecoderCompatible` and
+supplying it through `audioDecoderBuilder`.
+
+| Format | Extensions | Why |
+| --- | --- | --- |
+| MP1 / AMR-NB / AMR-WB | `.mp1` `.amr` | hint-table mapped, but no encoder was available to build a fixture — unverified |
+| Opus outside an OGG container | (raw) | containerless Opus is not parsed |
+| Windows Media Audio | `.wma` `.asf` | no Core Audio decoder |
+| Monkey's Audio / True Audio | `.ape` `.tta` | no Core Audio decoder |
+| Dolby TrueHD / MLP / AC-4 | `.thd` `.mlp` `.ac4` | no Core Audio decoder |
+| DSD | `.dsf` `.dff` | 1-bit stream; no Core Audio decoder |
+| Musepack | `.mpc` `.mpp` `.mp+` | no Core Audio decoder |
+| ATRAC3 / ATRAC9 | `.oma` `.at9` | Sony codecs; no Core Audio decoder |
+| Matroska audio / MPEG-TS | `.mka` `.ts` | no Core Audio parser (`APlayOpus` covers Opus in Matroska) |
+| Raw PCM | — | no header metadata to parse |
+
+> An extension the hint table does not recognise falls back to `.mp3` and relies on
+> `AudioFileStream` to sniff the actual content, so an unknown extension is not
+> automatically a failure.
+
+Features
+---
+- CPU-friendly design to avoid excessive peaks
+- Every audio format iOS already supports (MP3, WAVE, FLAC, ALAC, AAC, …), plus the
+  optional codec libraries above for the formats Core Audio does not ship
+- Seek on WAVE, FLAC (with a seek table) and every optional-library format
+- Multiple protocols: standard HTTP, ShoutCast/ICY (with metadata), local files
+- Prepared for tough network conditions: restart on failures, and restart when the end
+  of stream arrives with incomplete content
+- Metadata: ShoutCast, ID3v1 / v1.1 / v2.2 / v2.3 / v2.4, FLAC
+- Playback starts immediately, without waiting for buffering; `prepare(_:)` preloads a
+  track so a later `play(_:)` starts instantly
+- Gapless playlist playback (same format across the handoff)
+- Stream contents can be cached to a file on disk
+- Built-in `NBandEq` equalizer (see *Equalizer*)
+- Custom logging module, with logging to file
+- Open protocols for customization: `AudioDecoderCompatible`,
+  `ConfigurationCompatible`, `LoggerCompatible`, …
+- Swift 6 language mode with strict concurrency checking enabled
+- AirPlay 2 and lock-screen remote control wired in by default (see *AirPlay 2*)
+
+✅ Release-build silence (fixed)
+---
+Earlier releases could go silent with optimization (`-O`) enabled — two separate
+pointer-lifetime bugs, both invisible in `Debug`:
+
+1. **The decode loop** (2.1.0): the packet-description pointer and decode buffers were
+   handed to Core Audio through stack locals and unscoped `inout` references; the
+   converter dereferences them *after* the input callback returns.
+2. **The render loop** (2.1.1): the `AVAudioEngine` manual-rendering input block returned
+   its `AudioBufferList` via `withUnsafePointer(to: &property)`, which only guarantees
+   the pointer for the duration of the call — the engine reads the list *after* the block
+   returns, so under `-O` the render pulled freed memory and emitted silence.
+
+Both are now backed by stable, object-owned storage that outlives the call. If playback
+is silent in a `Release` build again, look for a pointer crossing an API boundary before
+checking anything else.
+
+Docs
+---
+Run `./generate_docs.sh`
+
+Platform notes
+---
+On iOS and visionOS the audio session is configured with the `.playback` category and
+the long-form-audio route sharing policy, and the lock screen / AirPlay 2 remote
+commands are wired (see *AirPlay 2 and remote control*). tvOS has no `AVAudioSession`,
+`MPNowPlayingInfoCenter` or background-task concept, so those stay compiled out there —
+the decoder, ring buffer and render path work unchanged.
+
+Sponsor
 ---
 [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
 

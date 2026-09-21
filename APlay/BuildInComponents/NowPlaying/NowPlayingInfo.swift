@@ -44,8 +44,8 @@ extension APlay {
                 map[MPMediaItemPropertyAlbumTitle] = album
                 map[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(playbackTime)
                 map[MPNowPlayingInfoPropertyPlaybackRate] = Double(playbackRate)
-                map[MPMediaItemPropertyPlaybackDuration] = duration
-                #if os(iOS) || os(visionOS)
+                map[MPMediaItemPropertyPlaybackDuration] = Double(duration)
+                #if os(iOS) || os(visionOS) || os(macOS)
                     if let image = artwork {
                         map[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                     }
@@ -90,6 +90,14 @@ extension APlay {
                     let nowPlayingInfo = self.info
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
                 }
+            #elseif os(macOS)
+                DispatchQueue.main.async {
+                    let center = MPNowPlayingInfoCenter.default()
+                    center.nowPlayingInfo = self.info
+                    // macOS only routes headset and media-key events to the Now
+                    // Playing app; an app claims the slot by announcing state.
+                    center.playbackState = self.playbackRate > 0 ? .playing : .paused
+                }
             #endif
         }
 
@@ -106,6 +114,12 @@ extension APlay {
             #if os(iOS) || os(visionOS)
                 DispatchQueue.main.async {
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+                }
+            #elseif os(macOS)
+                DispatchQueue.main.async {
+                    let center = MPNowPlayingInfoCenter.default()
+                    center.nowPlayingInfo = nil
+                    center.playbackState = .stopped
                 }
             #endif
         }

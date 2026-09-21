@@ -71,6 +71,16 @@
 		A5E0A5000000000000002303 /* APlayMidi.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000002001 /* APlayMidi.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A5E0A5000000000000003201 /* melody.mid in Resources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000003101 /* melody.mid */; };
 		A5E0A5000000000000003202 /* APlayTestSine.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000003102 /* APlayTestSine.sf2 */; };
+		4CA1982280814E49912516D8 /* tone-mp4.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 4824268A22754479BA166437 /* tone-mp4.mp4 */; };
+		322B1BF9C8474BF4A989B6C1 /* tone.m4b in Resources */ = {isa = PBXBuildFile; fileRef = 43E8513F05F1495C8C231B80 /* tone.m4b */; };
+		485571F09E1C47348B233EF1 /* tone-mp2.mp2 in Resources */ = {isa = PBXBuildFile; fileRef = B2F735D6704A43E792F95D1B /* tone-mp2.mp2 */; };
+		E8E32F4BA9BB4DF3BA23F095 /* tone-ima4.wav in Resources */ = {isa = PBXBuildFile; fileRef = 6A239AD407C2483893847F5C /* tone-ima4.wav */; };
+		C6F88EA7F12340C986E3948C /* tone.ac3 in Resources */ = {isa = PBXBuildFile; fileRef = EBE508C1A26A478F86350170 /* tone.ac3 */; };
+		259857E9E88F4531AAAAEB3E /* tone.eac3 in Resources */ = {isa = PBXBuildFile; fileRef = B8BC7E172FDE4E58B70C9245 /* tone.eac3 */; };
+		92793B7087C94547988BC501 /* tone.au in Resources */ = {isa = PBXBuildFile; fileRef = D27DE97CF902467D96442AE1 /* tone.au */; };
+		1579FD6B5D4A48E795109B25 /* tone.3gp in Resources */ = {isa = PBXBuildFile; fileRef = D558F22D7FF14758A87D88E9 /* tone.3gp */; };
+		6B2D55482AE44EDC8DB0D651 /* tone.3g2 in Resources */ = {isa = PBXBuildFile; fileRef = 22A28138BCCF4CF2A05E1F48 /* tone.3g2 */; };
+		19D174E80552479AADEEB3FB /* tone.w64 in Resources */ = {isa = PBXBuildFile; fileRef = 98145EB6CEBC418ABE8D9009 /* tone.w64 */; };
 		A5E0A5000000000000004201 /* APlayOpus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000004101 /* APlayOpus.swift */; };
 		A5E0A5000000000000004202 /* OpusDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000004102 /* OpusDecoder.swift */; };
 		A5E0A5000000000000004203 /* WebMDemuxer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000004103 /* WebMDemuxer.swift */; };
@@ -211,6 +221,16 @@ A5E0A500000000000000120E /* IcyTestServer.swift in Sources */ = {isa = PBXBuildF
 		A5E0A5000000000000004001 /* APlayOpus.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = APlayOpus.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5E0A5000000000000003101 /* melody.mid */ = {isa = PBXFileReference; lastKnownFileType = file; path = melody.mid; sourceTree = "<group>"; };
 		A5E0A5000000000000003102 /* APlayTestSine.sf2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = APlayTestSine.sf2; sourceTree = "<group>"; };
+		4824268A22754479BA166437 /* tone-mp4.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-mp4.mp4; sourceTree = "<group>"; };
+		43E8513F05F1495C8C231B80 /* tone.m4b */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.m4b; sourceTree = "<group>"; };
+		B2F735D6704A43E792F95D1B /* tone-mp2.mp2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-mp2.mp2; sourceTree = "<group>"; };
+		6A239AD407C2483893847F5C /* tone-ima4.wav */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-ima4.wav; sourceTree = "<group>"; };
+		EBE508C1A26A478F86350170 /* tone.ac3 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.ac3; sourceTree = "<group>"; };
+		B8BC7E172FDE4E58B70C9245 /* tone.eac3 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.eac3; sourceTree = "<group>"; };
+		D27DE97CF902467D96442AE1 /* tone.au */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.au; sourceTree = "<group>"; };
+		D558F22D7FF14758A87D88E9 /* tone.3gp */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.3gp; sourceTree = "<group>"; };
+		22A28138BCCF4CF2A05E1F48 /* tone.3g2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.3g2; sourceTree = "<group>"; };
+		98145EB6CEBC418ABE8D9009 /* tone.w64 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.w64; sourceTree = "<group>"; };
 		A5E0A5000000000000000101 /* APlayExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APlayExtras.swift; sourceTree = "<group>"; };
 		A5E0A5000000000000002101 /* MidiDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MidiDecoder.swift; sourceTree = "<group>"; };
 		A5E0A5000000000000002102 /* SMFFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMFFile.swift; sourceTree = "<group>"; };
@@ -487,6 +507,16 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5A5A5EE059BBD0370458A8D /* tone.wav */,
 				A5A5A5C10000000000000001 /* tone.webm */,
 				A5A5A5C10000000000000002 /* tone.mka */,
+				4824268A22754479BA166437 /* tone-mp4.mp4 */,
+				43E8513F05F1495C8C231B80 /* tone.m4b */,
+				B2F735D6704A43E792F95D1B /* tone-mp2.mp2 */,
+				6A239AD407C2483893847F5C /* tone-ima4.wav */,
+				EBE508C1A26A478F86350170 /* tone.ac3 */,
+				B8BC7E172FDE4E58B70C9245 /* tone.eac3 */,
+				D27DE97CF902467D96442AE1 /* tone.au */,
+				D558F22D7FF14758A87D88E9 /* tone.3gp */,
+				22A28138BCCF4CF2A05E1F48 /* tone.3g2 */,
+				98145EB6CEBC418ABE8D9009 /* tone.w64 */,
 				A5E0A5000000000000003101 /* melody.mid */,
 				A5E0A5000000000000003102 /* APlayTestSine.sf2 */,
 			);
@@ -700,6 +730,16 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5E0A5000000000000003202 /* APlayTestSine.sf2 in Resources */,
 				A5A5A5C10000000000000003 /* tone.webm in Resources */,
 				A5A5A5C10000000000000004 /* tone.mka in Resources */,
+				4CA1982280814E49912516D8 /* tone-mp4.mp4 in Resources */,
+				322B1BF9C8474BF4A989B6C1 /* tone.m4b in Resources */,
+				485571F09E1C47348B233EF1 /* tone-mp2.mp2 in Resources */,
+				E8E32F4BA9BB4DF3BA23F095 /* tone-ima4.wav in Resources */,
+				C6F88EA7F12340C986E3948C /* tone.ac3 in Resources */,
+				259857E9E88F4531AAAAEB3E /* tone.eac3 in Resources */,
+				92793B7087C94547988BC501 /* tone.au in Resources */,
+				1579FD6B5D4A48E795109B25 /* tone.3gp in Resources */,
+				6B2D55482AE44EDC8DB0D651 /* tone.3g2 in Resources */,
+				19D174E80552479AADEEB3FB /* tone.w64 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

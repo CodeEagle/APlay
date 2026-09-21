@@ -671,13 +671,15 @@ private extension Streamer {
                                 var metadataMap: [MetadataParser.Item] = []
                                 let tokens = metaData.components(separatedBy: ";")
                                 for token in tokens {
+                                    // The delimiter is the whole `='` pair: the key
+                                    // sits before it, the quoted value after it.
+                                    // Starting the value range at the `=` would keep
+                                    // both the delimiter prefix and the closing quote.
                                     if let range = token.range(of: "='") {
                                         let keyRange = Range(uncheckedBounds: (token.startIndex, range.lowerBound))
                                         let key = String(token[keyRange])
-                                        let distance = token.distance(from: token.startIndex, to: keyRange.upperBound)
-                                        let valueStart = token.index(token.startIndex, offsetBy: distance)
-                                        let valueRange = Range(uncheckedBounds: (valueStart, token.endIndex))
-                                        let value = String(token[valueRange])
+                                        var value = String(token[range.upperBound..<token.endIndex])
+                                        if value.hasSuffix("'") { value.removeLast() }
                                         metadataMap.append(.other([key: value]))
                                     }
                                 }

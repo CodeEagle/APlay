@@ -194,6 +194,9 @@ public struct AudioDecoder {
         /// Speex — not a Core Audio type at all; owned by the optional
         /// `APlaySpeex` product.
         public static let speex = AudioFileType("SPX ")
+        /// Standard MIDI File — not decoded by Core Audio; owned by the
+        /// optional `APlayMidi` product, which renders it through a SoundFont.
+        public static let midi = AudioFileType("MIDI")
         public static let amr = AudioFileType("amrf")
         public static let flac = AudioFileType("flac")
         public static let opus = AudioFileType("opus")

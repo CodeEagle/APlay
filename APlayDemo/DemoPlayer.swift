@@ -21,14 +21,20 @@ final class DemoPlayer: ObservableObject {
 
     // MARK: Published state
 
-    /// What the UI is currently pointing at: the bundled format matrix, or a
-    /// single remote URL the user typed in.
+    /// What the UI is currently pointing at: the bundled format matrix, a
+    /// single remote URL the user typed in, or a file picked from the device.
     enum PlaybackSource: Equatable {
         case matrix
         case remote(URL)
+        case file(URL)
     }
 
     private(set) var source: PlaybackSource = .matrix
+
+    /// The latest inline ICY fields, surfaced so the stream test card can show
+    /// what the player actually received.
+    @Published private(set) var icyStreamTitle: String?
+    @Published private(set) var icyStreamURL: String?
 
     @Published private(set) var state: APlay.State = .idle
     @Published private(set) var nowPlayingTitle: String = "APlay"
@@ -80,12 +86,47 @@ final class DemoPlayer: ObservableObject {
     }
 
     deinit {
+        // `deinit` is nonisolated, so the scope is released inline.
+        if let scopedFileURL {
+            scopedFileURL.stopAccessingSecurityScopedResource()
+        }
         player.destroy()
+    }
+
+    // MARK: Sandbox scope
+
+    /// The picker URL we currently hold sandbox access for, if any. Kept
+    /// apart from `source` because the token has to be released explicitly —
+    /// handing the URL to the player does not keep access alive by itself.
+    /// `nonisolated(unsafe)` because `deinit` releases it off the main actor;
+    /// every other access is main-actor bound.
+    nonisolated(unsafe) private var scopedFileURL: URL?
+
+    /// Claims sandbox access for a document-picker URL, releasing any scope
+    /// the previous source was holding.
+    @discardableResult
+    func retainScopedFileURL(_ url: URL) -> Bool {
+        let granted = url.startAccessingSecurityScopedResource()
+        guard granted else {
+            appendLog("Sandbox access denied for \(url.lastPathComponent)", isFramework: false)
+            return false
+        }
+        releaseScopedFileURL()
+        scopedFileURL = url
+        return true
+    }
+
+    func releaseScopedFileURL() {
+        if let scopedFileURL {
+            scopedFileURL.stopAccessingSecurityScopedResource()
+            self.scopedFileURL = nil
+        }
     }
 
     // MARK: Playback
 
     func playMatrix() {
+        releaseScopedFileURL()
         let urls = TrackLibrary.localURLs()
         guard !urls.isEmpty else {
             appendLog("No bundled samples found in the app bundle", isFramework: false)
@@ -100,21 +141,44 @@ final class DemoPlayer: ObservableObject {
     /// Jumps to one row of the format matrix.
     func playTrack(at index: Int) {
         guard TrackLibrary.local.indices.contains(index) else { return }
-        config.startBackgroundTask()
         if source != .matrix {
+            releaseScopedFileURL()
             source = .matrix
+            config.startBackgroundTask()
             player.play(TrackLibrary.localURLs(), at: index)
         } else {
+            config.startBackgroundTask()
             player.play(at: index)
         }
     }
 
     func playRemote(_ url: URL) {
+        releaseScopedFileURL()
         source = .remote(url)
         playingIndex = -1
         nowPlayingTitle = url.lastPathComponent
         nowPlayingArtist = url.host ?? ""
         nowPlayingAlbum = "Remote stream"
+        let seed = url.absoluteString
+        cover = CoverArt.image(forSeed: seed)
+        coverPalette = CoverArt.palette(forSeed: seed)
+        pushNowPlaying()
+        config.startBackgroundTask()
+        player.play(url)
+    }
+
+    /// Plays a file the document picker handed over. The URL is
+    /// security-scoped, so the scope is claimed here and held until playback
+    /// moves to any other source.
+    func playFile(_ url: URL) {
+        guard retainScopedFileURL(url) else { return }
+        source = .file(url)
+        playingIndex = -1
+        icyStreamTitle = nil
+        icyStreamURL = nil
+        nowPlayingTitle = url.lastPathComponent
+        nowPlayingArtist = url.deletingPathExtension().lastPathComponent
+        nowPlayingAlbum = "Local file"
         let seed = url.absoluteString
         cover = CoverArt.image(forSeed: seed)
         coverPalette = CoverArt.palette(forSeed: seed)
@@ -239,6 +303,8 @@ final class DemoPlayer: ObservableObject {
             player.play(TrackLibrary.localURLs(), at: index)
         case let .remote(url):
             player.play(url)
+        case let .file(url):
+            player.play(url)
         }
         if !wasPlaying {
             player.pause()
@@ -322,6 +388,17 @@ final class DemoPlayer: ObservableObject {
             case let .artist(value): artist = value
             case let .album(value): album = value
             case let .cover(data): coverData = data
+            // Inline ICY frames arrive as raw fields: StreamTitle is surfaced
+            // to the stream test card, and also feeds Now Playing unless a
+            // later item (icy-name arrives last) overrides the title.
+            case let .other(dict):
+                if let value = dict["StreamTitle"] {
+                    title = value
+                    icyStreamTitle = value
+                }
+                if let value = dict["StreamUrl"] {
+                    icyStreamURL = value
+                }
             default: continue
             }
         }

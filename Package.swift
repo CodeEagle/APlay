@@ -15,6 +15,10 @@ let package = Package(
         .library(name: "APlayWavPack", targets: ["APlayWavPack"]),
         .library(name: "APlayVorbis", targets: ["APlayVorbis"]),
         .library(name: "APlaySpeex", targets: ["APlaySpeex"]),
+        // MIDI playback through a SoundFont. Pure Swift on AVFoundation — no
+        // vendored C — because AVAudioSequencer + AVAudioUnitSampler already
+        // render Standard MIDI Files to PCM.
+        .library(name: "APlayMidi", targets: ["APlayMidi"]),
     ],
     targets: [
         .target(
@@ -93,6 +97,17 @@ let package = Package(
             dependencies: ["APlay", "CAPlayOgg", "CAPlaySpeex"],
             path: "Sources/APlaySpeex"
         ),
+        // Standard MIDI File playback. Core Audio has no MIDI decoder, so this
+        // product renders the file itself through AVAudioSequencer + an
+        // AVAudioUnitSampler loaded with a SoundFont, inside an AVAudioEngine
+        // in offline manual rendering mode. The wrapper implements
+        // `AudioDecoderCompatible` and is wired through the same
+        // `audioDecoderBuilder` seam as the vendored codecs.
+        .target(
+            name: "APlayMidi",
+            dependencies: ["APlay"],
+            path: "Sources/APlayMidi"
+        ),
         .executableTarget(
             name: "APlayMacPlayback",
             dependencies: ["APlay"],
@@ -100,7 +115,7 @@ let package = Package(
         ),
         .testTarget(
             name: "APlayTests",
-            dependencies: ["APlay", "APlayExtras", "APlayWavPack", "APlayVorbis", "APlaySpeex"],
+            dependencies: ["APlay", "APlayExtras", "APlayWavPack", "APlayVorbis", "APlaySpeex", "APlayMidi"],
             path: "MacTests",
             resources: [.copy("Fixtures")]
         ),

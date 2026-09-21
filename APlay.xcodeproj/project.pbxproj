@@ -69,6 +69,8 @@
 		A5E0A5000000000000001203 /* DemoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000001103 /* DemoPlayer.swift */; };
 120B /* VerticalEQSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A500000000000000110B /* VerticalEQSlider.swift */; };
 A5E0A500000000000000120C /* AirPlayRoutePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A500000000000000110C /* AirPlayRoutePicker.swift */; };
+A5E0A500000000000000120D /* FilePlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A500000000000000110D /* FilePlayback.swift */; };
+A5E0A500000000000000120E /* IcyTestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E0A500000000000000110E /* IcyTestServer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -173,6 +175,8 @@ A5E0A500000000000000120C /* AirPlayRoutePicker.swift in Sources */ = {isa = PBXB
 		A5E0A500000000000000110A /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 A5E0A500000000000000110B /* VerticalEQSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerticalEQSlider.swift; sourceTree = "<group>"; };
 A5E0A500000000000000110C /* AirPlayRoutePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayRoutePicker.swift; sourceTree = "<group>"; };
+A5E0A500000000000000110D /* FilePlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePlayback.swift; sourceTree = "<group>"; };
+A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IcyTestServer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -217,6 +221,8 @@ A5E0A500000000000000110C /* AirPlayRoutePicker.swift */ = {isa = PBXFileReferenc
 				A5E0A5000000000000001108 /* EqualizerView.swift */,
 				A5E0A500000000000000110B /* VerticalEQSlider.swift */,
 				A5E0A500000000000000110C /* AirPlayRoutePicker.swift */,
+				A5E0A500000000000000110D /* FilePlayback.swift */,
+				A5E0A500000000000000110E /* IcyTestServer.swift */,
 				A5E0A5000000000000001109 /* InfoSections.swift */,
 				A5E0A500000000000000110A /* SceneDelegate.swift */,
 				1009026322785EE500BAA9BE /* a.m4a */,
@@ -584,6 +590,8 @@ A5E0A500000000000000110C /* AirPlayRoutePicker.swift */ = {isa = PBXFileReferenc
 				1208 /* EqualizerView.swift in Sources */,
 				120B /* VerticalEQSlider.swift in Sources */,
 				A5E0A500000000000000120C /* AirPlayRoutePicker.swift in Sources */,
+				A5E0A500000000000000120D /* FilePlayback.swift in Sources */,
+				A5E0A500000000000000120E /* IcyTestServer.swift in Sources */,
 				1209 /* InfoSections.swift in Sources */,
 				120A /* SceneDelegate.swift in Sources */,
 			);

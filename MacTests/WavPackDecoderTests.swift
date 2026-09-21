@@ -56,6 +56,62 @@ final class WavPackDecoderTests: XCTestCase {
         XCTAssertTrue(decoder.seekable(), "a buffered local file must report seekable")
     }
 
+    // MARK: - Lifecycle
+
+    /// Decoding runs to the end of the file and reports it via `.empty`.
+    func testReachesEndOfTheFile() throws {
+        let url = try fixture("tone", "wv")
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlayWavPack.decoder(fallback: { DefaultAudioDecoder(config: $0) })(config)
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .wavpack)
+        streamer.contentLength = fileSize(of: url)
+        decoder.resume()
+        try decoder.prepare(for: streamer, at: 0)
+
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline, collector.emptyCount == 0 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        XCTAssertGreaterThan(collector.totalBytes, 100_000,
+                             "the whole clip should decode before the end is reported")
+        XCTAssertEqual(collector.emptyCount, 1,
+                       "the decoder must report the end of the file exactly once")
+        XCTAssertTrue(collector.errors.isEmpty)
+    }
+
+    /// Pausing suspends the render timer and resuming picks it back up.
+    func testPauseAndResume() throws {
+        let url = try fixture("tone", "wv")
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlayWavPack.decoder(fallback: { DefaultAudioDecoder(config: $0) })(config)
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .wavpack)
+        streamer.contentLength = fileSize(of: url)
+        decoder.resume()
+        try decoder.prepare(for: streamer, at: 0)
+        XCTAssertTrue(wait(for: collector, minBytes: 20_000))
+
+        decoder.pause()
+        let paused = collector.totalBytes
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertEqual(collector.totalBytes, paused, "a paused decoder must keep decoding")
+
+        decoder.resume()
+        XCTAssertTrue(wait(for: collector, minBytes: paused + 20_000),
+                      "a resumed decoder must keep decoding")
+    }
+
     // MARK: - Routing
 
     /// Direct construction (no fallback) refuses a non-WavPack URL with a

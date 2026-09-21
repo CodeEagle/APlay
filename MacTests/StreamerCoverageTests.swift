@@ -463,10 +463,10 @@ final class StreamerCoverageTests: XCTestCase {
         }
         XCTAssertEqual(Set(fields.keys), ["StreamTitle", "StreamUrl"],
                        "both ';' separated fields must be parsed")
-        // The value keeps its delimiters: the parser splits on "='" but the
-        // range it builds starts at the '=' and runs to the token's end.
-        XCTAssertEqual(fields["StreamTitle"], "='AB'")
-        XCTAssertEqual(fields["StreamUrl"], "='xy'")
+        // The parser splits on `='` and strips the closing quote, so the
+        // value is the raw field content.
+        XCTAssertEqual(fields["StreamTitle"], "AB")
+        XCTAssertEqual(fields["StreamUrl"], "xy")
         XCTAssertEqual(titles, ["Radio APlay"],
                        "icy-name must be attached to every frame as a title")
 

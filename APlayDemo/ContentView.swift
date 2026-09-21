@@ -23,6 +23,8 @@ struct ContentView: View {
                     NowPlayingView(player: player)
                     FormatMatrixView(player: player)
                     EqualizerView(player: player)
+                    FilePlaybackView(player: player)
+                    IcyStreamTestView(player: player)
                     RemoteSourceView(player: player)
                     CapabilitiesView(player: player)
                     EventLogView(player: player, isExpanded: $showEventLog)

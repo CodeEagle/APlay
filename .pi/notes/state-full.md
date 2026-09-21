@@ -1160,3 +1160,378 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - 优先 Opus 裸流 / Speex（单库、结构简）；Vorbis-in-Ogg 需 ogg+vorbis
   双库且可能需 config.h，较重。/tmp/codec_probe 源码全 BSD-3。
 - 不可做：AC-4/TrueHD/WMA/ATRAC/DSD 无开源解码器。
+
+## SF-0067
+- Revision: 67
+- 取代 SF-0066。立长期目标 8c44a3aa（complete all feasible codec libs +
+  产品 Swift 覆盖率 ≥90%），预算 2,000,000 token。
+
+### 覆盖率基线（2026-09-21，llvm-cov，232 测试）
+- 命令: xcrun llvm-cov report -instr-profile
+  .build/out/Products/Debug/codecov/default.profdata
+  .build/out/Products/Debug/APlayTests.xctest/Contents/MacOS/APlayTests
+- 口径: 只计 .swift，剔除 MacTests/ 与 .build/Intermediates（test_entry_point、
+  resource_bundle_accessor），剔除 vendored C。
+- 产品 Swift: 4714/5841 = **80.71%**。整体（含 C 库）55.43%——C 库第三方，
+  拉到 31.7% regions，**不计入目标口径**。
+- 缺口分布（<85%）: Streamer 538/1019=53%、NowPlayingInfo 67/126=53%、
+  APlayer 211/274=77%、Composer 331/420=79%、WavPackDecoder 236/312=76%、
+  FlacParser 280/338=83%、LoggerCompatible 30/36=83%、
+  PlayerCompatible 6/8=75%、APlayExtras.swift 0/4。
+- 高覆盖示范: InternalLogger/EqualizerPreset/APlay+Extensions/Delegated 100%、
+  PlayList 97.9%、Uroboros 95.6%、AudioDecoderCompatible 97.5%。
+
+### 下一 codec 选型（照 WavPack 样板）
+- Opus 裸流（.opus 单库，最简）→ Speex（.spx）→ Vorbis-in-Ogg（双库+config.h，最重）。
+- 样板: CAPlayXxx(publicHeadersPath+headerSearchPath) + APlayXxx(wrapper
+  AudioDecoderCompatible，decoder(fallback:) 接 audioDecoderBuilder) +
+  Package product + AudioFileType/fileHint 表 + fixture(ffmpeg 生成) +
+  2 测试（解码 + FakeDecoder 路由）。
+- 每加 1 codec 测试数 +2（当前 232）。
+
+## SF-0068
+- Revision: 68
+- 取代 SF-0067。目标 d867b7b7（无 token 上限）进行中。
+
+### 已完成并提交
+- e4f039b WavPack 子库；e31f342 Vorbis 子库（CAPlayOgg 共享 libogg +
+  CAPlayVorbis）；2da2b26 Speex 子库（CAPlaySpeex，config.h 供 EXPORT 宏，
+  cSettings: FLOATING_POINT + HAVE_CONFIG_H + USE_KISS_FFT）。
+- 三 codec 各 2 测试（解码 + FakeDecoder 路由）全过；236/236。
+
+### 覆盖率工作（**未提交**，工作区脏）
+- 基线 80.71% → 当前 **83.02%**（产品 Swift，剔除 MacTests/C/DerivedSources）。
+  口径命令: xcrun llvm-cov report -instr-profile
+  .build/out/Products/Debug/codecov/default.profdata
+  .build/out/Products/Debug/APlayTests.xctest/Contents/MacOS/APlayTests
+- 已加测试（251 total，全绿）:
+  - StreamerLocalTests +3: testPauseAndResumeTheLocalReadLoop、
+    testResumeWithoutAnOpenFileIsHarmless、testOpeningAMissingFileReportsAnError
+    （Collector 加 waitForError；missing-file 用它 5s→0.06s）。
+  - NowPlayingInfoTests.swift 新文件 +4: 封面下载（CoverProtocol URLProtocol
+    投递 1x1 PNG，经 sessionBuilder 注入 ephemeral session + 私有 urlCache）、
+    无效 URL 忽略、remove() 清空（remove 后读 info.info 同步 barrier）、
+    play/pause 传输态。**坑**: session 是 let，须用 Configuration(sessionBuilder:)；
+    MP* 符号须 import MediaPlayer；NSImage PNG 须 NSBitmapImageRep。
+  - StreamerCoverageTests +2: testRemote401ArmsTheReconnectWatchdog（401 后
+    200 恢复）、testRemote302ReportsNetworkStatusCode（default 分支）。
+  - 三 codec 各 +2: testDirectConstructionRefusesAnMp3（WavPackDecoder(config:)
+    直接构造，非本格式抛 parser + seekable()==false）、
+    testCorruptFileReportsAnError（4 字节假文件，期望抛错+1 error）。
+    **坑**: 直接构造时 error 发在 fallback 的 outputStream，外层 collector
+    收不到——断言改为 seekable()==false。
+- 覆盖率现状: Streamer 58%（缺口 258 行，Icy 解析 657-806 ~150 行未覆盖，
+  为最大块）、APlayer 77%、Composer 79%、NowPlayingInfo 74%、
+  FlacParser 83%、WavPackDecoder 81%、VorbisDecoder 88%、SpeexDecoder 86%、
+  APlayExtras.swift 0/4、LoggerCompatible 83%、PlayerCompatible 75%。
+
+### 关键经验
+- Speex 解码参考流程（/tmp/speexprobe.c 已验证 88320 样本）: header.mode 选
+  band（非 rate），rate 原样传 SPEEX_SET_SAMPLING_RATE；第 2 个包是 Ogg
+  comment 须跳过（firstAudioPacket=2，header 计 1）；eos 页仍要 pagein。
+- resume 早于 prepare 时 _pendingResume 必须在 openFile 成功后启动 timer
+  （Speex 初版漏掉此段导致 decodeTick 从不进入，表现为何解不出 PCM）。
+- ov_read_float 返回非交错 float***（Swift: UnsafeMutablePointer<
+  UnsafeMutablePointer<Float>?>?，须 withUnsafeMutablePointer 取址）。
+- ffmpeg 无 libspeex/vorbis（vorbis 需 -strict -2 且仅 2 声道）；
+  speex fixture 用 meson 编 /tmp/speexbuild/src/speexenc（brew install libogg
+  后 meson setup -Dtools=enabled；-n 窄带 --stereo）。
+
+### 下一步
+1. 提交本轮覆盖率测试（独立提交）。
+2. 攻 Streamer Icy 解析（657-806）: 需造 icy-metaint 响应 + 元数据帧
+   （间隔字节后 length*16 字节 "StreamTitle='..';"），最难但回报最大。
+3. 再补 APlayer/Composer/FlacParser 分支。目标 ≥90%。
+
+## SF-0069
+- Revision: 69
+- 取代 SF-0068。**目标 d867b7b7 完成**：三 codec 子库已提交，产品 Swift
+  行覆盖率达 90.14%（≥90%），272 测试全绿。
+
+### 提交
+- 76bcf5b: SF-0068 的 251 测试批次（覆盖率 83.02%）。
+- 3132323: ICY 修复 + 死代码清理 + 新测试，覆盖率 → 90.14%。
+
+### 发现并修复的真实 bug（Streamer.readICY）
+- `buffer?[i] = buf` 写在 i 自增之后，导致每个 ICY 音频块**首字节被 0 填充、
+  末字节丢失**（off-by-one）。改为 `buffer?[i-1] = buf`，投递长度改
+  `min(i, buffer.count)`（此前 >8KB 的块会越界读缓冲）。
+  复现: icyBody(metaint:8, frame:"StreamTitle='AB';StreamUrl='xy';")
+  投递出 `00 4A×8 4B×7` 而非 `4A×8 4B×8`。
+
+### 死代码清理
+- `readICYHeader`/`parseICYHeader`（约 70 行）不可达: isIcyStream 仅在
+  handle(response:) 的 icy-metaint / icy-notice1 分支置真，同时已把
+  isHeadersRead/isHeadersParsed 置真，dispatch 永远走 readICY。连同
+  isHeaderCR/headerLines/isHeadersRead/isHeadersParsed 及 handle(response:)
+  里的赋值一并删除。IcyCastInfo 与 APlay 的常量初值 lazy var 改普通存储属性。
+
+### 新增测试（+21 用例）
+- StreamerCoverageTests +3: 内联元数据帧解析（length×16 帧，末字节触发解析、
+  值保留 "='" 定界符、icy-name 附 title）、空帧续流、8KB 缓冲上限。
+- MetadataParserTests +16: ID3 填充帧（仅 v2.2 的跳过算法正确，v2.3 的
+  realLength-2 仍错位，故只用 v2.2）、截断帧（空名才 settle，有名帧永远
+  卡在 .parsering——疑似 bug 但未改）、非法帧名、APIC 三个错误守卫、
+  未知编码、UTF-16 文本（encoding 1 + BOM）、v2.2 压缩/v2.3 实验/v2.4
+  footer/未知版本 头标志、v1.0 完整 comment 域 + 未知 genre、
+  远端 v1 探测（V1ProbeProtocol，Range 请求）与短响应拒绝。
+- NowPlayingInfoTests +2: 冷缓存下载（唯一 URL 避开 URLCache.shared 命中；
+  测后 removeCachedResponse 清理）、.requiredPermission 拒绝。
+- FileFallbackDecoderTests +1: APlayExtras.fileDecoder(fallback:) 入口
+  （APlayExtras.swift 0/4 → 覆盖）。
+- FormatHintTests: 扩 testIsWaveDetection 覆盖 isWave/isRemoteWave/isLocalWave。
+
+### 剩余缺口（90.14%，余 532 行未覆盖）
+- Streamer 101、Composer 89、APlay.swift 84、DefaultAudioDecoder 72、
+  APlayer 63、SeekableFileDecoder 37、FlacParser 35。
+- 多为渲染回调/端到端播放管线与 ExtAudioFile 错误分支，单测代价高。
+
+### 关键经验
+- ICY 协议: metaint 数据字节后是 length 字节，帧长 = length×16；帧最后一
+  字节不进 metadata，它是触发解析的信号；帧后须恰好再给 metaint 个数据
+  字节，否则后续字节被当下一轮 length/metadata 吞掉。
+- ID3Parser 远端 v1 探测的 dataTask 闭包持有 config unowned，测试须把
+  config 存到测试实例属性（heldConfig）否则 EXC_BREAKDOWN。
+- URLCache.shared 是磁盘缓存且跨进程持久：固定 URL 的封面测试第二次运行
+  会命中缓存而跳过 doRequest。用唯一 URL 才能测冷路径。
+- llvm-cov export 的 segments 里"某行任一段为 0"不等于整行未覆盖（if-let
+  的 false 段），统计未覆盖行须用 summary 或"全段为 0"判断。
+
+## SF-0070
+- Revision: 70
+- 取代 SF-0069。新需求（**未开始**）: 在 APlayDemo 加①本机文件播放
+  （UIDocumentPicker 选任意音频文件）②ICY 流测试。
+
+### 计划（读码已定，尚未写任何文件）
+- 新文件 APlayDemo/FilePlayback.swift: UIViewControllerRepresentable 包
+  UIDocumentPickerViewController（UTType.audio）；卡片 FilePlaybackView。
+  DemoPlayer 加 PlaybackSource.file(URL) + playFile(_:)——picked URL 须
+  startAccessingSecurityScopedResource 并在换源/destroy 时 stop
+  （scopedFileURL）；rebuild() 须处理 .file 分支。
+- 新文件 APlayDemo/IcyTestServer.swift: Network.framework（NWListener+
+  NWConnection）在本机跑 ShoutCast 式服务器: 响应行+头含
+  icy-metaint/icy-name/icy-br/icy-genre，无 Content-Length；body = 内置
+  tone-cbr.mp3 按 metaint=4096 切块循环，每块后发 length 字节 +
+  "StreamTitle='<t>';StreamUrl='...';"（空格补齐 16 倍数），标题轮换以
+  观察内联元数据事件。端口 0 由 OS 分配，port 发布给 UI。
+- Info.plist 加 NSAppTransportSecurity{NSAllowsLocalNetworking=true}。
+- pbxproj ID 规则已查清: fileRef A5E0A500000000000000110D/110E，
+  buildFile …120D/120E；须加 PBXFileReference 段（164-175 行区）、
+  PBXGroup children（211-222 行区，AirPlayRoutePicker 后）、
+  Sources phase（578-590 行区）。ContentView 在 EqualizerView 后插入
+  FilePlaybackView 与 IcyStreamTestView。
+- 框架修正（待做）: readICY 的 token 值含 "='" 前缀与尾 "'"，应取
+  range.upperBound 之后并去尾引号; MacTests 的
+  testIcyMetaintParsesInlineMetadataFrame 断言需同步改（现断 "='AB'"）。
+  DemoPlayer.applyParsedMetadata 须处理 .other 的 StreamTitle/StreamUrl。
+- 坑: URLCache.shared 跨进程持久；ID3Parser 远端 v1 探测的 dataTask 闭包
+  持有 config unowned。
+
+## SF-0071
+- Revision: 71
+- 取代 SF-0070。需求已完成（编码+构建+自动化验证；交互手测留用户）。
+
+### 已成
+- 框架修正: readICY 值改取 `range.upperBound` 之后并去尾引号（原值含
+  `='` 前缀与尾 `'`）。MacTests 断言改 "AB"/"xy"。272/272 通过。
+- 新文件 APlayDemo/FilePlayback.swift: AudioDocumentPicker
+  （UIDocumentPickerViewController forOpeningContentTypes UTType.audio,
+  asCopy: false，security-scoped）+ FilePlaybackView 卡片。
+- 新文件 APlayDemo/IcyTestServer.swift: NWListener(端口0) 本机
+  ShoutCast 式服务器; metaint=4096 切块循环 tone-cbr.mp3，每块后发
+  length 字节 + "StreamTitle='<t>';StreamUrl='<url>';"（空格补16倍数），
+  标题每 4 间隔轮换; pace 0.25s 近实时。IcyStreamTestView 卡片
+  （启停、显示端口/客户端数、"Stream it" 直播）。
+- DemoPlayer: PlaybackSource.file(URL) + playFile + retain/release
+  ScopedFileURL（nonisolated(unsafe)，deinit 内联释放；playMatrix/
+  playRemote/playTrack 换源时释放）+ rebuild .file 分支 + 新增
+  icyStreamTitle/icyStreamURL published；applyParsedMetadata 处理
+  .other(StreamTitle/StreamUrl)。
+- ContentView: EqualizerView 后插 FilePlaybackView、IcyStreamTestView。
+- Info.plist: NSAppTransportSecurity{NSAllowsLocalNetworking=true}。
+- pbxproj: fileRef 110D/110E、buildFile 120D/120E，三处（BuildFile、
+  FileReference、Group、Sources）齐注册。
+
+### 关键事实（本轮实测）
+- **CFNetwork 对 `ICY 200 OK` 状态行会剥掉全部响应头**（实测仅剩
+  Date/Max-Age），icy-metaint 没了→元数据模式失效。必须答
+  `HTTP/1.1 200 OK`（Icecast 式）才能保留 icy-* 头。已写入服务器注释。
+- NWConnection.send 须显式 `completion: .contentProcessed { }`，
+  纯尾随闭包不匹配 SendCompletion 枚举。
+- DemoPlayer 是 @MainActor，deinit 非隔离→跨 actor 释放作用域须
+  nonisolated(unsafe)。
+- pbxproj 大坑: buildFile ID 与 fileRef ID 不可重复。曾误把
+  AirPlayRoutePicker 的 buildFile 写成 110C（=其 fileRef ID），导致
+  该文件被编译输入静默丢弃，NowPlayingView 报 "cannot find in scope"。
+- 临时端到端测试（真实 NWListener + 真实 Streamer/URLSession，已删除）
+  验证: 0.225s 内 12 条元数据、3 标题轮换、值无 `='`/尾引号、
+  icy-name 随帧为 .title、音频持续。teardown 顺序须先 stop server 再
+  跑 runloop 再放 config（ID3Parser v1 探测闭包持 config unowned）。
+
+### 验证
+- xcodebuild APlayDemo (Debug, iOS Simulator) BUILD SUCCEEDED。
+- swift test 272/272，18.6s。APlay.o 行覆盖 90.29%（4489/4972）。
+- 未做: 模拟器交互手测（选文件、看 ICY 事件卡）——本环境无 UI 交互。
+
+### 下一步
+- 用户在模拟器/真机手测两条 demo 流程; 如需可把临时端到端测试转为
+  常驻 MacTests（注意 teardown 顺序）。
+
+## SF-0072
+- Revision: 72
+- 取代 SF-0071。SF-0071 编码已全部完成并装真机；本轮纯审计与答问，
+  **未改代码**。
+
+### 已验（本轮）
+- 真机安装成功: xcodebuild APlayDemo Debug → id=00008130-000E7959262B803A
+  （lincoln-phone, iPhone 15 Pro Max），签名用本机已登录团队 L5W9FHSX92
+  的 "iOS Team Provisioning Profile: *" 通配描述文件（2X9CSZ37SU 团队
+  未登录 Xcode，不可用）。须带 -allowProvisioningUpdates。
+  产物 build/phone/.../Debug-iphoneos/APlayDemo.app；主二进制是 thin
+  stub，代码在 APlayDemo.debug.dylib（Xcode27 debug 分体布局；查符号须
+  grep 该 dylib）。devicectl install + launch 均成功。
+- 用户反馈: ①icy stop 后还播很久才停（缓冲排空+重连所致，未修）；
+  ②"新增的支持没有播放文件，icy流也没有"——经查 debug.dylib 含全部新
+  类与字符串，卡片已渲染，疑用户未下滑到 EqualizerView 之下。
+- 覆盖率复测（5 个产品 swift 模块合计）: 5689/6343 = **89.69%**
+  APlay 4489/4972、APlayExtras 381/430、APlayWavPack 253/312、
+  APlayVorbis 261/298、APlaySpeex 305/331。低于 90% 目标，与 SF-0069
+  记录的 90.14% 口径不一致（分母集合不同），须统一口径或补测。
+
+### 用户追问结论（事实）
+- "新增的都要解析元数据": **未支持**。tagParser 只接 .mp3(ID3)/.flac；
+  .ogg/.spx/.wv 走 .metadata([]) 空分支。Speex 显式跳过 Ogg comment
+  包；Vorbis comment 头未提取；WavPack 不读 tag。计划（已定未写）:
+  AudioDecoder.Event 加 .metadata([MetadataParser.Item]) 分支，Composer
+  转发 modifyMetadata；ogg/spx 共用 Vorbis comment 包解析，wv 用
+  WavpackGetTagItem。
+- README "Not supported" 表**已过期**: Vorbis in Ogg、Speex 两行仍列
+  不支持，但两库已存在且同 README 上文已文档化。
+- 能否靠加子库补齐: audioDecoderBuilder 缝隙即为此设计。ffmpeg 有解码器
+  → 可做（mp1, amr_nb/wb, ape, tta, mpc7/mpc8, truehd/mlp, dsd, atrac3,
+  atrac9, wma 全系, als, ralf；opus 裸流 enc+dec 都有）。AC-4 无开源
+  解码器→不可做。mka/mpegts 属容器层（需 demuxer 非 codec）。MIDI/SF2
+  需合成器（设计排除）。mp1/amr 无编码器，fixture 须从 FATE 套取。
+- demo 接三 codec 的障碍: 三个 codec 库是 SPM target，**完全不在
+  APlay.xcodeproj**（grep 命中 0）。要进 format matrix 须先把它们作为
+  Xcode target 加入（pbxproj 大改）或改用 SPM 构建 demo。
+
+### Goal d867b7b7 收尾审计（未完成）
+- WavPack/Vorbis/Speex 三库已提交（e4f039b/e31f342/2da2b26，本地）。
+- Opus 裸流: 未做（goal 明列可做项）。
+- 覆盖率 ≥90%: 未达标（89.69%）。
+- 全部提交并推送: 未推（本地领先 origin 4 提交 + 工作区 demo 改动未提交）。
+
+### Next（优先序）
+1. 统一覆盖率口径并补测到 ≥90%，或核对 SF-0069 的 90.14% 算法。
+2. 新格式元数据解析（AudioDecoder.Event.metadata 分支 + 三库）。
+3. demo format matrix 接入三 codec（先解决 Xcode target 缺失）。
+4. ICY stop 停播延迟修复。
+5. README "Not supported" 表去过期行。
+6. Opus 裸流子库（可选，工作量大）。
+7. 全部提交并推送后 update_goal(complete)。
+
+## SF-0073
+- Revision: 73
+- 取代 SF-0072。**新需求（用户明令）: MIDI + SF2 支持**——此前被判
+  "需合成器、设计排除"，现已用 Apple 自带方案做成，且覆盖率达标。
+
+### 决策: 不 vendor 第三方合成器
+- FluidSynth 有 glib 依赖（PR #1564 才在分离）；WildMIDI LGPL 且保真低。
+- **改用纯 Swift + AVFoundation**: AVAudioSequencer 读 .mid，
+  AVAudioUnitSampler 读 .sf2/.dls，AVAudioEngine
+  `enableManualRenderingMode(.offline)` 手动渲染，直接拉出 canonical
+  16-bit/44.1k/stereo PCM。零外部依赖、正合现有 AudioDecoderCompatible
+  管线。spike 全部验证。
+
+### 已成
+- 新 SPM target/product `APlayMidi`（`Sources/APlayMidi/`，依赖仅 APlay）:
+  - `MidiDecoder.swift`: 仿 WavPackDecoder 结构（unowned config、
+    DispatchSourceTimer 20ms、_pendingResume、UnhandledDecoder）。
+    `APlayMidi.decoder(fallback:soundfont:)`；`Soundfont{url,program,bank}`。
+    openFile 建 engine+sampler+sequencer、离线渲染、position→比例→秒映射
+    （Composer 按 byte position 搜寻）。播完发 `.empty`。
+  - `SMFFile.swift`: 自写 SMF 解析器算时长（running status、sysex、
+    system-common 0xF1/0xF2/0xF3、tempo meta、SMPTE 与 quarter 两种
+    division、边界检查、畸形返 nil）。
+- 框架核心: `AudioFileType.midi`("MIDI")；fileHint 加
+  mid/midi/kar/audio/midi/audio/x-midi → .midi。
+- 夹具（脚本可复现，已并入 generate-fixtures.sh）:
+  `Scripts/generate-midi.py` → `MacTests/Fixtures/melody.mid`（2.5s 旋律+低音）;
+  `Scripts/generate-soundfont.py` → `MacTests/Fixtures/APlayTestSine.sf2`
+  （88KB，一 preset/一 instrument/一 220Hz 循环正弦）。
+- 测试 `MacTests/MidiDecoderTests.swift`（13 例）+ FormatHintTests 加 midi 行。
+- `Scripts/coverage.py`: 统一覆盖率口径脚本（6 个产品 swift 模块，
+  剔除 vendored C 与测试；文件级 summary lines 口径）。
+
+### spike 关键实测（/tmp/midispike，已弃，结论入文件）
+- AVAudioSequencer 在 manual rendering mode 下 `start()` 正常推进；
+  结束检测用 `currentPositionInSeconds >= duration + tail`（isPlaying
+  不可靠，会一直真）。
+- **`loadSoundBankInstrument(at:program:bankMSB:bankLSB:)` 的 bank 约定:
+  MSB=121(0x79, General MIDI set) 才选中 SF2 bank 0；MSB=0 报 -10851。**
+- 音高验证: note 60→220.0Hz、72→440.0Hz、48→110Hz，循环持续——
+  SF2 真正加载且音高正确。
+- **SF2 生成器大坑: `sampleID`(gen 53) 必须是 zone 内最后一个 generator**
+  （规范要求），否则 Apple 忽略其后的 sampleModes(54)/overridingRootKey(58)
+  → 循环失效，音符播一遍采样即停。已修，循环正常。
+- renderOffline 状态: .success/.insufficientDataFromInputNode/
+  .cannotDoInCurrentContext/.error（无 .noData）。
+- API 摘要: manualRenderingMode 只读，只能 enableManualRenderingMode 设置；
+  Player.canonical 非 public，wrapper 须自带一份 canonical ASBD（用
+  CoreAudio. 前缀限定 kAudioFormat* 常量，否则 beta 工具链编译器崩）。
+
+### 验证
+- swift build --target APlayMidi: 通过。
+- swift test: 287/287（原 272 + MIDI 13 + WavPack 2）。
+- 覆盖率（6 模块合计）: **6109/6773 = 90.20%** 达 ≥90% 目标。
+  APlay 90.29、APlayExtras 88.60、APlayWavPack 86.54、APlayVorbis 87.58、
+  APlaySpeex 92.15、APlayMidi 93.68。
+- APlay 模块覆盖随测试时序 ±5 行抖动（streamer 异步）；余量 +13 行，
+  WavPack/Midi 新增分支覆盖是确定性的。
+- 修 flaky: pause 后至多一个在途缓冲(16KB)到达，断言改 `<= 16384`
+  （DispatchSourceTimer suspend 后串行队列至多再跑一个 tick）。
+  **注: 任一测试失败会使 SwiftPM 不合并 profdata，覆盖率测量直接失败。**
+
+### 未做（下一轮）
+- README: 在可选库章节加 APlayMidi 文档段（仿三 codec 节）；"Not
+  supported" 表本无 MIDI 行。
+- demo 接 MIDI: APlayMidi 是 SPM target 不在 xcodeproj，与三 codec 同障碍。
+- SF2 preset 枚举/UI、MIDI 轨名作元数据（Event 无 .metadata 分支，属
+  SF-0072 另一计划项）。
+- Goal d867b7b7 余项: Opus 裸流、新格式元数据、ICY stop 延迟、
+  README 去过期行、提交推送。
+- 工作区未提交（含 SF-0071 demo 改动 + 本轮全部 MIDI 新增）。
+
+## SF-0074
+- Revision: 74
+- 取代 SF-0073 的"未做"列表中的 README 项。本轮在 SF-0073 基础上收尾文档。
+
+### 已成
+- README 新增 `### MIDI and SoundFont (via the optional APlayMidi library)` 段
+  （Speex 段后、Not supported 前），仿三 codec 节结构: 原理
+  （AVAudioSequencer + AVAudioUnitSampler + 离线 AVAudioEngine）、
+  audioDecoderBuilder seam 用法代码、格式表（.mid/.midi/.kar）、
+  Soundfont 参数说明（bank 0 = GM melodic set，内部以 bankMSB 0x79 选中；
+  .default 回落内建单音乐器；无第三方合成器、无 vendored C、无 license 段）。
+- "Not supported" 表后原排除段（"MIDI/SF2 不是音频流、需合成器"）已改写为
+  指向 APlayMidi 库的交叉引用。
+- Todo 章节 issue #17 条目由 `[ ]` 改 `[ ]`→`[x]`：四个可选库
+  （WavPack/Vorbis/Speex/Midi）即为 bundle 的参考实现。
+- Features/Installation/Docs 等其余章节通读无过期行（Requirements 的
+  "Swift 6.0+/Xcode 16+" 是兼容下限，不改）。
+
+### 验证
+- swift build: 全 7 产品通过（含 APlayMidi）。
+- swift test: **287/287 通过**，0 失败（README 改动不涉代码，回归确认）。
+- 注: swift test 尾部会多打一行 "Test run with 0 tests in 0 suites passed"
+  ——是 SwiftPM 额外 runner 噪音，非失败；以 "Executed 287 tests" 行为准。
+
+### 仍未做（Goal d867b7b7 余项）
+- demo 接四库: 三 codec + APlayMidi 均为 SPM target，完全不在
+  APlay.xcodeproj；demo 目前只 import APlay/APlayExtras。接入须先在
+  xcodeproj 加 target 引用（pbxproj buildFile ID 不可与 fileRef ID 重复）。
+- 新格式元数据: tagParser 只接 .mp3(ID3)/.flac；.mid/.ogg/.spx/.wv 空分支。
+- Opus 裸流、ICY stop 延迟。
+- 提交推送: 工作区积压 SF-0071 demo 改动 + SF-0073 MIDI 全部新增 +
+  本轮 README，均未提交（HEAD 3132323 仍领先 origin 4 提交）。

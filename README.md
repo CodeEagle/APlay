@@ -156,6 +156,35 @@ let config = APlay.Configuration(
 
 The vendored C library is BSD-3 licensed (`Sources/CAPlaySpeex/LICENSE.txt`).
 
+### MIDI and SoundFont (via the optional `APlayMidi` library)
+
+A `.mid` file is a note sequence rather than an audio stream, so `AudioFileStream`
+cannot decode it. `APlayMidi` synthesises it instead: `AVAudioSequencer` reads the
+Standard MIDI File, `AVAudioUnitSampler` loads a `.sf2` or `.dls` instrument bank,
+and an `AVAudioEngine` renders offline straight into the pipeline's canonical
+16-bit/44.1 kHz stereo PCM. No third-party synthesiser is vendored and no audio
+device is touched — the work happens on the decode queue like every other decoder.
+The same `audioDecoderBuilder` seam is used: only `.mid` / `.midi` / `.kar` are
+claimed, and everything else falls through unchanged. A local file is buffered
+whole and is seekable; live streams are not (a SMF is not a streaming format).
+Pinned by `MacTests/MidiDecoderTests.swift`.
+
+```swift
+let config = APlay.Configuration(
+    audioDecoderBuilder: APlayMidi.decoder(
+        fallback: APlay.Configuration().audioDecoderBuilder,
+        soundfont: .init(url: soundfontURL)))
+```
+
+| Format | Common extensions | Note |
+| --- | --- | --- |
+| Standard MIDI File | `.mid` `.midi` `.kar` | renders to canonical 16-bit stereo PCM; any channel count is up-mixed |
+
+Core Audio ships no default `.sf2`, so pass a `Soundfont` URL you ship with your
+app; leave `.default` and the sampler falls back to its built-in single tone. The
+`bank` selects the SoundFont bank (`0` is the General MIDI melodic set, selected
+internally as bank MSB `0x79`) and `program` the instrument number.
+
 ### Not supported
 
 Core Audio ships no decoder for these, or the container cannot be parsed. Any of them can
@@ -181,8 +210,8 @@ be added by implementing `AudioDecoderCompatible` and supplying it through
 | MPEG-TS | `.ts` | no Core Audio decoder |
 | Raw PCM | — | no header metadata to parse |
 
-MIDI (`.mid` / `.midi`) and SoundFont (`.sf2`) are not audio streams at all — they are
-note sequences and instrument banks that need a synthesiser, not a decoder.
+A `.mid` / `.midi` / `.kar` file is a note sequence rather than an audio stream, but it
+plays through the optional `APlayMidi` library above.
 
 > An extension the hint table does not recognise falls back to `.mp3` and relies on
 > `AudioFileStream` to sniff the actual content, so an unknown extension is not
@@ -358,9 +387,10 @@ Todo
       `MPRemoteCommandCenter`; route picking stays app-level UI (`AVRoutePickerView`)
 - [x] AudioEffectUnit support: band **frequencies** and **gains** are configurable, and
       gains apply at runtime either per band or as a whole preset — see "Equalizer" above.
-- [ ] Custom decoder formats (see issue #17): the `audioDecoderBuilder` seam already hands an
-      injected decoder the stream's file hint (verified for `.opus`), so an app can decode a
-      format Core Audio does not ship — the remaining gap is bundling a reference implementation.
+- [x] Custom decoder formats (see issue #17): the `audioDecoderBuilder` seam hands an
+      injected decoder the stream's file hint, and the optional `APlayWavPack`,
+      `APlayVorbis`, `APlaySpeex` and `APlayMidi` libraries each bundle a reference
+      implementation for a format Core Audio does not ship — see *Supported formats* above.
 
 Sponsor 
 ---

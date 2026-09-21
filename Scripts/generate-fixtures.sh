@@ -48,5 +48,11 @@ gen tone.flac    "sine=frequency=440:duration=2:sample_rate=44100" -c:a flac -ac
 # opus parser, so decode must fail until an injected decoder is supplied.
 gen tone.opus    "sine=frequency=440:duration=2:sample_rate=48000" -c:a libopus -b:a 32k -ac 1 -f opus
 
+# --- MIDI + SoundFont (APlayMidi) ----------------------------------------
+# Plain Python generators, no ffmpeg needed. melody.mid is the fixture the
+# APlayMidi tests render through APlayTestSine.sf2.
+python3 "$(dirname "$0")/generate-midi.py" "$OUT/melody.mid"
+python3 "$(dirname "$0")/generate-soundfont.py" "$OUT/APlayTestSine.sf2"
+
 echo
 echo "fixtures written to $OUT"

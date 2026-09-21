@@ -49,6 +49,9 @@ final class FormatHintTests: XCTestCase {
             "ogg": .ogg, "audio/ogg": .ogg, "application/ogg": .ogg,
             "spx": .speex, "audio/speex": .speex,
             "wv": .wavpack,
+            // Standard MIDI Files — rendered by APlayMidi, never by Core Audio.
+            "mid": .midi, "midi": .midi, "kar": .midi,
+            "audio/midi": .midi, "audio/x-midi": .midi,
             // Opus — the hint is recognised and Core Audio decodes the OGG
             // container on this platform (see the README format matrix).
             "opus": .opus, "audio/opus": .opus,

@@ -8,6 +8,7 @@
 //
 
 import XCTest
+import AVFoundation
 @testable import APlay
 
 // MARK: - Fakes
@@ -109,6 +110,8 @@ final class FakePlayer: PlayerCompatible {
     var asbd = AudioStreamBasicDescription()
     var state: Player.State = .idle
     var volume: Float = 1
+    /// Mirrors the protocol requirement; tests leave it unset.
+    var pcmTap: ((UnsafePointer<AudioBufferList>, UInt32, AVAudioFormat) -> Void)?
     private(set) var setupCount = 0
     private(set) var resumeCount = 0
     private(set) var pauseCount = 0

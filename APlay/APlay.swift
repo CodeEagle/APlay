@@ -158,6 +158,16 @@ public final class APlay: @unchecked Sendable {
 // MARK: - Public API
 
 public extension APlay {
+    /// Realtime PCM observer for spectrum analyzers and visualizers.
+    ///
+    /// Set to a closure to receive the interleaved samples about to enter the
+    /// render graph; the closure runs on the audio thread and must not allocate
+    /// or block. Set to `nil` to detach. See `PlayerCompatible.pcmTap`.
+    var pcmTap: ((UnsafePointer<AudioBufferList>, UInt32, AVAudioFormat) -> Void)? {
+        get { _player.pcmTap }
+        set { _player.pcmTap = newValue }
+    }
+
     /// play with a autoclosure
     ///
     /// - Parameter url: a autoclosure to produce URL

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import AVFoundation
 protocol PlayerCompatible: AnyObject {
     var readClosure: (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) { get set }
     var eventPipeline: Delegated<Player.Event, Void> { get }
@@ -34,6 +35,15 @@ protocol PlayerCompatible: AnyObject {
     /// `Configuration.equalizerBandFrequencies`. Players without a built-in
     /// equalizer return an empty array.
     var equalizerBandGains: [Float] { get }
+
+    /// Realtime PCM observer, for spectrum analyzers and visualizers.
+    ///
+    /// Invoked on the audio render thread with the interleaved samples about
+    /// to enter the render graph: an `AudioBufferList` holding `frameCount`
+    /// frames in `format`. The list and its `mData` are only valid for the
+    /// duration of the call — copy what you need, allocate nothing, never block.
+    /// Set to `nil` to detach. Players without a render hook leave it `nil`.
+    var pcmTap: ((UnsafePointer<AudioBufferList>, UInt32, AVAudioFormat) -> Void)? { get set }
 
     func currentTime() -> Float
 

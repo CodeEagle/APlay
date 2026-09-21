@@ -145,6 +145,11 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
     private let _eq: AVAudioUnitEQ
     fileprivate var _renderBlock: AVAudioEngineManualRenderingBlock?
 
+    /// Realtime PCM observer. Invoked on the audio thread from the render
+    /// input block, so it must be lock-free and allocation-free on the reader
+    /// side. See `PlayerCompatible.pcmTap`.
+    var pcmTap: ((UnsafePointer<AudioBufferList>, UInt32, AVAudioFormat) -> Void)?
+
     private unowned let _config: ConfigurationCompatible
 
     deinit {
@@ -333,6 +338,9 @@ extension APlayer {
 
                 let progress = sself._progress + Float(totalReadFrame)
                 sself._progressLock.lock(); sself._progress = progress; sself._progressLock.unlock()
+                if let pcmTap = sself.pcmTap {
+                    pcmTap(UnsafePointer(sself._inputBufferList), totalReadFrame, format)
+                }
                 return UnsafePointer(sself._inputBufferList)
             }
 
@@ -343,6 +351,28 @@ extension APlayer {
         }
     }
 }
+
+#if DEBUG
+extension APlayer {
+    /// Test-only render seam.
+    ///
+    /// The xctest process cannot start an output audio unit on macOS (-10867;
+    /// see `APlaySmokeTests`), so real end-to-end playback is exercised by the
+    /// `APlayMacPlayback` executable. This pulls one render quantum through the
+    /// same `AVAudioEngineManualRenderingBlock` the output unit's render callback
+    /// drives — which is enough to assert `pcmTap` is wired into the render path
+    /// with a correct format and frame count, without touching any audio unit.
+    ///
+    /// `setup(_:)` must have been called first so the block is armed.
+    /// - Returns: the status the rendering block reported.
+    @discardableResult
+    func pullRenderQuantum(_ frameCount: UInt32, into ioData: UnsafeMutablePointer<AudioBufferList>) -> OSStatus {
+        var status: OSStatus = noErr
+        _renderBlock?(frameCount, ioData, &status)
+        return status
+    }
+}
+#endif
 
 /// renderCallback
 ///

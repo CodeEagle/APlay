@@ -192,6 +192,39 @@ final class DemoPlayer: ObservableObject {
         player.toggle()
     }
 
+    /// True while the player streams from this device's own ICY test server.
+    var isPlayingLocalStream: Bool {
+        if case let .remote(url) = source {
+            return url.host == "127.0.0.1" || url.host == "localhost"
+        }
+        return false
+    }
+
+    /// Stops playback outright. `pause()` halts the output unit immediately, so
+    /// a stream whose ring buffer is still draining — or which is about to
+    /// reconnect — makes no further sound. The ICY card calls this when its
+    /// server is shut down mid-playback; stopping the server alone left the
+    /// buffered audio still playing out for a while.
+    func stop() {
+        player.pause()
+        releaseScopedFileURL()
+        source = .matrix
+        playingIndex = -1
+        icyStreamTitle = nil
+        icyStreamURL = nil
+        nowPlayingTitle = "APlay"
+        nowPlayingArtist = ""
+        nowPlayingAlbum = ""
+        cover = nil
+        coverPalette = CoverArt.palette(forSeed: "APlay")
+        currentTime = 0
+        duration = 0
+        isSeekable = false
+        buffering = nil
+        trackStatuses = Array(repeating: .idle, count: TrackLibrary.local.count)
+        pushNowPlaying()
+    }
+
     func seek(to time: TimeInterval) {
         player.seek(to: time)
         currentTime = time

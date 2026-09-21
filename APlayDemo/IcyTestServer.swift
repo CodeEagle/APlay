@@ -292,6 +292,13 @@ struct IcyStreamTestView: View {
             HStack(spacing: 10) {
                 if server.isRunning {
                     Button {
+                        // Stop the player first: pausing halts the output
+                        // unit before the socket goes away, otherwise the
+                        // streamer keeps draining its ring buffer (and retrying
+                        // the connection) while the server tears down.
+                        if player.isPlayingLocalStream {
+                            player.stop()
+                        }
                         server.stop()
                     } label: {
                         Label("Stop server", systemImage: "stop.fill")

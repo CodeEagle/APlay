@@ -1535,3 +1535,55 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
 - Opus 裸流、ICY stop 延迟。
 - 提交推送: 工作区积压 SF-0071 demo 改动 + SF-0073 MIDI 全部新增 +
   本轮 README，均未提交（HEAD 3132323 仍领先 origin 4 提交）。
+
+## SF-0075
+- Revision: 75
+- 取代 SF-0074 的"未做"列表中的 demo 项。**demo 已接 MIDI**。
+
+### 关键发现: xcodeproj 用本地 framework target 镜像，非 SPM 引用
+- APlay.xcodeproj 里**没有任何 XCRemoteSwiftPackageReference**；
+  APlay/APlayExtras/APlayDemo 都是 PBXNativeTarget，编译本地 swift 源
+  （APlayExtras.framework 的源在 APlayExtras/ 目录，与 SPM 包平行）。
+- APlayExtras 是现成模板（前缀 A5E0A5000000000000000，后缀 0xxx）。
+- APlayMidi 依赖仅 APlay（纯 Swift + AVFoundation/CoreAudio），
+  所以可照抄模板建本地 framework target；三 codec 依赖 vendored C
+  target，仍不可行。
+- ID 段: A5E0A5000000000000002 全空（段 0=APlayExtras，段 1=demo 新文件
+  CoverArt/TrackLibrary/FilePlayback/IcyTestServer），demo 资源 fileRef
+  用段 3。新 target IDs: 2001 product / 2101-2102 源 fileRef /
+  2201-2202 sources buildFile / 2301 APlay.framework in Frameworks /
+  2302-2303 demo 链接+嵌入 / 2401-2403 phases / 2501 target /
+  2601-2602 configs / 2701 configList / 2801+2803 proxies /
+  2802+2804 deps / 2901 group。资源: 3101 melody.mid / 3102
+  APlayTestSine.sf2 fileRef，3201-3202 in Resources。
+- **edit 工具大坑: oldText 若与既有缩进/tab 不完全一致即"Could not find"；
+  用 section 结束标记（如 `/* End PBXFrameworksBuildPhase section */`）
+  作唯一锚点最稳。另有一次 edits[2] 的 oldText 在传输中被丢，须重发。**
+
+### 已成
+- pbxproj: 加 APlayMidi.framework 本地 target（Sources 舍 MidiDecoder+
+  SMFFile、链接 APlay、productType framework、bundle id
+  app.Selfstudio.APlayMidi）；APlayDemo 链接+嵌入 APlayMidi.framework、
+  dependencies 加 2802、targets 列表加 2501；Samples group 与 demo
+  Resources phase 加 melody.mid + APlayTestSine.sf2。
+- 夹具同步: APlayDemo/Samples/ 放 melody.mid + APlayTestSine.sf2；
+  generate-fixtures.sh 末尾 cp 两文件到 APlayDemo/Samples（可复现）。
+- TrackLibrary: DecodeRoute 加 .midi（badge "APlayMidi"，raw
+  "APlayMidi · SoundFont sampler"）；local 加 melody.mid 行（置于
+  fileFallback 三行之后）；badge 改 switch。
+- DemoPlayer: import APlayMidi；makeConfig 的 builder 链改为
+  APlayExtras.fileDecoder(fallback: APlayMidi.decoder(fallback: 默认,
+  soundfont: Bundle.main APlayTestSine.sf2))；nowPlayingAlbum 三分支。
+
+### 验证
+- plutil -lint: OK；xcodebuild -list 出现 APlayMidi target。
+- xcodebuild APlayDemo Debug **模拟器 BUILD SUCCEEDED**：app/Frameworks/
+  含 APlayMidi.framework，bundle 含 melody.mid + APlayTestSine.sf2。
+- xcodebuild APlayDemo Debug **真机 BUILD SUCCEEDED**（通配 profile
+  "iOS Team Provisioning Profile: *" 签名通过）。
+- 提交 ddd3640 "Wire MIDI playback into the demo"。
+
+### 仍未做（Goal d867b7b7 余项）
+- 新格式元数据: tagParser 只接 .mp3(ID3)/.flac；.mid/.ogg/.spx/.wv 空分支。
+- Opus 裸流、ICY stop 延迟。
+- 推送: efce7eb + ddd3640 两个本地提交未推。

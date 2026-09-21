@@ -1,34 +1,38 @@
 State format: capsule-v2
-State revision: 87
+State revision: 88
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
-- Baseline: 2026-09-21；Xcode 27.0 / Swift 6.4。HEAD=a0933c0 已推送（SF-0087）。
-  v2.1.0/v2.1.1/v2.1.2 已 tag/Release。真机装机待命仍挂起（手机不在本网段）。
+- Baseline: 2026-09-21；Xcode 27.0 / Swift 6.4。HEAD=9be00b6 未推（SF-0088）。
+  v2.1.0/v2.1.1/v2.1.2 已 tag/Release。手机在线（iPhone 15 Pro Max / iOS 27.0），
+  demo 已装已启动（25 条 matrix）。
 
 ## Task
-- Goal: 修「合成 fixture 端到端 FAIL」→ **已修完并发布 v2.1.2**。
-- Unit: APlay 仓库；提交 + tag v2.1.2（Composer 改动影响产品库）。
-- Done when: 提交推送、tag v2.1.2 发布 ✓；release midi 用户确认有声（待）。
+- Goal: fixture 端到端修复 + v2.1.2 发布 → **全部闭环**（release midi 有声已确认）。
+- Unit: APlay 仓库。
+- Done when: ✓ 全部达成。
 
 ## Progress
-- Done: v2.1.2 全部交付（SF-0087）:
-  commit a0933c0 推送；tag v2.1.2 远端确认；Release 已建。
-  修复内容见 SF-0086: Composer 首批解码数据兜底广播 duration；
-  MacPlayback 按扩展名装配可选库；tone-opus.ogg 属预期 FAIL。
-- Open: 仅剩 release midi 用户确认有声（装机挂起中）。
-- Checks: 提交前 swift build 通过；326/326 与 7 格式端到端在
-  同一工作树已验（SF-0086）。
-- Pending: 用户确认 release midi 有声。
+- Done: demo matrix 15→25（拷 10 样本 + TrackLibrary + pbxproj 批量插入）； README 精简 492→195 行；midi 有声确认。 v2.1.2 已发布（commit a0933c0、tag、Release）。
+- Open: 两件待用户定夺:
+  ① wv/ogg/spx 入 demo 需在 xcodeproj 新建 4 个 C target（163 源文件）；
+  ② ChangeLog.md unreleased 段对的是已发版本，头未改（本次改动也未入）。
+- Checks: Release 构建成功；24 样本确认进 bundle；plutil -lint 通过；
+  装机启动成功。SF-0086 的 326/326 仍有效。
+- Pending: 等用户反馈 demo 上 25 条 matrix 的播放结果（尤其新加的
+  ac3/eac3 在 iOS 上的 Dolby 授权表现）。
 
 ## Rules
-- Constraints: 覆盖率口径=Scripts/coverage.py。本次未改解码逻辑、
-  未重跑 coverage。bash 工具 cwd 每次回 APlay，跨仓库须带
-  `--package-path`/`git -C`。edit oldText 须含 4 空格缩进。
-- 可选库 fallback 包装不要套在不需要它的格式上（info 不透明致回归）。
+- Constraints: 覆盖率口径=Scripts/coverage.py；本次未改解码逻辑。
+  bash 工具 cwd 每次回 APlay，跨仓库须带 `--package-path`/`git -C`。
+  edit oldText 须含 4 空格缩进。改 pbxproj 用 python 脚本批量插入 +
+  plutil -lint 校验。可选库 fallback 包装不要套在不需要它的格式上。
+- xcodeproj 无 SPM 的 C 库 target（WavPack/Vorbis/Speex/CAPlay*）。
 
 ## Next
-- Action: 待用户确认 release midi 有声；有声则本任务彻底关闭。
-  无声则回 SF-0086 排查 APlayMidi 装配路径（MacPlayback main.swift）。
-- Verify: 用户反馈。
-- Refs: SF-0087（v2.1.2 交付闭环），SF-0086（修复细节），SF-0085（mp3）。
+- Action: HEAD=9be00b6（demo matrix + README）尚未 push；先推送。
+  然后等用户: ① 手机上 25 条 matrix 播放反馈 ② wv/ogg/spx 是否值得
+  新建 C target ③ ChangeLog 要不要整理。
+- Verify: git ls-remote HEAD 与本地一致。
+- Refs: SF-0088（matrix 扩展 + README 精简 + midi 确认），SF-0087（v2.1.2），
+  SF-0086（修复细节），SF-0085（mp3）。

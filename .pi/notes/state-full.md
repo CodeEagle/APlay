@@ -2137,3 +2137,31 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
     验收是在同一棵工作树上跑的，提交未改代码内容。
 - 残留: release midi 有声仍待用户确认（手机不在本网段，装机挂起）。
   确认后此条即可彻底关闭；若无声，回到 SF-0086 排查装配路径。
+
+## SF-0088
+- Revision: 88
+- 取代: SF-0087「残留」——release midi 有声已由用户确认，原任务彻底关闭。
+- 三件事:
+  1. **demo matrix 扩展（commit 9be00b6）**: 从 Fixtures 拷 10 个样本到
+     APlayDemo/Samples（tone-mp4.mp4 / tone.m4b / tone-mp2.mp2 /
+     tone-ima4.wav / tone.ac3 / tone.eac3 / tone.au / tone.3gp /
+     tone.3g2 / tone.w64），TrackLibrary 加 10 条，matrix 15→25 行。
+     pbxproj 用 python 脚本批量插 PBXBuildFile/FileReference/group/
+     Resources（plutil -lint 通过，Release 构建确认 24 样本进 bundle，
+     装机启动成功）。native 6 条 + fileFallback 4 条。
+  2. **README 精简（两次）**: 492→195 行 / 11.9KB→8.3KB。删重复的两个
+     Equalizer 节合并、APlayExtras 专节并入 Installation、删全完成的
+     Todo 与 Features、Known issue 长文压成 Troubleshooting 一条、
+     Platform notes 删掉。保留全部格式表与扩展名，新增 Highlights 节
+     承载 ShoutCast/ID3/缓存/CPU-friendly 等能力声明（第一次砍过头，
+     补 Highlights 找回）。Installation 的 from 改 2.1.2，补了正文引用
+     却表格漏掉的 APlayOpus 行。
+  3. **wv/ogg/spx 未入 demo**: APlayWavPack/APlayVorbis/APlaySpeex 是
+     SPM-only target，APlay.xcodeproj 没有；要进 demo 需新建 4 个 C
+     target（CAPlayWavPack 31 + CAPlayOgg 5 + CAPlayVorbis 44 +
+     CAPlaySpeex 83 = 163 源文件），手工编 pbxproj 风险高。先做零成本
+     的 10 格式，此项待用户定夺。
+- 验收: release 构建 7 格式端到端（SF-0086）+ release midi 用户确认有声。
+- ChangeLog.md 的 unreleased 段对的是已发版本（Speex/Vorbis/WavPack +
+  format matrix fixtures），头没改成 v2.1.1；本次改动也未入 ChangeLog。
+  若要整理需另议。

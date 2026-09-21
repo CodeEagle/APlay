@@ -2081,3 +2081,46 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   **亲耳确认有声音**。原始问题「release -O 打包后播放不了」彻底闭环。
 - kumone-tca 的 Package.resolved 已升至 2.1.1/ce911a3（其工作区改动，
   由用户自行提交；APlay 侧不碰）。
+
+## SF-0086
+- Revision: 86
+- 取代: SF-0085「残留（非 bug）」段——那批 FAIL 分解为三件事，两真一假。
+
+### 分解「合成 fixture 端到端 FAIL」
+1. **真 bug（ALAC/AAC 短文件 duration 不广播）**:
+   `.duration` 事件只在 `.bitrate` 事件时由 Composer.updateDuration()
+   广播。ALAC/AAC 合成文件（2s）缺 BitRate 属性，回退估算要攒 50 个包
+   （Info.maxBitrateSample）才算 bitrate，而 2s 文件只有 ~21/43 包，
+   永远攒不够 → bitrate 事件不到 → duration 事件不到 → Recorder
+   要求 _duration != nil，干等超时。真实文件（有 BitRate 属性、或够长）
+   从不踩。
+   修复: Composer 新增 hasAnnouncedDuration，在 .output 分支（首批解码
+   数据，此时 info 已就绪）若 duration>0 且未广播过则广播一次；.bitrate
+   路径行为不变（继续细化估算）。这是产品库改动，影响 duration 事件
+   的及时性，值得发版。
+2. **验收装配缺失（MIDI）**: MacPlayback 用默认 APlay()，没装配
+   APlayMidi builder，melody.mid 落回 DefaultAudioDecoder → AudioFileStream
+   解 MIDI 解不出（ElapsedPlaybackTime 恒 0）。
+   修复: MacPlayback 按扩展名装配——.webm/.mka → APlayOpus.decoder，
+   .mid/.midi/.kar → APlayMidi.decoder + Fixtures/APlayTestSine.sf2，
+   其余保持默认 builder。
+3. **假问题（tone-opus.ogg）**: Ogg+Opus 容器 APlay 本不支持——APlayOpus
+   只做 WebM/Matroska（.webm/.mka）。它落回 AudioFileStream 解不出。
+   该文件只给 VorbisDecoderTests 做 ogg 解复用单测，不该当端到端
+   验收。保持 FAIL 属预期，不改代码。
+
+### 踩过的坑（备忘）
+- 一度把所有文件统一走复合 builder（APlayOpus.decoder(fallback:
+  APlayMidi.decoder(fallback: base)))，结果 mp3/alac/aac 集体回归:
+  包装层对非自身格式不透明（Composer 读 _decoder.info 拿到的是包装层
+  的空 info 而非 fallback 的）。改回「按扩展名装配，普通格式走默认
+  builder」后全绿。教训: 可选库的 fallback 包装不要套在不需要它的
+  格式上。
+
+### 验证
+- debug + release 双构建，7 格式端到端全 PASS:
+  mp3 / alac / aac(mp4) / ima4wav / webm(opus) / mka(opus) / midi。
+  其中 midi 与 webm/mka 的渲染路径（AVAudioSequencer offline render、
+  EBML 解复用 + AudioConverter）在 -O 下也正常，未藏新的 release-only bug。
+- swift test 326/326 passed 0 failures。
+- 用户已确认 release mp3 有声（SF-0085）；release midi 待用户确认。

@@ -13,6 +13,8 @@
 //
 
 import APlay
+import APlayMidi
+import APlayOpus
 import Foundation
 
 /// Resolves the sample asset: first CLI argument, else `<package-root>/APlayDemo/a.m4a`.
@@ -62,7 +64,30 @@ final class Recorder {
     private var _times: [Float] = []
 
     init(url: URL, configuration: APlay.Configuration? = nil) {
-        player = configuration.map { APlay(configuration: $0) } ?? APlay()
+        if let configuration = configuration {
+            player = APlay(configuration: configuration)
+        } else {
+            let base = APlay.Configuration()
+            let ext = url.pathExtension.lowercased()
+            // Only the formats the framework default cannot handle are wired
+            // through their optional decoder; everything else stays on the
+            // default builder so nothing is wrapped unnecessarily.
+            let builder: AudioDecoderBuilder
+            switch ext {
+            case "webm", "mka":
+                builder = APlayOpus.decoder(fallback: base.audioDecoderBuilder)
+            case "mid", "midi", "kar":
+                let sf2 = url.deletingLastPathComponent()
+                    .appendingPathComponent("APlayTestSine.sf2")
+                let soundfont = FileManager.default.fileExists(atPath: sf2.path)
+                    ? APlayMidi.Soundfont(url: sf2) : .default
+                builder = APlayMidi.decoder(fallback: base.audioDecoderBuilder,
+                                            soundfont: soundfont)
+            default:
+                builder = base.audioDecoderBuilder
+            }
+            player = APlay(configuration: APlay.Configuration(audioDecoderBuilder: builder))
+        }
         player.eventPipeline.delegate(to: self) { [weak self] _, event in
             self?.handle(event)
         }

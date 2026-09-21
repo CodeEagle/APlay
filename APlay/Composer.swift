@@ -39,6 +39,10 @@ final class Composer: @unchecked Sendable {
     }
 
     private unowned let _config: ConfigurationCompatible
+    /// Guards the first-audio duration announcement (see the `.output` case):
+    /// formats that never emit a bitrate event would otherwise stay silent on
+    /// duration forever, even though the value is already computable.
+    private var hasAnnouncedDuration = false
     #if DEBUG
         private nonisolated(unsafe) static var count = 0
         private let _id: Int
@@ -120,6 +124,19 @@ final class Composer: @unchecked Sendable {
                     }
                 }
                 sself._ringBuffer.write(data: item.0, amount: item.1)
+                // Bitrate events are the usual trigger, but they never arrive
+                // for three classes of track that can still compute a duration:
+                // Opus/MIDI report it through the container instead of the
+                // bitrate property, and a short file can stop before the
+                // 50-packet bitrate fallback accumulates. Announce on the
+                // first decoded audio so the pipeline gets a duration either
+                // way; the bitrate path keeps refining it afterwards.
+                if sself.isPreloadAhead == false,
+                   sself.hasAnnouncedDuration == false,
+                   sself.duration > 0 {
+                    sself.hasAnnouncedDuration = true
+                    sself.updateDuration()
+                }
             case let .error(err):
                 sself.eventPipeline.call(.error(err))
                 if case APlay.Error.parser = err {

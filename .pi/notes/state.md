@@ -1,44 +1,41 @@
 State format: capsule-v2
-State revision: 85
+State revision: 86
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
-- Baseline: 2026-09-21；Xcode 27.0 / Swift 6.4。HEAD ce911a3（已推送）。
-  v2.1.0 + **v2.1.1** 已 tag/Release。真机 lincoln-phone 仍 unavailable
-  （装机待命挂起，手机不在本网段）。
+- Baseline: 2026-09-21；Xcode 27.0 / Swift 6.4。HEAD 待提交（SF-0086）。
+  v2.1.0 + v2.1.1 已 tag/Release。真机装机待命仍挂起（手机不在本网段）。
 
 ## Task
-- Goal: 修 kumone-tca 报的「release -O 打包后播放不了」→ **已修复并闭环**。
-- Unit: 无在做的产品任务。
-- Done when: （已达成）v2.1.1 发布 + kumone-tca release 打包有声（用户确认）。
+- Goal: 修「合成 fixture 端到端 FAIL」→ **已修完，待提交发版**。
+- Unit: APlay 仓库；提交 + tag v2.1.2（Composer 改动影响产品库）。
+- Done when: 提交推送、tag v2.1.2 发布；release midi 用户确认有声。
 
 ## Progress
-- Done: **release-only 无声**修复（SF-0085）。AVAudioEngine manual rendering
-  的 inputBlock 原用 `withUnsafePointer(to: &lazyVar)` 返回 AudioBufferList，
-  指针只在调用期间有效、引擎返回后才读，-O 下拿到临时拷贝地址 → 静音。
-  改稳定堆分配 `_inputBufferList`（deinit 释放），删废弃 lazy var；
-  README「Known issue (fixed)」重写为两处修复并列。
-- 发版: ce911a3 推 master；tag v2.1.1（annotated）+ GitHub Release
-  （https://github.com/CodeEagle/APlay/releases/tag/v2.1.1）。
-- kumone-tca: Package.resolved 升到 2.1.1/ce911a3；
-  Scripts/build-app.sh release 打包成功，.build/app/Kumone.app 里点歌
-  **用户亲耳确认有声音** → 闭环。
-- Open: none（装机待命仍挂起，等用户插 USB 或指明手机网段）。
-- Checks: swift test 326/326 passed 0 failures；release 端到端
-  APlayMacPlayback + Kumone.app 双双有声（用户确认）。
+- Done: 分解三件事（SF-0086）:
+  ①真 bug——`.duration` 事件只在 `.bitrate` 事件时广播;Composer 加
+  hasAnnouncedDuration，.output 首批数据时若 duration>0 兜底广播一次,
+  .bitrate 路径不变（ALAC/AAC 短文件缺 BitRate 且 2s 攒不够 50 包回退）。
+  ②MacPlayback 按扩展名装配可选库:.webm/.mka→APlayOpus、
+  .mid/.midi/.kar→APlayMidi+Fixtures/APlayTestSine.sf2，其余走默认 builder。
+  ③tone-opus.ogg 是假问题——Ogg+Opus 容器本不支持（APlayOpus 只做
+  WebM/Matroska），仅 VorbisDecoderTests 用，保持 FAIL 属预期。
+- 坑: 统一走复合 builder 会让 mp3/alac 回归（包装层 info 不透明），
+  已改回按扩展名装配。
+- Open: 提交 + tag v2.1.2 + Release；release midi 待用户确认有声。
+- Checks: debug+release 双构建 7 格式端到端全 PASS（mp3/alac/aac/
+  ima4wav/webm/mka/midi）；swift test 326/326 passed 0 failures。
 - Pending: none。
 
 ## Rules
-- Constraints: 覆盖率口径=Scripts/coverage.py（7 产品 swift 模块）。
-  本次纯指针生存期修复未改逻辑，未重跑 coverage。
-  edit oldText 须含 4 空格缩进；同文件多 edit 分开发。
-  bash 工具 cwd 每次回 APlay：跨仓库命令须带绝对路径或
-  `--package-path`（swift package）/ `git -C`。
-- 残留（非 bug）: 合成 fixture（tone-alac/tone-mp4/tone-opus/melody.mid）
-  缺 bitrate → .duration 事件不发 → APlayMacPlayback 超时 FAIL，但音频
-  实际在播；真实文件与 afconvert 转的 m4a 全 PASS。备忘勿误判为回归。
+- Constraints: 覆盖率口径=Scripts/coverage.py。本次未改解码逻辑、
+  未重跑 coverage。bash 工具 cwd 每次回 APlay，跨仓库须带
+  `--package-path`/`git -C`。edit oldText 须含 4 空格缩进。
+- 可选库 fallback 包装不要套在不需要它的格式上（info 不透明致回归）。
 
 ## Next
-- Action: none；等用户下一步指令（或插 USB 线装机）。
-- Verify: —
-- Refs: SF-0085（release 无声根因、修复、发版、闭环），SF-0084（装机待命）。
+- Action: git add APlay/Composer.swift MacPlayback/main.swift
+  Package.swift .pi/notes/*，commit；tag v2.1.2；push + push --tags；
+  gh release create v2.1.2。
+- Verify: git ls-remote --tags 含 v2.1.2；kumone-tca 可升依赖。
+- Refs: SF-0086（fixture FAIL 分解与修复），SF-0085（release 无声已闭环）。

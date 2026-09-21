@@ -117,4 +117,82 @@ final class VorbisDecoderTests: XCTestCase {
         XCTAssertEqual(fake.prepareCalls.count, 1, "the fallback decoder must prepare for a local mp3")
         XCTAssertEqual(fake.prepareFileHints, [.mp3])
     }
+
+    /// Whatever the fallback emits must surface through this decoder's stream
+    /// and its bytes must reach it: the pipeline subscribes to the wrapper, not
+    /// to the fallback, so a missing relay would silence every other format.
+    func testFallbackEventsAndBytesReachThePipeline() throws {
+        let fake = FakeDecoder()
+        fake.recordInput()
+        fake.seekableValue = true
+        let url = try fixture("tone-cbr", "mp3")
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .mp3)
+        fake.setAttached(streamer)
+
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlayVorbis.decoder(fallback: { _ in fake })(config)
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+        try decoder.prepare(for: streamer, at: 0)
+
+        fake.outputStream.call(.bitrate(32_000))
+        fake.outputStream.call(.seekable(true))
+        XCTAssertEqual(collector.bitrateEvents, 1, "the fallback's bitrate event was lost")
+        XCTAssertEqual(collector.seekableEvents, 1, "the fallback's seekable event was lost")
+        XCTAssertTrue(decoder.info === fake.info, "a handed-off URL must expose the fallback's info")
+        XCTAssertTrue(decoder.seekable(), "a handed-off URL must report the fallback's seekability")
+
+        var byte: UInt8 = 0x42
+        decoder.inputStream.call((withUnsafePointer(to: &byte) { $0 }, 1, true))
+        XCTAssertEqual(fake.inputPackets.count, 1, "streamer bytes must reach the fallback")
+    }
+
+    /// An Ogg stream that turns out to be Opus still carries the `.ogg` hint, so
+    /// this library claims it — libvorbis cannot open it, and the URL must go
+    /// back to the fallback (Core Audio plays Opus-in-Ogg) instead of failing.
+    func testOpusInOggReachesTheFallback() throws {
+        let fake = FakeDecoder()
+        let url = try fixture("tone-opus", "ogg")
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .ogg)
+        fake.setAttached(streamer)
+
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlayVorbis.decoder(fallback: { _ in fake })(config)
+        try decoder.prepare(for: streamer, at: 0)
+
+        XCTAssertEqual(fake.prepareCalls.count, 1, "Opus-in-Ogg must reach the fallback, not a parser error")
+        XCTAssertEqual(fake.prepareFileHints, [.ogg])
+        XCTAssertTrue(decoder.info === fake.info)
+    }
+
+    /// The headline promise end to end: with the product installed, an mp3 still
+    /// decodes to PCM through the framework's own decoder.
+    func testMp3DecodesThroughTheFallback() throws {
+        let url = try fixture("tone-cbr", "mp3")
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlayVorbis.decoder(fallback: { DefaultAudioDecoder(config: $0) })(config)
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .mp3)
+        streamer.contentLength = fileSize(of: url)
+        try decoder.prepare(for: streamer, at: 0)
+        decoder.info.fileHint = .mp3
+        decoder.resume()
+
+        let data = try Data(contentsOf: url)
+        data.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            decoder.inputStream.call((base, UInt32(data.count), true))
+        }
+        XCTAssertTrue(wait(for: collector, minBytes: 1000), "the fallback decoded no PCM")
+        XCTAssertTrue(collector.errors.isEmpty, "the fallback emitted \(collector.errors.count) errors")
+    }
 }

@@ -50,6 +50,10 @@ gen tone.flac    "sine=frequency=440:duration=2:sample_rate=44100" -c:a flac -ac
 # script runs on a stock FFmpeg; these fixtures exist for metadata and decode
 # path coverage, not sound quality. libspeex still needs a full FFmpeg build.
 gen tone.ogg    "sine=frequency=440:duration=2:sample_rate=44100" -c:a vorbis -strict -2 -ac 2 -metadata title="APlay Ogg/Vorbis tone" -metadata artist="APlay" -metadata album="Fixtures"
+# Opus inside an Ogg container that still carries the .ogg hint: APlayVorbis
+# owns the hint but libvorbis cannot open the stream, so the decoder must
+# hand the URL back to the fallback (Core Audio plays Opus-in-Ogg).
+gen tone-opus.ogg "sine=frequency=440:duration=2:sample_rate=48000" -c:a libopus -b:a 32k -ac 1
 if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libspeex; then
   gen tone.spx  "sine=frequency=440:duration=2:sample_rate=44100" -c:a libspeex -b:a 32k -ac 2 -metadata title="APlay Speex tone" -metadata artist="APlay" -metadata album="Fixtures"
 else

@@ -19,6 +19,7 @@ final class OutputCollector {
     private let lock = NSLock()
     private var _bytes = Data()
     private(set) var bitrateEvents: UInt32 = 0
+    private(set) var seekableEvents: Int = 0
     private(set) var emptyCount = 0
     private(set) var errors: [APlay.Error] = []
     private var _metadata: [MetadataParser.Item] = []
@@ -35,7 +36,7 @@ final class OutputCollector {
         case .empty: lock.lock(); emptyCount &+= 1; lock.unlock()
         case let .error(error): lock.lock(); errors.append(error); lock.unlock()
         case let .metadata(items): lock.lock(); _metadata.append(contentsOf: items); lock.unlock()
-        case .seekable: break
+        case .seekable: lock.lock(); seekableEvents &+= 1; lock.unlock()
         }
     }
 

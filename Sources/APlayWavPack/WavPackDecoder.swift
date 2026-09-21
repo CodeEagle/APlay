@@ -90,11 +90,26 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
     public init(config: ConfigurationCompatible, fallback: AudioDecoderCompatible) {
         _config = config
         _fallback = fallback
+        // The pipeline subscribes to *this* decoder when it is built, so a URL
+        // the fallback takes must still surface its events and its bytes —
+        // otherwise installing this product would silence every format it does
+        // not own.
+        _fallback.outputStream.delegate(to: self) { decoder, event in
+            decoder._outputStream.call(event)
+        }
+        _inputStream.delegate(to: self) { decoder, input in
+            guard decoder._handedOff else { return }
+            decoder._fallback.inputStream.call(input)
+        }
         let timer = DispatchSource.makeTimerSource(flags: [], queue: _decodeQueue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(20))
         timer.setEventHandler { [weak self] in self?.decodeTick() }
         _timer = timer
     }
+
+    /// True while a `prepare` was routed to the fallback, so `info`, seekability
+    /// and the byte stream follow it instead of this decoder's empty state.
+    private var _handedOff = false
 
     /// Satisfies `AudioDecoderCompatible.init(config:)`. Direct construction has
     /// no fallback for other formats, so anything that is not WavPack fails
@@ -290,20 +305,26 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
 
     // MARK: - AudioDecoderCompatible
 
-    public var info: AudioDecoder.Info { _info }
+    public var info: AudioDecoder.Info { _handedOff ? _fallback.info : _info }
     public var outputStream: Delegated<AudioDecoder.Event, Void> { _outputStream }
     public var inputStream: Delegated<AudioDecoder.AudioInput, Void> { _inputStream }
 
     /// The whole file is buffered, so a seek to any position is possible once
     /// the file is open.
     public func seekable() -> Bool {
-        _stateQueue.sync { _context != nil }
+        if _handedOff { return _fallback.seekable() }
+        return _stateQueue.sync { _context != nil }
     }
 
     public func prepare(for provider: StreamProviderCompatible, at position: StreamProvider.Position) throws {
         // Only own WavPack hints; anything else belongs to the fallback decoder.
         guard case let .local(url, hint) = provider.info, APlayWavPack.handledHints.contains(hint) else {
+            _handedOff = true
             return try _fallback.prepare(for: provider, at: position)
+        }
+        if _handedOff {
+            _handedOff = false
+            _fallback.pause()
         }
         try openFile(at: url)
     }

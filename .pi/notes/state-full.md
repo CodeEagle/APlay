@@ -1696,3 +1696,51 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   测试（WavPack/Vorbis/Speex）各加端到端 titles 断言。
 - **swift test 全量 290/290 通过（20.6s）**——此前在 WavPack 处
   signal 11 中断，首次跑完整套。
+
+## SF-0078
+- Revision: 78
+- 取代 SF-0077 的「工作区未提交」——已提交推送（c12c613）；并修三个可选库
+  的一处**高危缺陷**。
+
+### 缺陷：可选库会静默废掉所有非所属格式
+- 现象: 装 APlayVorbis/Speex/WavPack 后，mp3/m4a/flac 等非所属格式
+  的 prepare 被转发给 fallback，但 **fallback 的 outputStream 从未中继**
+  到 wrapper——管线订阅的是 wrapper（Composer 在 init 时只接
+  `_decoder.outputStream`）。PCM/错误事件全部丢失 → 装库即坏其他格式。
+- 对照真相: APlayExtras/FileFallbackDecoder 早就做对了——选解码器时
+  `new.outputStream.delegate(to: self) { _outputStream.call($1) }`，
+  且 info → active?.info，inputStream 也转发给 active。三个新 wrapper
+  只在 init 里建了 fallback 却没接事件流。
+- 修复（三库同模式）:
+  - init 里 `_fallback.outputStream.delegate(to: self)` 中继事件；
+    `_inputStream.delegate` 在 `_handedOff` 时把字节转发给 fallback。
+  - 加 `_handedOff`；`info` → `_handedOff ? _fallback.info : _info`；
+    `seekable()` 同理（Vorbis/Speex 原先只返自身状态）。
+  - prepare 非所属 hint 置 `_handedOff=true`；自己接管时置 false 并
+    `_fallback.pause()` 收停旧解码器。
+- Vorbis 额外: Ogg 里装 Opus（.ogg hint 归 APlayVorbis）时
+  ov_open_callbacks 返 OV_ENOTVORBIS → 交还 fallback（Core Audio 能播）。
+  **精确化**: 仅当 `_fileData` 以 "OggS" 开头才移交——垃圾文件仍报
+  parser error（testCorruptFileReportsAnError 由此回归，已修）。
+
+### 测试（+5，295 全绿）
+- 三库各加 testFallbackEventsAndBytesReachThePipeline（FakeDecoder 验
+  bitrate/seekable 事件中继、info 同一性、inputStream 字节到达）。
+- Vorbis 加 testOpusInOggReachesTheFallback（新夹具 tone-opus.ogg =
+  OpusHead/OpusTags 的 OGG，扩展名 .ogg）与
+  testMp3DecodesThroughTheFallback（真 DefaultAudioDecoder 端到端出 PCM）。
+- generate-fixtures.sh 增 tone-opus.ogg（libopus -f ogg）。
+- OutputCollector 增 seekableEvents 计数。
+- **swift test 295/295（20.6s）；覆盖率 90.47%**（6 模块，APlayWavPack
+  88.95→89.38、Vorbis 88.62→89.68、Speex 92.89→93.08）。
+
+### Opus 裸流评估结论（goal 最后一项）
+- **前提不成立**: 本机 ffmpeg 8.0.1 只有 "Ogg Opus" muxer，**无裸 opus
+  容器**；世上亦无标准裸-opus 文件格式（无帧同步规范）。故无法造真实
+  夹具，做了也只能播自造格式。
+- 实测 Core Audio 对 Opus 的覆盖: OGG(.opus) ✅ 解码、CAF ✅ 解码
+  （afconvert 出 198016B PCM）、MP4 ⚠️ 解析成功但解码 'pck?' 失败、
+  **WebM/Matroska ❌ 连打不开**。
+- 真正的缺口是 **Opus-in-WebM/Matroska**（.webm/.mka），需 EBML demuxer
+  + vendoring libopus（autotools，需 config.h，114 文件含之），工作量远
+  超(goal 描述的)「裸流」，且非 goal 字面所列。→ 报用户定夺。

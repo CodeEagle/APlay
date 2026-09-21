@@ -93,11 +93,31 @@ public final class VorbisDecoder: @unchecked Sendable, AudioDecoderCompatible {
     public init(config: ConfigurationCompatible, fallback: AudioDecoderCompatible) {
         _config = config
         _fallback = fallback
+        // The pipeline subscribes to *this* decoder when it is built, so a URL
+        // the fallback takes must still surface its events and its bytes —
+        // otherwise installing this product would silence every format it does
+        // not own (including Opus-in-Ogg, which claims the same hint).
+        _fallback.outputStream.delegate(to: self) { decoder, event in
+            decoder._outputStream.call(event)
+        }
+        _inputStream.delegate(to: self) { decoder, input in
+            guard decoder._handedOff else { return }
+            decoder._fallback.inputStream.call(input)
+        }
         let timer = DispatchSource.makeTimerSource(flags: [], queue: _decodeQueue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(20))
         timer.setEventHandler { [weak self] in self?.decodeTick() }
         _timer = timer
     }
+
+    /// True while a `prepare` was routed to the fallback, so `info`, seekability
+    /// and the byte stream follow it instead of this decoder's empty state.
+    private var _handedOff = false
+
+    /// Raised when the Ogg stream turns out not to be Vorbis — the container is
+    /// real, but Core Audio owns its payload (Opus-in-Ogg is the common case),
+    /// so the fallback gets the URL rather than a dead-end parser error.
+    private enum HandoffError: Error { case notVorbis }
 
     /// Satisfies `AudioDecoderCompatible.init(config:)`. Direct construction has
     /// no fallback for other formats, so anything that is not Ogg/Vorbis fails
@@ -181,9 +201,20 @@ public final class VorbisDecoder: @unchecked Sendable, AudioDecoderCompatible {
             ov_open_callbacks(myself, filePtr, nil, 0, _callbacks)
         }
         guard status == 0 else {
+            _vorbisFile = OggVorbis_File()
+            if status == OV_ENOTVORBIS, _fileData.starts(with: "OggS".utf8) {
+                // A real Ogg stream whose payload is not Vorbis (Opus-in-Ogg
+                // is the common case — Core Audio still plays it). Hand the
+                // URL back rather than reporting a dead-end parser error.
+                // Files without the capture pattern are just corrupt, and
+                // stay this decoder's error to report.
+                _config.logger.log("not a Vorbis stream (\(status)); " +
+                                   "deferring to the fallback decoder",
+                                   to: .audioDecoder, method: #function)
+                throw HandoffError.notVorbis
+            }
             _config.logger.log("ov_open_callbacks failed: \(status)",
                                to: .audioDecoder, method: #function)
-            _vorbisFile = OggVorbis_File()
             let error = APlay.Error.parser(kAudioFileUnsupportedDataFormatError)
             outputStream.call(.error(error))
             throw error
@@ -345,22 +376,40 @@ public final class VorbisDecoder: @unchecked Sendable, AudioDecoderCompatible {
 
     // MARK: - AudioDecoderCompatible
 
-    public var info: AudioDecoder.Info { _info }
+    public var info: AudioDecoder.Info { _handedOff ? _fallback.info : _info }
     public var outputStream: Delegated<AudioDecoder.Event, Void> { _outputStream }
     public var inputStream: Delegated<AudioDecoder.AudioInput, Void> { _inputStream }
 
     /// The whole file is buffered, so a seek to any position is possible once
     /// the file is open.
     public func seekable() -> Bool {
-        _stateQueue.sync { _isOpen }
+        if _handedOff { return _fallback.seekable() }
+        return _stateQueue.sync { _isOpen }
     }
 
     public func prepare(for provider: StreamProviderCompatible, at position: StreamProvider.Position) throws {
         // Only own Ogg hints; anything else belongs to the fallback decoder.
         guard case let .local(url, hint) = provider.info, APlayVorbis.handledHints.contains(hint) else {
-            return try _fallback.prepare(for: provider, at: position)
+            return try handoff(to: provider, at: position)
         }
-        try openFile(at: url)
+        do {
+            try openFile(at: url)
+        } catch HandoffError.notVorbis {
+            return try handoff(to: provider, at: position)
+        }
+        if _handedOff {
+            _handedOff = false
+            _fallback.pause()
+        }
+    }
+
+    /// Routes the whole decoder to the fallback: an Ogg stream that is not
+    /// Vorbis (or a hint this library does not own) still plays through Core
+    /// Audio, so owning the hint must not regress the other formats.
+    private func handoff(to provider: StreamProviderCompatible, at position: StreamProvider.Position) throws {
+        _handedOff = true
+        closeFile()
+        try _fallback.prepare(for: provider, at: position)
     }
 
     public func pause() {

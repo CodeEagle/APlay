@@ -117,4 +117,36 @@ final class SpeexDecoderTests: XCTestCase {
         XCTAssertEqual(fake.prepareCalls.count, 1, "the fallback decoder must prepare for a local mp3")
         XCTAssertEqual(fake.prepareFileHints, [.mp3])
     }
+
+    /// Whatever the fallback emits must surface through this decoder's stream
+    /// and its bytes must reach it: the pipeline subscribes to the wrapper, not
+    /// to the fallback, so a missing relay would silence every other format.
+    func testFallbackEventsAndBytesReachThePipeline() throws {
+        let fake = FakeDecoder()
+        fake.recordInput()
+        fake.seekableValue = true
+        let url = try fixture("tone-cbr", "mp3")
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .mp3)
+        fake.setAttached(streamer)
+
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlaySpeex.decoder(fallback: { _ in fake })(config)
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+        try decoder.prepare(for: streamer, at: 0)
+
+        fake.outputStream.call(.bitrate(32_000))
+        fake.outputStream.call(.seekable(true))
+        XCTAssertEqual(collector.bitrateEvents, 1, "the fallback's bitrate event was lost")
+        XCTAssertEqual(collector.seekableEvents, 1, "the fallback's seekable event was lost")
+        XCTAssertTrue(decoder.info === fake.info, "a handed-off URL must expose the fallback's info")
+        XCTAssertTrue(decoder.seekable(), "a handed-off URL must report the fallback's seekability")
+
+        var byte: UInt8 = 0x42
+        decoder.inputStream.call((withUnsafePointer(to: &byte) { $0 }, 1, true))
+        XCTAssertEqual(fake.inputPackets.count, 1, "streamer bytes must reach the fallback")
+    }
 }

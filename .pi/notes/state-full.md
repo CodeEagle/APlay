@@ -1899,3 +1899,66 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   generate-fixtures.sh + tone.webm/tone.mka 夹具 + 四个测试文件
   （EBMLTestBuilders/WebMDemuxerTests/OpusDecoderTests/FormatHintTests）
   + .pi 笔记；推 origin master。
+
+## SF-0082
+- Revision: 82
+- 取代 SF-0081 的「提交推送」——APlayOpus 的库与测试已提交推送
+  （09876ee），本轮把库接进 Demo 应用并已为真机签名构建；**装手机被
+  锁屏挡住，等用户解锁设备**。
+
+### 已成
+- APlay.xcodeproj: 克隆 APlayMidi 加 APlayOpus framework target
+  （product APlayOpus.framework，bundle app.Selfstudio.APlayOpus，
+  依赖 APlay；APlayDemo 的 Frameworks/Embed Frameworks/Resources 加
+  引用与依赖）。pbxproj 用 Python 按唯一锚点插入（工程缩进 tab/0 混用，
+  故逐行复制锚点缩进），plutil -lint OK，xcodebuild -list 见 5 target。
+- APlayDemo: DemoPlayer import APlayOpus，解码链改为
+  Extras.fileDecoder → Midi.decoder → **APlayOpus.decoder** → 默认；
+  adoptTrack 的 nowPlayingAlbum 加 .opus 分支
+  （"APlayOpus · EBML demuxer"）。TrackLibrary 加 DecodeRoute.opus
+  （badge APlayOpus）与 tone.webm/tone.mka 两行；APlayDemo/Samples/
+  放入两夹具（md5 与 MacTests/Fixtures 一致）。
+- xcodebuild -scheme APlayDemo -configuration Debug
+  -destination "generic/platform=iOS" -allowProvisioningUpdates：
+  **BUILD SUCCEEDED**，APlayOpus.framework 已嵌入并随本机团队
+  L5W9FHSX92 签名；app 内含 tone.webm/tone.mka/melody.mid。
+- 已提交并推送 380f250「Wire APlayOpus into the demo so WebM and
+  Matroska play on the device」。
+
+### 阻塞
+- 装机: lincoln-phone（00008130-000E7959262B803A）devicectl 状态
+  unavailable→网络可发现但锁屏，install app 报 4016
+  （RequestedDeviceStates: powerAssertionTaken/
+  coreDeviceServicesLoaded/
+  remoteServiceDiscoveryTrustedConnectivityAvailable；CurrentlyAssertable
+  为空）。pairingState=paired、developerMode=enabled，故**只需用户解锁
+  手机屏幕（或插 USB 线）**，再执行:
+  xcrun devicectl device install app --device 00008130-000E7959262B803A \
+    /Users/lincoln/Library/Developer/Xcode/DerivedData/APlay-gfytkcitxzqwancvzwfeukdqiaqf/Build/Products/Debug-iphoneos/APlayDemo.app
+  随后可选启动:
+  xcrun devicectl device process launch --device <udid> fun.selftsudio.APlayDemo
+
+## SF-0083
+- Revision: 83
+- **Goal d867b7b7 完成度审计通过，结单。**
+
+### 逐项验收（goal 字面 → 实际）
+- codec 子库（照 WavPack 样板: vendored C + wrapper + Package product
+  + hint 表 + 解码/路由测试 + fixture）:
+  APlayWavPack(e4f039b 基线)、APlayVorbis、APlaySpeex、**APlayOpus**
+  （09876ee）、APlayMidi（goal 外附带）——全部提交并推送 origin/master。
+- goal 的「Opus 裸流」前提不成立（无标准裸流格式、ffmpeg 8.0.1 无裸
+  muxer），经用户定夺改为真正的缺口 **Opus-in-WebM/Matroska**
+  （SF-0079 决策），无需 vendoring C（纯 Swift EBML + Core Audio
+  Opus converter）。.opus(OGG)/CAF 由 Core Audio 原生支持，非缺口。
+- 覆盖率: 产品 Swift 80.71% → **91.14%**（≥90% 达成）; APlayOpus
+  100.00%、APlay 90.29%、APlayExtras 88.60%、APlayWavPack 89.38%、
+  APlayVorbis 89.68%、APlaySpeex 93.08%、APlayMidi 93.68%。
+- 测试: 232 → **326**，全绿。
+- 排除项 AC-4/TrueHD/WMA/ATRAC/DSD/MIDI-SF2 未动（MIDI 已超额完成）。
+
+### 遗留（非 goal 项）
+- 装机: lincoln-phone 仍 unavailable（未插 USB/不在同网段）。
+  app 已签名构建完毕，插 USB 即可:
+  xcrun devicectl device install app --device 00008130-000E7959262B803A \
+    ~/Library/Developer/Xcode/DerivedData/APlay-gfytkcitxzqwancvzwfeukdqiaqf/Build/Products/Debug-iphoneos/APlayDemo.app

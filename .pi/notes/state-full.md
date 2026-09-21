@@ -2075,3 +2075,9 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   `.revision("<commit>")` 验证 release 打包有声，再回 2.1.1。
 - kumone 的 release 打包: `bash Scripts/build-app.sh release`
   （已验证脚本可跑通，产物 .build/app/Kumone.app）。
+
+### 闭环确认（2026-09-21）
+- 用户在 kumone-tca 的 release 打包产物 .build/app/Kumone.app 里点歌，
+  **亲耳确认有声音**。原始问题「release -O 打包后播放不了」彻底闭环。
+- kumone-tca 的 Package.resolved 已升至 2.1.1/ce911a3（其工作区改动，
+  由用户自行提交；APlay 侧不碰）。

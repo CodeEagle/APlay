@@ -2124,3 +2124,16 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   EBML 解复用 + AudioConverter）在 -O 下也正常，未藏新的 release-only bug。
 - swift test 326/326 passed 0 failures。
 - 用户已确认 release mp3 有声（SF-0085）；release midi 待用户确认。
+
+## SF-0087
+- Revision: 87
+- 取代: SF-0086「Open」——修复已提交发版，闭环。
+- v2.1.2 交付完成:
+  - commit a0933c0 `fix(composer): announce duration on first decoded audio`
+    （Composer.swift / MacPlayback/main.swift / Package.swift + state）。
+  - tag v2.1.2 已推远端（ls-remote 确认 a0933c0）。
+  - gh release create v2.1.2 完成: https://github.com/CodeEagle/APlay/releases/tag/v2.1.2
+  - 提交前 swift build 通过（debug）。SF-0086 的 326/326 与 7 格式端到端
+    验收是在同一棵工作树上跑的，提交未改代码内容。
+- 残留: release midi 有声仍待用户确认（手机不在本网段，装机挂起）。
+  确认后此条即可彻底关闭；若无声，回到 SF-0086 排查装配路径。

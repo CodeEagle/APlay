@@ -113,11 +113,16 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
         return UnsafeMutablePointer.uint8Pointer(of: size)
     }()
 
-    private lazy var audioBufferList: AudioBufferList = {
-        let buf = AudioBuffer()
-        var list = AudioBufferList(mNumberBuffers: 1, mBuffers: buf)
-        return list
-    }()
+    /// The AudioBufferList handed to `AVAudioEngine`'s manual rendering input
+    /// block.
+    ///
+    /// `withUnsafePointer(to: &someProperty)` only promises the pointer for the
+    /// duration of the call, but the engine reads the returned list *after* the
+    /// input block returns. Under optimization the compiler is free to hand back
+    /// the address of a temporary, so the render would pull freed/reused memory
+    /// and emit silence — an output-only, Release-only failure. The list is kept
+    /// on stable, object-owned storage instead.
+    fileprivate let _inputBufferList: UnsafeMutablePointer<AudioBufferList> = .allocate(capacity: 1)
 
     private var _player: AudioUnit? = {
         #if os(OSX)
@@ -143,6 +148,7 @@ final class APlayer: PlayerCompatible, @unchecked Sendable {
     private unowned let _config: ConfigurationCompatible
 
     deinit {
+        _inputBufferList.deallocate()
         debug_log("\(self) \(#function)")
     }
 
@@ -320,13 +326,14 @@ extension APlayer {
                     totalReadFrame = readSize / bytesPerFrame
                     memset(sself._buffers.advanced(by: Int(readSize)), 0, Int(size - readSize))
                 }
-                sself.audioBufferList.mBuffers.mData = UnsafeMutableRawPointer(sself._buffers)
-                sself.audioBufferList.mBuffers.mNumberChannels = sself.asbd.mChannelsPerFrame
-                sself.audioBufferList.mBuffers.mDataByteSize = size
+                sself._inputBufferList.pointee.mNumberBuffers = 1
+                sself._inputBufferList.pointee.mBuffers.mNumberChannels = sself.asbd.mChannelsPerFrame
+                sself._inputBufferList.pointee.mBuffers.mDataByteSize = size
+                sself._inputBufferList.pointee.mBuffers.mData = UnsafeMutableRawPointer(sself._buffers)
 
                 let progress = sself._progress + Float(totalReadFrame)
                 sself._progressLock.lock(); sself._progress = progress; sself._progressLock.unlock()
-                return withUnsafePointer(to: &sself.audioBufferList, { $0 })
+                return UnsafePointer(sself._inputBufferList)
             }
 
             _engine.prepare()

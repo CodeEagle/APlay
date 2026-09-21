@@ -219,12 +219,29 @@ plays through the optional `APlayMidi` library above.
 
 ✅ Known issue (fixed)
 ---
-Earlier releases could only run in `DEBUG` mode: with optimization enabled (`-O`) the decode
-loop would stall. The root cause was a set of dangling pointers around the audio converter —
-`outDataPacketDescription` pointed at a stack-local `AudioStreamPacketDescription` that the
-converter dereferences *after* the input callback returns, and the decode/output buffers were
-handed to Core Audio through unscoped `inout` references. These are now backed by stable,
-object-owned storage and scoped pointer access, so optimized `Release` builds work correctly.
+Earlier releases could only run in `DEBUG` mode: with optimization enabled (`-O`) the audio
+path would go silent. Two separate pointer-lifetime bugs were involved, both invisible in
+`Debug` and both only reproducible in an optimized build:
+
+1. **The decode loop** (fixed in 2.1.0): `outDataPacketDescription` pointed at a stack-local
+   `AudioStreamPacketDescription` that the audio converter dereferences *after* the input
+   callback returns, and the decode/output buffers were handed to Core Audio through unscoped
+   `inout` references. These are backed by stable, object-owned storage and scoped pointer
+   access.
+2. **The render loop** (fixed after 2.1.0 — the residual `-O` silence): the
+   `AVAudioEngine` manual-rendering input block returned its `AudioBufferList` via
+   `withUnsafePointer(to: &property)`. That API only guarantees the pointer for the *duration
+   of the call*, but the engine reads the returned list *after* the block returns. Under `-O`
+   the compiler is free to hand back the address of a temporary, so the render pulled
+   freed/reused memory and emitted silence — `AudioOutputUnitStart` succeeded, the decode
+   buffers were full, playback state reported `.playing`, and not a sample reached the
+   output. The list is now stable, object-owned storage (`_inputBufferList`) that outlives the
+   render.
+
+Both are the same class of bug — a Core Audio/AVFoundation pointer escaping the scope that
+owns it — and both only surfaced once the optimizer stopped keeping temporaries alive by
+accident. If playback is silent in a `Release` build again, look for a pointer crossing an
+API boundary before checking anything else.
 
 > ℹ️ Plain `http://` streams: iOS blocks non-HTTPS URLs via App Transport Security by default.
 > If your stream URL is `http://...`, add an `NSAllowsArbitraryLoads` (or a per-domain) exception

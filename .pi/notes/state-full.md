@@ -1962,3 +1962,116 @@ HttpInfo 的状态码处理语义（实现改为读 HTTPURLResponse）。
   app 已签名构建完毕，插 USB 即可:
   xcrun devicectl device install app --device 00008130-000E7959262B803A \
     ~/Library/Developer/Xcode/DerivedData/APlay-gfytkcitxzqwancvzwfeukdqiaqf/Build/Products/Debug-iphoneos/APlayDemo.app
+
+## SF-0084
+- Revision: 84
+- 用户问「看下上一级的 iOS remote 的 skill，找下为啥机器连不上」——
+  **该 skill 未找到**；同时记录连不上的诊断事实。
+
+### skill 检索结果（皆无 ios-remote）
+- 已查: ~/.agents/skills（pi 的 16 个 skill，无）、~/.claude/skills
+  （asc-* 全家 + xcode-* 全家，无）、/Users/lincoln/Develop/GitHub/skills
+  （**即「上一级」的 skills 仓库**: manifest.json + common/skills +
+  skills/ + plugins/，无 ios/remote 名；grep devicectl/真机/device
+  install 仅命中 asc-crash-triage 一条）、~/.pi/posthorse-agent/
+  settings.json（skills 配置只排除 handoff；packages 无 ios）、
+  ~/.claude/plugins marketplace 缓存（无）、~/.iflow / ~/.agenthub /
+  ~/everything-claude-code（无）。
+- 结论: 本机无名为 ios-remote / iOS remote 的 skill。可能用户记忆有误、
+  在别的机器、或指 asc-xcode-build / asc-testflight-orchestration 之一
+  （皆不含无线装机排障）。**待用户指明确切路径或名称。**
+
+### 连不上的诊断事实（devicectl，可复用）
+- lincoln-phone=00008130-000E7959262B803A: pairingState=**paired**、
+  developerMode=**enabled**（mode 1）、iOS 27.0 build 24A435、iPhone16,2
+  → 配对与开发者模式正常，不是信任问题。
+- devicectl list 状态 **unavailable**；install app 报 4016:
+  RequestedDeviceStates = powerAssertionTaken /
+  coreDeviceServicesLoaded /
+  remoteServiceDiscoveryTrustedConnectivityAvailable，
+  CurrentlyAssertableStates = ()（空）。
+- DNS: lincoln-phone.local 与 lincoln-phone.coredevice.local
+  **都解析失败** → 设备不在 Mac 可达的同一网段（或未连 Wi-Fi）。
+- Mac 网络: en0=192.168.6.141（有线）、en1=192.168.10.240；
+  en0 is not a Wi-Fi interface（无 Wi-Fi 接口）。
+- USB: system_profiler SPUSBDataType 无 iPhone → **没插线**。
+- 判定: 无线 CoreDevice 通路需设备解锁+同网段+已配对（配对✅），当前
+  缺「同网段可达」；USB 未接。→ 二选一: 插 USB 线（最稳），或把手机
+  连到 Mac 所在网段并解锁。
+
+### 装机待命（app 已备）
+- 路径: /Users/lincoln/Library/Developer/Xcode/DerivedData/APlay-gfytkcitxzqwancvzwfeukdqiaqf/Build/Products/Debug-iphoneos/APlayDemo.app
+  （BUILD SUCCEEDED；APlayOpus.framework 已嵌入签名；含 tone.webm/
+  tone.mka；bundle fun.selftsudio.APlayDemo）
+- 命令: xcrun devicectl device install app --device 00008130-000E7959262B803A <app>
+  可选启动: xcrun devicectl device process launch --device <udid> fun.selftsudio.APlayDemo
+
+## SF-0085
+- Revision: 85
+- 取代: SF-0084 的装机待命状态（任务挂起，手机不在本网段）。
+
+### 任务切换
+- 用户改派: 兄弟目录 kumone-tca（TCA 重写版，依赖 APlay 2.1.0）
+  报「release -O 打包后播放不了」，判断为 APlay 的 known issue。
+- 结论: 用户判断正确，但 known issue 的描述要修正——README 原先只记了
+  decode loop 的 dangling pointer（2.1.0 已修），**还残留第二处**:
+  AVAudioEngine manual rendering inputBlock 返回的 AudioBufferList
+  指针生存期不足。修完 release 恢复有声。
+
+### 根因（确证，release-only 无声）
+- 现象: swift build -c release 的 APlayMacPlayback 播真实文件，
+  状态到 .playing、decode buffer 满、playback 时间推进，
+  但**扬声器无声**；同一文件 debug 正常。mp3/m4a 表现一致（之前
+  误以为「m4a 有声 mp3 无声」是用户听觉/系统状态差异，探针证明两者
+  engine 输出在 release 下都是静音）。
+- 链路定位（探针逐步排除）:
+  1. inputBlock 闭包里 _buffers 的 rms 有效（4000–9000）→ decode 与
+     ring buffer 数据正常。
+  2. AudioUnit 的 renderCallback **被调用**（frames≈470），
+     AudioOutputUnitStart=0，_renderBlock 非 nil，state=running。
+  3. renderCallback 里绕过 engine 直接写方波 → **有声音** →
+     AU 输出链本身是通的。
+  4. engine 渲染输出 rms: debug 9004/6435/2203 有效，release 恒 0。
+- 根因: `APlayer.setup()` 的 inputBlock 原先用
+  `withUnsafePointer(to: &sself.audioBufferList, { $0 })` 返回
+  AudioBufferList 指针。withUnsafePointer 只保证指针在**调用期间**
+  有效；而 AVAudioEngine manual rendering 在 inputBlock **返回之后**
+  才读该 list。-O 下编译器合法地把临时拷贝的地址交出去，engine 读到
+  已失效/被复用的内存 → 静音。debug 下编译器恰好让临时存储存活，
+  所以不可复现。
+- 与 2.1.0 修的那处是**同一类 bug**（指针逃出拥有它的作用域），
+  只是位置在 render 侧而非 decode 侧。
+
+### 修复（APlayer.swift）
+- 新增 `fileprivate let _inputBufferList:
+  UnsafeMutablePointer<AudioBufferList> = .allocate(capacity: 1)`
+  （稳定、对象拥有的存储），deinit 里 `_inputBufferList.deallocate()`。
+- inputBlock 填 `_inputBufferList.pointee`（mNumberBuffers=1、
+  mChannels/mDataByteSize/mData 指向 _buffers）并
+  `return UnsafePointer(sself._inputBufferList)`。
+- 删掉废弃的 `private lazy var audioBufferList: AudioBufferList`。
+- README「Known issue (fixed)」段重写为两处修复并列，说明第二处。
+
+### 验证
+- release APlayMacPlayback: /tmp/kumone-fixture.mp3（用户提供真实
+  mp3，210s）PASS、APlayDemo/a.m4a（AAC 137s）PASS、
+  /tmp/aac-2ch.m4a PASS；用户亲耳确认修复后**有声音**。
+- swift test: 326/326 passed, 0 failures（21.98s）。
+- 未动覆盖率口径；未重跑 coverage（纯指针生存期修复，不改逻辑）。
+
+### 残留（非本次问题，备忘）
+- MacTests/Fixtures 的合成 tone-alac.m4a / tone-mp4.mp4 /
+  tone-opus.ogg / melody.mid 在 APlayMacPlayback 仍 FAIL:
+  它们缺 bitrate，`.duration` 事件不发，Recorder 干等超时；
+  但音频实际在播（NowPlayingInfo 的 ElapsedPlaybackTime 推进）。
+  属 fixture 元数据/验收条件问题，不是播放 bug。真实文件与
+  afconvert 转的 m4a 全 PASS。
+
+### kumone-tca 取修复的方式
+- 它 `.package(url: CodeEagle/APlay.git, from: "2.1.0")`。
+  修复在 master，需打新 tag（建议 2.1.1）并发 GitHub Release，
+  kumone 端 Package.resolved 才会升上来。本地可先直接测:
+  在 kumone-tca 里把依赖临时改 `.branch("master")` 或
+  `.revision("<commit>")` 验证 release 打包有声，再回 2.1.1。
+- kumone 的 release 打包: `bash Scripts/build-app.sh release`
+  （已验证脚本可跑通，产物 .build/app/Kumone.app）。

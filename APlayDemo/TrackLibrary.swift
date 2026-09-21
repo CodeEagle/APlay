@@ -19,12 +19,16 @@ enum DecodeRoute: String, Hashable, Sendable {
     /// Rendered by `APlayMidi` through a SoundFont — a `.mid` is a note
     /// sequence, not an audio stream, so there is nothing to decode.
     case midi = "APlayMidi · SoundFont sampler"
+    /// Demuxed by `APlayOpus` — Core Audio has the Opus codec but no parser
+    /// for the EBML container, so the track is pulled apart in Swift.
+    case opus = "APlayOpus · EBML demuxer"
 
     var badge: String {
         switch self {
         case .native: return "APlay"
         case .fileFallback: return "APlayExtras"
         case .midi: return "APlayMidi"
+        case .opus: return "APlayOpus"
         }
     }
 }
@@ -61,7 +65,8 @@ enum TrackLibrary {
 
     /// All local samples, ordered as the demo plays them. The containers the
     /// streaming decoder cannot open come last so their badges land right after
-    /// the native ones — first the `APlayExtras` rows, then the MIDI sequence.
+    /// the native ones — the `APlayExtras` rows, then the EBML ones, then the
+    /// MIDI sequence.
     static let local: [Track] = [
         Track(resourceName: "a", resourceType: "m4a",
               format: "AAC · M4A",
@@ -113,6 +118,15 @@ enum TrackLibrary {
               format: "CAF",
               detail: "Core Audio Format, also routed via APlayExtras.",
               route: .fileFallback, isShowcase: false),
+
+        Track(resourceName: "tone", resourceType: "webm",
+              format: "Opus · WebM",
+              detail: "Opus inside the EBML container — Core Audio has the codec but no parser for it.",
+              route: .opus, isShowcase: false),
+        Track(resourceName: "tone", resourceType: "mka",
+              format: "Opus · Matroska",
+              detail: "The same container carrying scripted tags, demuxed and decoded in Swift.",
+              route: .opus, isShowcase: false),
 
         Track(resourceName: "melody", resourceType: "mid",
               format: "MIDI",

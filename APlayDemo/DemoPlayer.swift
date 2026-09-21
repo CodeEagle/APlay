@@ -14,6 +14,7 @@
 import APlay
 import APlayExtras
 import APlayMidi
+import APlayOpus
 import Combine
 import UIKit
 
@@ -270,6 +271,7 @@ final class DemoPlayer: ObservableObject {
     /// and so the demo can badge those rows with the route that serves them.
     /// `APlayMidi` sits one step further in: a `.mid` is a note sequence, not
     /// an audio stream, so it is rendered through the bundled SoundFont.
+    /// `APlayOpus` takes the WebM/Matroska rows Core Audio has no parser for.
     private static func makeConfig(gapless: Bool, logSink: ((String) -> Void)?) -> APlay.Configuration {
         let soundfont = Bundle.main.url(forResource: "APlayTestSine", withExtension: "sf2")
         return APlay.Configuration(
@@ -282,12 +284,13 @@ final class DemoPlayer: ObservableObject {
                 DemoLogger(policy: policy, sink: logSink ?? { _ in })
             },
             audioDecoderBuilder: APlayExtras.fileDecoder(fallback: APlayMidi.decoder(
-                fallback: { config in
-                    // A fresh default configuration is the only public way to reach
-                    // the built-in decoder builder; building one here also keeps the
-                    // chain from recursing into this router.
-                    APlay.Configuration().audioDecoderBuilder(config)
-                },
+                fallback: APlayOpus.decoder(
+                    fallback: { config in
+                        // A fresh default configuration is the only public way to reach
+                        // the built-in decoder builder; building one here also keeps the
+                        // chain from recursing into this router.
+                        APlay.Configuration().audioDecoderBuilder(config)
+                    }),
                 soundfont: .init(url: soundfont)))
         )
     }
@@ -458,7 +461,8 @@ final class DemoPlayer: ObservableObject {
         nowPlayingArtist = track.format
         nowPlayingAlbum = track.route == .native
             ? "APlay · native decoder"
-            : track.route == .midi ? "APlayMidi · SoundFont sampler" : "APlayExtras · ExtAudioFile"
+            : track.route == .midi ? "APlayMidi · SoundFont sampler"
+            : track.route == .opus ? "APlayOpus · EBML demuxer" : "APlayExtras · ExtAudioFile"
         let seed = track.resourceName + "." + track.resourceType
         cover = CoverArt.image(forSeed: seed)
         coverPalette = CoverArt.palette(forSeed: seed)

@@ -138,13 +138,21 @@ final class MidiDecoderTests: XCTestCase {
                       "the track should render before pausing")
 
         decoder.pause()
-        let paused = collector.totalBytes
-        // Paused means the render timer is suspended: a brief wait must not add PCM.
+        // `pause()` suspends the render timer on the decode queue, but a tick
+        // already queued there can still land in the collector after it
+        // returns — drain that in-flight PCM, then prove no more arrives.
+        var drained = collector.totalBytes
+        for _ in 0..<20 {
+            Thread.sleep(forTimeInterval: 0.05)
+            if collector.totalBytes == drained { break }
+            drained = collector.totalBytes
+        }
         Thread.sleep(forTimeInterval: 0.2)
-        XCTAssertEqual(collector.totalBytes, paused, "a paused decoder must keep rendering")
+        XCTAssertEqual(collector.totalBytes, drained,
+                       "a paused decoder must stop rendering")
 
         decoder.resume()
-        XCTAssertTrue(wait(for: collector, minBytes: paused + 20_000),
+        XCTAssertTrue(wait(for: collector, minBytes: drained + 20_000),
                       "a resumed decoder must keep rendering")
         decoder.destroy()
         XCTAssertTrue(collector.errors.isEmpty)

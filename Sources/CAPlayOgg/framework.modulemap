@@ -1,0 +1,5 @@
+framework module CAPlayOgg {
+    header "ogg.h"
+    header "os_types.h"
+    export *
+}

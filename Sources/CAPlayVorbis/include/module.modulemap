@@ -1,0 +1,6 @@
+module CAPlayVorbis {
+    header "vorbis/codec.h"
+    header "vorbis/vorbisenc.h"
+    header "vorbis/vorbisfile.h"
+    export *
+}

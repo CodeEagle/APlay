@@ -15,6 +15,9 @@
 import APlay
 import APlayMidi
 import APlayOpus
+import APlaySpeex
+import APlayVorbis
+import APlayWavPack
 import Foundation
 
 /// Resolves the sample asset: first CLI argument, else `<package-root>/APlayDemo/a.m4a`.
@@ -76,6 +79,12 @@ final class Recorder {
             switch ext {
             case "webm", "mka":
                 builder = APlayOpus.decoder(fallback: base.audioDecoderBuilder)
+            case "wv":
+                builder = APlayWavPack.decoder(fallback: base.audioDecoderBuilder)
+            case "ogg":
+                builder = APlayVorbis.decoder(fallback: base.audioDecoderBuilder)
+            case "spx":
+                builder = APlaySpeex.decoder(fallback: base.audioDecoderBuilder)
             case "mid", "midi", "kar":
                 let sf2 = url.deletingLastPathComponent()
                     .appendingPathComponent("APlayTestSine.sf2")

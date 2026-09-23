@@ -71,6 +71,133 @@
 		A5E0A5000000000000002303 /* APlayMidi.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000002001 /* APlayMidi.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A5E0A5000000000000003201 /* melody.mid in Resources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000003101 /* melody.mid */; };
 		A5E0A5000000000000003202 /* APlayTestSine.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = A5E0A5000000000000003102 /* APlayTestSine.sf2 */; };
+		55D3842F3C884C2D8EAC53D4 /* tone.ogg in Resources */ = {isa = PBXBuildFile; fileRef = F94C045DF9094A5D836D307F /* tone.ogg */; };
+		5464FFDD72804DAA95B9EC66 /* tone.wv in Resources */ = {isa = PBXBuildFile; fileRef = 86C6420E46E04909B32541C6 /* tone.wv */; };
+		8F3FFBA3F4E34B6F9C1602DD /* tone.spx in Resources */ = {isa = PBXBuildFile; fileRef = 0C025F40E8D242479302E31E /* tone.spx */; };
+		724B9F0097C74172B70067A8 /* bitwise.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BFBD4F1C54E442DB87CC134 /* bitwise.c */; };
+		50DD9B1657E24265823C7306 /* framing.c in Sources */ = {isa = PBXBuildFile; fileRef = 925D4AB87467471C84B1F0D1 /* framing.c */; };
+		0BEFE3B8236B467681F3FEFB /* ogg.h in Headers */ = {isa = PBXBuildFile; fileRef = 6310D1F3A4084473A330BFE5 /* ogg.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		9FE67E0F838C459BBFD4BEB6 /* os_types.h in Headers */ = {isa = PBXBuildFile; fileRef = 5EF85327AD4B4F92A5C10F8E /* os_types.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		E25C3896E3864617BCB62BAD /* CAPlayOgg.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */; };
+		4498ECAF7E9842D5B4091E93 /* CAPlayOgg.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		74DC62F644424CF59863C9D3 /* common_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = 678F24C77D1A4597981A1541 /* common_utils.c */; };
+		14F8342BB64E4B51AC891855 /* decorr_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = 1C8C060115B2480BA4BE584D /* decorr_utils.c */; };
+		6D9610DEF3C34392B5F01C0F /* entropy_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = D73BEBD018054AF2848A4AFF /* entropy_utils.c */; };
+		E4F249D1B722495F9F4D466D /* extra1.c in Sources */ = {isa = PBXBuildFile; fileRef = 290ED7CFE0904DE9A233AD71 /* extra1.c */; };
+		CCD01D2FDD674FD7B04C0CDF /* extra2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6DF6835A7EA24D09A8DDCD6B /* extra2.c */; };
+		10EE38722E7F457D856EC7F2 /* open_filename.c in Sources */ = {isa = PBXBuildFile; fileRef = 894862175A5646BCAF7A2266 /* open_filename.c */; };
+		423B7A7CCF47443E9EF5AE1C /* open_legacy.c in Sources */ = {isa = PBXBuildFile; fileRef = 43CA9B29C90D4892BCA2BC76 /* open_legacy.c */; };
+		323E201B618A4294B62933ED /* open_raw.c in Sources */ = {isa = PBXBuildFile; fileRef = 030FA38529584E3994C7D780 /* open_raw.c */; };
+		592E3F99A94E4EFB9DFD8865 /* open_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = BB35BC8651754D619A4D458B /* open_utils.c */; };
+		F02C51A948634676B588D09E /* pack.c in Sources */ = {isa = PBXBuildFile; fileRef = B13836BF11E149DE831930CF /* pack.c */; };
+		5905F6C321A147618C56466F /* pack_dns.c in Sources */ = {isa = PBXBuildFile; fileRef = 0BD1DCF6394647F1885B2820 /* pack_dns.c */; };
+		BB28EF16B06A41F7A36EBF88 /* pack_dsd.c in Sources */ = {isa = PBXBuildFile; fileRef = 9C03569927E24883B2084609 /* pack_dsd.c */; };
+		837CB85B636F4856BA949F0A /* pack_floats.c in Sources */ = {isa = PBXBuildFile; fileRef = 56CD1FF5D36D49FF81A88E51 /* pack_floats.c */; };
+		16FC1B1E0BA741ADB9FA9213 /* pack_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = B8E11AD5A85449DDAFA4FE7E /* pack_utils.c */; };
+		2CA379E3276E4E2BBB5328B1 /* read_words.c in Sources */ = {isa = PBXBuildFile; fileRef = 7BBD6E96FCBD4BBDB0DE8E82 /* read_words.c */; };
+		0E73C367DFEC465B9E7D8533 /* tag_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = CD1F8024D35C47AF8ADF86C5 /* tag_utils.c */; };
+		8F1005EB23594370892070EF /* tags.c in Sources */ = {isa = PBXBuildFile; fileRef = BC1357BC46074EEBADA938F6 /* tags.c */; };
+		4960BC30C8DE410DB00E5B12 /* unpack.c in Sources */ = {isa = PBXBuildFile; fileRef = A517DEB95746431C805D585A /* unpack.c */; };
+		DB3CCFCFDCD248F0BF970A9D /* unpack3.c in Sources */ = {isa = PBXBuildFile; fileRef = D3BFE1C7B3DE4D96B865A9A3 /* unpack3.c */; };
+		A38366E3F5CA4B82A1B5F6C7 /* unpack3_open.c in Sources */ = {isa = PBXBuildFile; fileRef = BDEC84A148B54932929BCB27 /* unpack3_open.c */; };
+		AE9D76DA7C04427F89F9117F /* unpack3_seek.c in Sources */ = {isa = PBXBuildFile; fileRef = C61EDB7DEB994485A2F409F5 /* unpack3_seek.c */; };
+		127DEC0D801448099EDAB2B3 /* unpack_dsd.c in Sources */ = {isa = PBXBuildFile; fileRef = E54DDBC565BD4846A1724EB4 /* unpack_dsd.c */; };
+		AEB5FD449C2A4751A0C164DF /* unpack_floats.c in Sources */ = {isa = PBXBuildFile; fileRef = EBB9338A7A2A426BBA2ABF2D /* unpack_floats.c */; };
+		73976B33D92F4A2BB0D92B24 /* unpack_seek.c in Sources */ = {isa = PBXBuildFile; fileRef = EF74472BD8214BF4B48162C4 /* unpack_seek.c */; };
+		8ECB7774805D47B299F4705A /* unpack_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = 06AA3FF215554E1B860526C2 /* unpack_utils.c */; };
+		611DC381BFFE493C8ADFEA04 /* write_words.c in Sources */ = {isa = PBXBuildFile; fileRef = 93FB49B51F874158A7E352C3 /* write_words.c */; };
+		F59CE9F51DF04EBE9BFD4D49 /* wavpack.h in Headers */ = {isa = PBXBuildFile; fileRef = AC2F67AEFBB9411D93468715 /* wavpack.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		95EA922B9B524A4F9770F843 /* CAPlayWavPack.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FECA328E81A34A72ADBD8F53 /* CAPlayWavPack.framework */; };
+		6AAED21FE2EF470F9942DF12 /* CAPlayWavPack.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FECA328E81A34A72ADBD8F53 /* CAPlayWavPack.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		BE84C97D38F047DD9471EDCB /* analysis.c in Sources */ = {isa = PBXBuildFile; fileRef = 14A9EAD2D3B347868BEBD574 /* analysis.c */; };
+		7037F3B3F897489D842E197B /* bitrate.c in Sources */ = {isa = PBXBuildFile; fileRef = 6ECFFC20ABF44BBCAB141D01 /* bitrate.c */; };
+		748A09F2B67B4BA0BD114AA3 /* block.c in Sources */ = {isa = PBXBuildFile; fileRef = D59575C532834B2287B1C2B6 /* block.c */; };
+		178E5C0D2A564B1E80181042 /* codebook.c in Sources */ = {isa = PBXBuildFile; fileRef = B0629F880D5844EE8D6B9A3C /* codebook.c */; };
+		4C8C1628B362463CA8C872D2 /* envelope.c in Sources */ = {isa = PBXBuildFile; fileRef = A742225574704165A22BADEA /* envelope.c */; };
+		9BA050C6734E416FBAB4CCCC /* floor0.c in Sources */ = {isa = PBXBuildFile; fileRef = 85309599284A4E318A4D0E0E /* floor0.c */; };
+		FF1D6BB689614556A7600A2D /* floor1.c in Sources */ = {isa = PBXBuildFile; fileRef = D8D52DCED9054653B57540AB /* floor1.c */; };
+		1F99BB5F09274611B14B037B /* info.c in Sources */ = {isa = PBXBuildFile; fileRef = 2E8C53EDAE0C48BCBB810F66 /* info.c */; };
+		02BAC5B0AE9D45D793BEDD25 /* lookup.c in Sources */ = {isa = PBXBuildFile; fileRef = C4A9C69C76A34F389348001D /* lookup.c */; };
+		EEAFDC9849A8424DAAD5FCDC /* lpc.c in Sources */ = {isa = PBXBuildFile; fileRef = 5BA38BE86F3144E1B365721F /* lpc.c */; };
+		B4339C02ACF14FEBA1022975 /* lsp.c in Sources */ = {isa = PBXBuildFile; fileRef = 2884DE0CB6F54AA28D68457A /* lsp.c */; };
+		8A4DAD85BD8A40B78603521F /* mapping0.c in Sources */ = {isa = PBXBuildFile; fileRef = 7DC46D8627BD40E5A290B24F /* mapping0.c */; };
+		0F3D4D7C3A064A7F8D1C9C8B /* mdct.c in Sources */ = {isa = PBXBuildFile; fileRef = A070B66E04A9450CAADDE9BD /* mdct.c */; };
+		7D48B35C457B4C668DC41D9F /* misc.c in Sources */ = {isa = PBXBuildFile; fileRef = 1B9B65D326EE4586934D7D35 /* misc.c */; };
+		92FC1097769B451D90352CA8 /* psy.c in Sources */ = {isa = PBXBuildFile; fileRef = 16CF3405523541CE9014056F /* psy.c */; };
+		BC5F98DC37CF47AAA8B127FF /* registry.c in Sources */ = {isa = PBXBuildFile; fileRef = 91BE3E6A56EE4F94A3F9C9F6 /* registry.c */; };
+		6D7FD17B15924A70BD016011 /* res0.c in Sources */ = {isa = PBXBuildFile; fileRef = 514D0AC7F75D4EB2AB159325 /* res0.c */; };
+		850D836712884D0AAEDA793B /* sharedbook.c in Sources */ = {isa = PBXBuildFile; fileRef = 9630357B1ED04501A4985ED2 /* sharedbook.c */; };
+		F639A626F47A4BF28C3D3980 /* smallft.c in Sources */ = {isa = PBXBuildFile; fileRef = 1755558A314E4F0DA2F789D6 /* smallft.c */; };
+		B2678EB4B34D40D7BF79073E /* synthesis.c in Sources */ = {isa = PBXBuildFile; fileRef = 6F1645853D6A4EC1B4B90C17 /* synthesis.c */; };
+		EB8F951FA6A84EE38C2F81AB /* vorbisfile.c in Sources */ = {isa = PBXBuildFile; fileRef = 7DCAD92E07C44AB983DF40F7 /* vorbisfile.c */; };
+		5C5483A0FEBF464B93E7730E /* window.c in Sources */ = {isa = PBXBuildFile; fileRef = EB19DA821DD7472191CC40CC /* window.c */; };
+		0FFE0A8DAA084004829E1617 /* codec.h in Headers */ = {isa = PBXBuildFile; fileRef = C26320143F574ACFA12309C2 /* codec.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		7D600BF10DD744FDA81247EA /* vorbisenc.h in Headers */ = {isa = PBXBuildFile; fileRef = 3EB98840DF1C4AE89BE50345 /* vorbisenc.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		A76C694CE2224FFD8018610B /* vorbisfile.h in Headers */ = {isa = PBXBuildFile; fileRef = 611A32E504E84FB9A6783701 /* vorbisfile.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */; };
+		7BB042A10E6D4EF1964F1759 /* CAPlayVorbis.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4807BAF0714E47DA9E9AF204 /* CAPlayVorbis.framework */; };
+		6F02620D35D64A7ABB1666BA /* CAPlayVorbis.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4807BAF0714E47DA9E9AF204 /* CAPlayVorbis.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E1B757E0600A44838588C229 /* bits.c in Sources */ = {isa = PBXBuildFile; fileRef = 032E321CA91B4A2EB4ACA4A2 /* bits.c */; };
+		F21B61684B844DD0A3003C2F /* cb_search.c in Sources */ = {isa = PBXBuildFile; fileRef = 81BC0B1E777E471281FC7986 /* cb_search.c */; };
+		08EFED075472477F9081F056 /* exc_10_16_table.c in Sources */ = {isa = PBXBuildFile; fileRef = D8AE82DAE07B4CD78DDC83C9 /* exc_10_16_table.c */; };
+		C1CCD1CCA16649B1872589F7 /* exc_10_32_table.c in Sources */ = {isa = PBXBuildFile; fileRef = CBFEB64B5E3C48D797A713E2 /* exc_10_32_table.c */; };
+		B078C4EB8F8446059B62C6EF /* exc_20_32_table.c in Sources */ = {isa = PBXBuildFile; fileRef = 0AAA1CD70D8B4A6DBC27F4AD /* exc_20_32_table.c */; };
+		E5C9F80C956849A1BDD6F561 /* exc_5_256_table.c in Sources */ = {isa = PBXBuildFile; fileRef = 92947300C3C040E7BF499A81 /* exc_5_256_table.c */; };
+		29AC973729DE4B9EA15AD9FA /* exc_5_64_table.c in Sources */ = {isa = PBXBuildFile; fileRef = BBE17BAD8B6848F1AA36F3ED /* exc_5_64_table.c */; };
+		F4F11A042CA44A4F913A27B1 /* exc_8_128_table.c in Sources */ = {isa = PBXBuildFile; fileRef = 19E9A14030934FD092648A3F /* exc_8_128_table.c */; };
+		4100A904F27E45B6970A1F55 /* fftwrap.c in Sources */ = {isa = PBXBuildFile; fileRef = DB5791061E024CF3B2169CFF /* fftwrap.c */; };
+		E351731B2FBC4B42A8787248 /* filters.c in Sources */ = {isa = PBXBuildFile; fileRef = 9725CD5810494BF5BA8F6C1C /* filters.c */; };
+		D7B8E9F219C541C7900796CD /* gain_table.c in Sources */ = {isa = PBXBuildFile; fileRef = 57CCAF4CA830441DA7BB9093 /* gain_table.c */; };
+		7D56570CEF834C1B86992AF8 /* gain_table_lbr.c in Sources */ = {isa = PBXBuildFile; fileRef = C557E35A31C341C2ADB2A14E /* gain_table_lbr.c */; };
+		73E98BB99C974FE6A508A2DB /* hexc_10_32_table.c in Sources */ = {isa = PBXBuildFile; fileRef = 4620AC2DB12E4A859B012224 /* hexc_10_32_table.c */; };
+		67BC6A7B42054BAA83730DF5 /* hexc_table.c in Sources */ = {isa = PBXBuildFile; fileRef = FAC1A534AA6F40FEB3814D83 /* hexc_table.c */; };
+		52ACEF985E37426AB2A447CF /* high_lsp_tables.c in Sources */ = {isa = PBXBuildFile; fileRef = 7961EBE99D7A45279E3EFA66 /* high_lsp_tables.c */; };
+		A36F2E495D614365BE6867D3 /* kiss_fft.c in Sources */ = {isa = PBXBuildFile; fileRef = E9DB4569F4FF4E399B57F77A /* kiss_fft.c */; };
+		91D6CE6E7B3A42459A1A817C /* kiss_fftr.c in Sources */ = {isa = PBXBuildFile; fileRef = 48EB7FE2E32D403AAD75D4AA /* kiss_fftr.c */; };
+		E569984D6BC64513ABD5E472 /* lpc.c in Sources */ = {isa = PBXBuildFile; fileRef = 5BB8B4B9EC9F45B0A03985D5 /* lpc.c */; };
+		C17C40B62BFB448F94BD9BA2 /* lsp.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7E0B6CC59E4E0CA6B66839 /* lsp.c */; };
+		C87A2E8C874D45B19C7D2DE4 /* lsp_tables_nb.c in Sources */ = {isa = PBXBuildFile; fileRef = F9474BACE37F4EEB8D371B58 /* lsp_tables_nb.c */; };
+		2027CA8486474B03987D6D5C /* ltp.c in Sources */ = {isa = PBXBuildFile; fileRef = 319F3284734E4A959B8B95DD /* ltp.c */; };
+		B991626751CA464FBE4430A3 /* modes.c in Sources */ = {isa = PBXBuildFile; fileRef = 2D31DC1B64BB466189BBC2DF /* modes.c */; };
+		FBB7087B1D744273A7897D77 /* modes_wb.c in Sources */ = {isa = PBXBuildFile; fileRef = 909722DD6F5349088E788078 /* modes_wb.c */; };
+		03D750CDB6FC42DD8ADBB6F2 /* nb_celp.c in Sources */ = {isa = PBXBuildFile; fileRef = 45EE2F8AC49B4A36ADC244F6 /* nb_celp.c */; };
+		77A0931FDA9240709DA64663 /* quant_lsp.c in Sources */ = {isa = PBXBuildFile; fileRef = 71FEFF4DEB08471295D29361 /* quant_lsp.c */; };
+		005CA7203AD94360A7325EA5 /* sb_celp.c in Sources */ = {isa = PBXBuildFile; fileRef = FD32B5463F7C4A3E8B5A2C5A /* sb_celp.c */; };
+		8B8F014E275F407BA7545482 /* smallft.c in Sources */ = {isa = PBXBuildFile; fileRef = 5884F6A505BD434DBEF32486 /* smallft.c */; };
+		2511E8937BF04446A5FBD25C /* speex.c in Sources */ = {isa = PBXBuildFile; fileRef = 6447211889924DD888CF3C85 /* speex.c */; };
+		9F5328EBD8CB4D34B5176CB1 /* speex_callbacks.c in Sources */ = {isa = PBXBuildFile; fileRef = DB94A0C5CCBE4259B61ABB20 /* speex_callbacks.c */; };
+		DE2CB6C64A8B456AB766B921 /* speex_header.c in Sources */ = {isa = PBXBuildFile; fileRef = 43BFB0428D634DFAA3092604 /* speex_header.c */; };
+		48386959F6AC4DAD936299BF /* stereo.c in Sources */ = {isa = PBXBuildFile; fileRef = 6CF94693BBBF4E0E83DAF3DD /* stereo.c */; };
+		AB820258E08F4679906AEC16 /* vbr.c in Sources */ = {isa = PBXBuildFile; fileRef = 5B3650DEBE6A4D638150F724 /* vbr.c */; };
+		EF853A0BCA96432B99AB560B /* vq.c in Sources */ = {isa = PBXBuildFile; fileRef = B54137F51AEF41659D720285 /* vq.c */; };
+		C839BF5D2403418F91005AF6 /* window.c in Sources */ = {isa = PBXBuildFile; fileRef = 41B724DDB8924322A89734AB /* window.c */; };
+		B98137A48EFC4F3CA33DEB1A /* speex.h in Headers */ = {isa = PBXBuildFile; fileRef = 94323524F8E44AD782B6C76A /* speex.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		7E0C11D6176A46DB95243BC1 /* speex_bits.h in Headers */ = {isa = PBXBuildFile; fileRef = B7DD62D29CD643C79BE0A637 /* speex_bits.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		98B231D75F084040816D9882 /* speex_callbacks.h in Headers */ = {isa = PBXBuildFile; fileRef = 9712E79742C24141BB76F802 /* speex_callbacks.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		D477F4C76CFC420F8E1ED357 /* speex_header.h in Headers */ = {isa = PBXBuildFile; fileRef = E570E30DA47A496C8508C508 /* speex_header.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		71E5A5DC9C064376A7C4C993 /* speex_stereo.h in Headers */ = {isa = PBXBuildFile; fileRef = 6884356235E746AAB81E645E /* speex_stereo.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		81828A91920342718AA9A3F0 /* speex_types.h in Headers */ = {isa = PBXBuildFile; fileRef = C964DA405F2A4DFCB4400E92 /* speex_types.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */; };
+		FB42EF9BD86E4BC499FB03D3 /* CAPlaySpeex.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0725CB7967D4DCC9DFD3A34 /* CAPlaySpeex.framework */; };
+		65B8C795D6CE447A98FB803D /* CAPlaySpeex.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = E0725CB7967D4DCC9DFD3A34 /* CAPlaySpeex.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E3492587042A47FBBB53A610 /* APEv2TagParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27468099E97742C8AF5E2978 /* APEv2TagParser.swift */; };
+		245E5C02CCE74178BC9C963F /* WavPackDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2C8B4AA78414E5E9D91FCAC /* WavPackDecoder.swift */; };
+		A56FAE3021034A9E9C99E788 /* APlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91F704DC9AD741BC85C2EBCC /* APlay.framework */; };
+		BFACCA3099A04F8190DC0D7E /* CAPlayWavPack.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FECA328E81A34A72ADBD8F53 /* CAPlayWavPack.framework */; };
+		7AFEBB6A6DCA49B8B564F406 /* APlayWavPack.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 667044F91781492BA2A65E9A /* APlayWavPack.framework */; };
+		36A0F0BD30D5498F8579FBE2 /* APlayWavPack.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 667044F91781492BA2A65E9A /* APlayWavPack.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C585FC26961248BCAC8DDFBD /* VorbisDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253F230468CA45C687AF167D /* VorbisDecoder.swift */; };
+		A56FAE3021034A9E9C99E788 /* APlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91F704DC9AD741BC85C2EBCC /* APlay.framework */; };
+		871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */; };
+		48AE6AC8C69C4843ADA88B27 /* CAPlayVorbis.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4807BAF0714E47DA9E9AF204 /* CAPlayVorbis.framework */; };
+		3DB57BB06E7E40D0BA0E49C8 /* APlayVorbis.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 83D30B7FD2B547A7BB28B2B5 /* APlayVorbis.framework */; };
+		B5DB6CF00CE1475EB65A681A /* APlayVorbis.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 83D30B7FD2B547A7BB28B2B5 /* APlayVorbis.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DCF4253539AC4101B58BBFEC /* SpeexDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B388C2F6DB86417384A31F70 /* SpeexDecoder.swift */; };
+		A56FAE3021034A9E9C99E788 /* APlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91F704DC9AD741BC85C2EBCC /* APlay.framework */; };
+		871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */; };
+		D981579971184814A696B097 /* CAPlaySpeex.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0725CB7967D4DCC9DFD3A34 /* CAPlaySpeex.framework */; };
+		22C265A3B28C4E18A1155BA0 /* APlaySpeex.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FD3837A61B748B19DAC6797 /* APlaySpeex.framework */; };
+		FD3EA5575FD14C39AB83AFA1 /* APlaySpeex.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9FD3837A61B748B19DAC6797 /* APlaySpeex.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		4CA1982280814E49912516D8 /* tone-mp4.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 4824268A22754479BA166437 /* tone-mp4.mp4 */; };
 		322B1BF9C8474BF4A989B6C1 /* tone.m4b in Resources */ = {isa = PBXBuildFile; fileRef = 43E8513F05F1495C8C231B80 /* tone.m4b */; };
 		485571F09E1C47348B233EF1 /* tone-mp2.mp2 in Resources */ = {isa = PBXBuildFile; fileRef = B2F735D6704A43E792F95D1B /* tone-mp2.mp2 */; };
@@ -148,6 +275,125 @@ A5E0A500000000000000120E /* IcyTestServer.swift in Sources */ = {isa = PBXBuildF
 					remoteGlobalIDString = A5E0A5000000000000004501;
 					remoteInfo = APlayOpus;
 		};
+		5E73598B15BF4832BD9D45B1 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = E5DAFC4ACD7E445289ECC600;
+					remoteInfo = CAPlayOgg;
+		};
+		3B457C078EDE4145875A9D01 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = BC7DBC1DDE2D424E82A10AE1;
+					remoteInfo = CAPlayWavPack;
+		};
+		A26C838619274757B92D0CD6 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = E5DAFC4ACD7E445289ECC600;
+					remoteInfo = CAPlayOgg;
+		};
+		8FA70265D65E49DA922011D3 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = EA09DD66E27F46D5AC5D357D;
+					remoteInfo = CAPlayVorbis;
+		};
+		3226DB2D840F460BACD4D89E /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = E5DAFC4ACD7E445289ECC600;
+					remoteInfo = CAPlayOgg;
+		};
+		3AA80C7F386C457D906DE8E1 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 91FF50AECEE64C37925700ED;
+					remoteInfo = CAPlaySpeex;
+		};
+		A27D49096ED5472C80BAD135 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 10F83A8020F3427E00AF8222;
+					remoteInfo = APlay;
+		};
+		8F48B051D45A4FF7AA675140 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = BC7DBC1DDE2D424E82A10AE1;
+					remoteInfo = CAPlayWavPack;
+		};
+		19C0FF77485A48C8BC038AD7 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 2FFF6453D2A643A4829E571A;
+					remoteInfo = APlayWavPack;
+		};
+		60F88A52EFD040E9A00297AA /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 10F83A8020F3427E00AF8222;
+					remoteInfo = APlay;
+		};
+		4CFA9055758447078BBB68C0 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = E5DAFC4ACD7E445289ECC600;
+					remoteInfo = CAPlayOgg;
+		};
+		C6E217B6D23D4B8C959A572D /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = EA09DD66E27F46D5AC5D357D;
+					remoteInfo = CAPlayVorbis;
+		};
+		C3A3BD20AB2D493BA5923454 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 7F4182CE29E347559563F965;
+					remoteInfo = APlayVorbis;
+		};
+		DEC105F9B96B48EEAB591CFC /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 10F83A8020F3427E00AF8222;
+					remoteInfo = APlay;
+		};
+		23DCE96E28E143F19F69A121 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = E5DAFC4ACD7E445289ECC600;
+					remoteInfo = CAPlayOgg;
+		};
+		922E588037DF484C93F40304 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 91FF50AECEE64C37925700ED;
+					remoteInfo = CAPlaySpeex;
+		};
+		E79958F06EB8469B80E88459 /* PBXContainerItemProxy */ = {
+					isa = PBXContainerItemProxy;
+					containerPortal = 10F83A7820F3427D00AF8222 /* Project object */;
+					proxyType = 1;
+					remoteGlobalIDString = 06633798F40747619100ABA7;
+					remoteInfo = APlaySpeex;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -161,7 +407,13 @@ A5E0A500000000000000120E /* IcyTestServer.swift in Sources */ = {isa = PBXBuildF
 				A5E0A5000000000000000303 /* APlayExtras.framework in Embed Frameworks */,
 				A5E0A5000000000000002303 /* APlayMidi.framework in Embed Frameworks */,
 				A5E0A5000000000000004303 /* APlayOpus.framework in Embed Frameworks */,
-			);
+				4498ECAF7E9842D5B4091E93 /* CAPlayOgg.framework in Embed Frameworks */,
+				6AAED21FE2EF470F9942DF12 /* CAPlayWavPack.framework in Embed Frameworks */,
+				6F02620D35D64A7ABB1666BA /* CAPlayVorbis.framework in Embed Frameworks */,
+				65B8C795D6CE447A98FB803D /* CAPlaySpeex.framework in Embed Frameworks */,
+				36A0F0BD30D5498F8579FBE2 /* APlayWavPack.framework in Embed Frameworks */,
+				B5DB6CF00CE1475EB65A681A /* APlayVorbis.framework in Embed Frameworks */,
+				FD3EA5575FD14C39AB83AFA1 /* APlaySpeex.framework in Embed Frameworks */,			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,6 +473,116 @@ A5E0A500000000000000120E /* IcyTestServer.swift in Sources */ = {isa = PBXBuildF
 		A5E0A5000000000000004001 /* APlayOpus.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = APlayOpus.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5E0A5000000000000003101 /* melody.mid */ = {isa = PBXFileReference; lastKnownFileType = file; path = melody.mid; sourceTree = "<group>"; };
 		A5E0A5000000000000003102 /* APlayTestSine.sf2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = APlayTestSine.sf2; sourceTree = "<group>"; };
+		F94C045DF9094A5D836D307F /* tone.ogg */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.ogg; sourceTree = "<group>"; };
+		86C6420E46E04909B32541C6 /* tone.wv */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.wv; sourceTree = "<group>"; };
+		0C025F40E8D242479302E31E /* tone.spx */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.spx; sourceTree = "<group>"; };
+		7BFBD4F1C54E442DB87CC134 /* bitwise.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bitwise.c; sourceTree = "<group>"; };
+		925D4AB87467471C84B1F0D1 /* framing.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = framing.c; sourceTree = "<group>"; };
+		6310D1F3A4084473A330BFE5 /* ogg.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/ogg/ogg.h; sourceTree = "<group>"; };
+		5EF85327AD4B4F92A5C10F8E /* os_types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/ogg/os_types.h; sourceTree = "<group>"; };
+		2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CAPlayOgg.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		678F24C77D1A4597981A1541 /* common_utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = common_utils.c; sourceTree = "<group>"; };
+		1C8C060115B2480BA4BE584D /* decorr_utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = decorr_utils.c; sourceTree = "<group>"; };
+		D73BEBD018054AF2848A4AFF /* entropy_utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = entropy_utils.c; sourceTree = "<group>"; };
+		290ED7CFE0904DE9A233AD71 /* extra1.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = extra1.c; sourceTree = "<group>"; };
+		6DF6835A7EA24D09A8DDCD6B /* extra2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = extra2.c; sourceTree = "<group>"; };
+		894862175A5646BCAF7A2266 /* open_filename.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = open_filename.c; sourceTree = "<group>"; };
+		43CA9B29C90D4892BCA2BC76 /* open_legacy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = open_legacy.c; sourceTree = "<group>"; };
+		030FA38529584E3994C7D780 /* open_raw.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = open_raw.c; sourceTree = "<group>"; };
+		BB35BC8651754D619A4D458B /* open_utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = open_utils.c; sourceTree = "<group>"; };
+		B13836BF11E149DE831930CF /* pack.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = pack.c; sourceTree = "<group>"; };
+		0BD1DCF6394647F1885B2820 /* pack_dns.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = pack_dns.c; sourceTree = "<group>"; };
+		9C03569927E24883B2084609 /* pack_dsd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = pack_dsd.c; sourceTree = "<group>"; };
+		56CD1FF5D36D49FF81A88E51 /* pack_floats.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = pack_floats.c; sourceTree = "<group>"; };
+		B8E11AD5A85449DDAFA4FE7E /* pack_utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = pack_utils.c; sourceTree = "<group>"; };
+		7BBD6E96FCBD4BBDB0DE8E82 /* read_words.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = read_words.c; sourceTree = "<group>"; };
+		CD1F8024D35C47AF8ADF86C5 /* tag_utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tag_utils.c; sourceTree = "<group>"; };
+		BC1357BC46074EEBADA938F6 /* tags.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tags.c; sourceTree = "<group>"; };
+		A517DEB95746431C805D585A /* unpack.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack.c; sourceTree = "<group>"; };
+		D3BFE1C7B3DE4D96B865A9A3 /* unpack3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack3.c; sourceTree = "<group>"; };
+		BDEC84A148B54932929BCB27 /* unpack3_open.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack3_open.c; sourceTree = "<group>"; };
+		C61EDB7DEB994485A2F409F5 /* unpack3_seek.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack3_seek.c; sourceTree = "<group>"; };
+		E54DDBC565BD4846A1724EB4 /* unpack_dsd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack_dsd.c; sourceTree = "<group>"; };
+		EBB9338A7A2A426BBA2ABF2D /* unpack_floats.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack_floats.c; sourceTree = "<group>"; };
+		EF74472BD8214BF4B48162C4 /* unpack_seek.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack_seek.c; sourceTree = "<group>"; };
+		06AA3FF215554E1B860526C2 /* unpack_utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unpack_utils.c; sourceTree = "<group>"; };
+		93FB49B51F874158A7E352C3 /* write_words.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = write_words.c; sourceTree = "<group>"; };
+		AC2F67AEFBB9411D93468715 /* wavpack.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/wavpack/wavpack.h; sourceTree = "<group>"; };
+		FECA328E81A34A72ADBD8F53 /* CAPlayWavPack.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CAPlayWavPack.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		14A9EAD2D3B347868BEBD574 /* analysis.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = analysis.c; sourceTree = "<group>"; };
+		6ECFFC20ABF44BBCAB141D01 /* bitrate.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bitrate.c; sourceTree = "<group>"; };
+		D59575C532834B2287B1C2B6 /* block.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = block.c; sourceTree = "<group>"; };
+		B0629F880D5844EE8D6B9A3C /* codebook.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = codebook.c; sourceTree = "<group>"; };
+		A742225574704165A22BADEA /* envelope.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = envelope.c; sourceTree = "<group>"; };
+		85309599284A4E318A4D0E0E /* floor0.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = floor0.c; sourceTree = "<group>"; };
+		D8D52DCED9054653B57540AB /* floor1.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = floor1.c; sourceTree = "<group>"; };
+		2E8C53EDAE0C48BCBB810F66 /* info.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = info.c; sourceTree = "<group>"; };
+		C4A9C69C76A34F389348001D /* lookup.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lookup.c; sourceTree = "<group>"; };
+		5BA38BE86F3144E1B365721F /* lpc.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lpc.c; sourceTree = "<group>"; };
+		2884DE0CB6F54AA28D68457A /* lsp.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lsp.c; sourceTree = "<group>"; };
+		7DC46D8627BD40E5A290B24F /* mapping0.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mapping0.c; sourceTree = "<group>"; };
+		A070B66E04A9450CAADDE9BD /* mdct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mdct.c; sourceTree = "<group>"; };
+		1B9B65D326EE4586934D7D35 /* misc.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = misc.c; sourceTree = "<group>"; };
+		16CF3405523541CE9014056F /* psy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = psy.c; sourceTree = "<group>"; };
+		91BE3E6A56EE4F94A3F9C9F6 /* registry.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = registry.c; sourceTree = "<group>"; };
+		514D0AC7F75D4EB2AB159325 /* res0.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = res0.c; sourceTree = "<group>"; };
+		9630357B1ED04501A4985ED2 /* sharedbook.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sharedbook.c; sourceTree = "<group>"; };
+		1755558A314E4F0DA2F789D6 /* smallft.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = smallft.c; sourceTree = "<group>"; };
+		6F1645853D6A4EC1B4B90C17 /* synthesis.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = synthesis.c; sourceTree = "<group>"; };
+		7DCAD92E07C44AB983DF40F7 /* vorbisfile.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = vorbisfile.c; sourceTree = "<group>"; };
+		EB19DA821DD7472191CC40CC /* window.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = window.c; sourceTree = "<group>"; };
+		C26320143F574ACFA12309C2 /* codec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/vorbis/codec.h; sourceTree = "<group>"; };
+		3EB98840DF1C4AE89BE50345 /* vorbisenc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/vorbis/vorbisenc.h; sourceTree = "<group>"; };
+		611A32E504E84FB9A6783701 /* vorbisfile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/vorbis/vorbisfile.h; sourceTree = "<group>"; };
+		4807BAF0714E47DA9E9AF204 /* CAPlayVorbis.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CAPlayVorbis.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		032E321CA91B4A2EB4ACA4A2 /* bits.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bits.c; sourceTree = "<group>"; };
+		81BC0B1E777E471281FC7986 /* cb_search.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = cb_search.c; sourceTree = "<group>"; };
+		D8AE82DAE07B4CD78DDC83C9 /* exc_10_16_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = exc_10_16_table.c; sourceTree = "<group>"; };
+		CBFEB64B5E3C48D797A713E2 /* exc_10_32_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = exc_10_32_table.c; sourceTree = "<group>"; };
+		0AAA1CD70D8B4A6DBC27F4AD /* exc_20_32_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = exc_20_32_table.c; sourceTree = "<group>"; };
+		92947300C3C040E7BF499A81 /* exc_5_256_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = exc_5_256_table.c; sourceTree = "<group>"; };
+		BBE17BAD8B6848F1AA36F3ED /* exc_5_64_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = exc_5_64_table.c; sourceTree = "<group>"; };
+		19E9A14030934FD092648A3F /* exc_8_128_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = exc_8_128_table.c; sourceTree = "<group>"; };
+		DB5791061E024CF3B2169CFF /* fftwrap.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = fftwrap.c; sourceTree = "<group>"; };
+		9725CD5810494BF5BA8F6C1C /* filters.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = filters.c; sourceTree = "<group>"; };
+		57CCAF4CA830441DA7BB9093 /* gain_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = gain_table.c; sourceTree = "<group>"; };
+		C557E35A31C341C2ADB2A14E /* gain_table_lbr.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = gain_table_lbr.c; sourceTree = "<group>"; };
+		4620AC2DB12E4A859B012224 /* hexc_10_32_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = hexc_10_32_table.c; sourceTree = "<group>"; };
+		FAC1A534AA6F40FEB3814D83 /* hexc_table.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = hexc_table.c; sourceTree = "<group>"; };
+		7961EBE99D7A45279E3EFA66 /* high_lsp_tables.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = high_lsp_tables.c; sourceTree = "<group>"; };
+		E9DB4569F4FF4E399B57F77A /* kiss_fft.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = kiss_fft.c; sourceTree = "<group>"; };
+		48EB7FE2E32D403AAD75D4AA /* kiss_fftr.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = kiss_fftr.c; sourceTree = "<group>"; };
+		5BB8B4B9EC9F45B0A03985D5 /* lpc.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lpc.c; sourceTree = "<group>"; };
+		CC7E0B6CC59E4E0CA6B66839 /* lsp.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lsp.c; sourceTree = "<group>"; };
+		F9474BACE37F4EEB8D371B58 /* lsp_tables_nb.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lsp_tables_nb.c; sourceTree = "<group>"; };
+		319F3284734E4A959B8B95DD /* ltp.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ltp.c; sourceTree = "<group>"; };
+		2D31DC1B64BB466189BBC2DF /* modes.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = modes.c; sourceTree = "<group>"; };
+		909722DD6F5349088E788078 /* modes_wb.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = modes_wb.c; sourceTree = "<group>"; };
+		45EE2F8AC49B4A36ADC244F6 /* nb_celp.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = nb_celp.c; sourceTree = "<group>"; };
+		71FEFF4DEB08471295D29361 /* quant_lsp.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = quant_lsp.c; sourceTree = "<group>"; };
+		FD32B5463F7C4A3E8B5A2C5A /* sb_celp.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sb_celp.c; sourceTree = "<group>"; };
+		5884F6A505BD434DBEF32486 /* smallft.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = smallft.c; sourceTree = "<group>"; };
+		6447211889924DD888CF3C85 /* speex.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = speex.c; sourceTree = "<group>"; };
+		DB94A0C5CCBE4259B61ABB20 /* speex_callbacks.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = speex_callbacks.c; sourceTree = "<group>"; };
+		43BFB0428D634DFAA3092604 /* speex_header.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = speex_header.c; sourceTree = "<group>"; };
+		6CF94693BBBF4E0E83DAF3DD /* stereo.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = stereo.c; sourceTree = "<group>"; };
+		5B3650DEBE6A4D638150F724 /* vbr.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = vbr.c; sourceTree = "<group>"; };
+		B54137F51AEF41659D720285 /* vq.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = vq.c; sourceTree = "<group>"; };
+		41B724DDB8924322A89734AB /* window.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = window.c; sourceTree = "<group>"; };
+		94323524F8E44AD782B6C76A /* speex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/speex/speex.h; sourceTree = "<group>"; };
+		B7DD62D29CD643C79BE0A637 /* speex_bits.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/speex/speex_bits.h; sourceTree = "<group>"; };
+		9712E79742C24141BB76F802 /* speex_callbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/speex/speex_callbacks.h; sourceTree = "<group>"; };
+		E570E30DA47A496C8508C508 /* speex_header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/speex/speex_header.h; sourceTree = "<group>"; };
+		6884356235E746AAB81E645E /* speex_stereo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/speex/speex_stereo.h; sourceTree = "<group>"; };
+		C964DA405F2A4DFCB4400E92 /* speex_types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/speex/speex_types.h; sourceTree = "<group>"; };
+		E0725CB7967D4DCC9DFD3A34 /* CAPlaySpeex.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CAPlaySpeex.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		27468099E97742C8AF5E2978 /* APEv2TagParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APEv2TagParser.swift; sourceTree = "<group>"; };
+		E2C8B4AA78414E5E9D91FCAC /* WavPackDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavPackDecoder.swift; sourceTree = "<group>"; };
+		667044F91781492BA2A65E9A /* APlayWavPack.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = APlayWavPack.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		253F230468CA45C687AF167D /* VorbisDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VorbisDecoder.swift; sourceTree = "<group>"; };
+		83D30B7FD2B547A7BB28B2B5 /* APlayVorbis.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = APlayVorbis.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		B388C2F6DB86417384A31F70 /* SpeexDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeexDecoder.swift; sourceTree = "<group>"; };
+		9FD3837A61B748B19DAC6797 /* APlaySpeex.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = APlaySpeex.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4824268A22754479BA166437 /* tone-mp4.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-mp4.mp4; sourceTree = "<group>"; };
 		43E8513F05F1495C8C231B80 /* tone.m4b */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone.m4b; sourceTree = "<group>"; };
 		B2F735D6704A43E792F95D1B /* tone-mp2.mp2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = tone-mp2.mp2; sourceTree = "<group>"; };
@@ -264,7 +626,13 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5E0A5000000000000000302 /* APlayExtras.framework in Frameworks */,
 				A5E0A5000000000000002302 /* APlayMidi.framework in Frameworks */,
 				A5E0A5000000000000004302 /* APlayOpus.framework in Frameworks */,
-			);
+				E25C3896E3864617BCB62BAD /* CAPlayOgg.framework in Frameworks */,
+				95EA922B9B524A4F9770F843 /* CAPlayWavPack.framework in Frameworks */,
+				7BB042A10E6D4EF1964F1759 /* CAPlayVorbis.framework in Frameworks */,
+				FB42EF9BD86E4BC499FB03D3 /* CAPlaySpeex.framework in Frameworks */,
+				7AFEBB6A6DCA49B8B564F406 /* APlayWavPack.framework in Frameworks */,
+				3DB57BB06E7E40D0BA0E49C8 /* APlayVorbis.framework in Frameworks */,
+				22C265A3B28C4E18A1155BA0 /* APlaySpeex.framework in Frameworks */,			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		10F83A7E20F3427D00AF8222 /* Frameworks */ = {
@@ -297,6 +665,65 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 						A5E0A5000000000000004301 /* APlay.framework in Frameworks */,
 					);
 					runOnlyForDeploymentPostprocessing = 0;
+		};
+		69C913D9D5314CD485BAB2CE = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3A6FD59D96D548F4A3A7F638 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		01F62698F1A74694B1364762 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2004D8EB63994364A786C5A5 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DEF8F827043D44B78DF1C5C3 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A56FAE3021034A9E9C99E788 /* APlay.framework in Frameworks */,
+				BFACCA3099A04F8190DC0D7E /* CAPlayWavPack.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		34CBAEEDAFE844A387ECF194 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A56FAE3021034A9E9C99E788 /* APlay.framework in Frameworks */,
+				871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */,
+				48AE6AC8C69C4843ADA88B27 /* CAPlayVorbis.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CDFD9657BFC4BC09E6C848E = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A56FAE3021034A9E9C99E788 /* APlay.framework in Frameworks */,
+				871039B2CD614DEAAEEED2FF /* CAPlayOgg.framework in Frameworks */,
+				D981579971184814A696B097 /* CAPlaySpeex.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -335,7 +762,13 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5E0A5000000000000000901 /* APlayExtras */,
 				A5E0A5000000000000002901 /* APlayMidi */,
 				A5E0A5000000000000004901 /* APlayOpus */,
-				106D4F0221F5D9B700EA58C4 /* APlayDemo */,
+				46C173E6F4914DE7B1ABCAFC /* CAPlayOgg */,
+				8817EF789DC444B4A497BB2C /* CAPlayWavPack */,
+				86AEF6B2CD0A44388475C367 /* CAPlayVorbis */,
+				F4BFF19414BD4AE18D569380 /* CAPlaySpeex */,
+				3F38F3D55E7145B3804E1458 /* APlayWavPack */,
+				066560A04F7843FA8B6A5FC8 /* APlayVorbis */,
+				DA5217FE7ABD4541A691A5AF /* APlaySpeex */,				106D4F0221F5D9B700EA58C4 /* APlayDemo */,
 				10F83A8220F3427E00AF8222 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -347,7 +780,13 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5E0A5000000000000000001 /* APlayExtras.framework */,
 				A5E0A5000000000000002001 /* APlayMidi.framework */,
 			A5E0A5000000000000004001 /* APlayOpus.framework */,
-				106D4F0121F5D9B700EA58C4 /* APlayDemo.app */,
+				2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */,
+				FECA328E81A34A72ADBD8F53 /* CAPlayWavPack.framework */,
+				4807BAF0714E47DA9E9AF204 /* CAPlayVorbis.framework */,
+				E0725CB7967D4DCC9DFD3A34 /* CAPlaySpeex.framework */,
+				667044F91781492BA2A65E9A /* APlayWavPack.framework */,
+				83D30B7FD2B547A7BB28B2B5 /* APlayVorbis.framework */,
+				9FD3837A61B748B19DAC6797 /* APlaySpeex.framework */,				106D4F0121F5D9B700EA58C4 /* APlayDemo.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -518,6 +957,9 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				22A28138BCCF4CF2A05E1F48 /* tone.3g2 */,
 				98145EB6CEBC418ABE8D9009 /* tone.w64 */,
 				A5E0A5000000000000003101 /* melody.mid */,
+				F94C045DF9094A5D836D307F /* tone.ogg */,
+				86C6420E46E04909B32541C6 /* tone.wv */,
+				0C025F40E8D242479302E31E /* tone.spx */,
 				A5E0A5000000000000003102 /* APlayTestSine.sf2 */,
 			);
 			path = Samples;
@@ -552,6 +994,155 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 					path = Sources/APlayOpus;
 					sourceTree = "<group>";
 		};
+		46C173E6F4914DE7B1ABCAFC /* CAPlayOgg */ = {
+			isa = PBXGroup;
+			children = (
+				7BFBD4F1C54E442DB87CC134 /* bitwise.c */,
+				925D4AB87467471C84B1F0D1 /* framing.c */,
+				6310D1F3A4084473A330BFE5 /* ogg.h */,
+				5EF85327AD4B4F92A5C10F8E /* os_types.h */,
+			);
+			path = Sources/CAPlayOgg;
+			sourceTree = "<group>";
+		};
+		8817EF789DC444B4A497BB2C /* CAPlayWavPack */ = {
+			isa = PBXGroup;
+			children = (
+				678F24C77D1A4597981A1541 /* common_utils.c */,
+				1C8C060115B2480BA4BE584D /* decorr_utils.c */,
+				D73BEBD018054AF2848A4AFF /* entropy_utils.c */,
+				290ED7CFE0904DE9A233AD71 /* extra1.c */,
+				6DF6835A7EA24D09A8DDCD6B /* extra2.c */,
+				894862175A5646BCAF7A2266 /* open_filename.c */,
+				43CA9B29C90D4892BCA2BC76 /* open_legacy.c */,
+				030FA38529584E3994C7D780 /* open_raw.c */,
+				BB35BC8651754D619A4D458B /* open_utils.c */,
+				B13836BF11E149DE831930CF /* pack.c */,
+				0BD1DCF6394647F1885B2820 /* pack_dns.c */,
+				9C03569927E24883B2084609 /* pack_dsd.c */,
+				56CD1FF5D36D49FF81A88E51 /* pack_floats.c */,
+				B8E11AD5A85449DDAFA4FE7E /* pack_utils.c */,
+				7BBD6E96FCBD4BBDB0DE8E82 /* read_words.c */,
+				CD1F8024D35C47AF8ADF86C5 /* tag_utils.c */,
+				BC1357BC46074EEBADA938F6 /* tags.c */,
+				A517DEB95746431C805D585A /* unpack.c */,
+				D3BFE1C7B3DE4D96B865A9A3 /* unpack3.c */,
+				BDEC84A148B54932929BCB27 /* unpack3_open.c */,
+				C61EDB7DEB994485A2F409F5 /* unpack3_seek.c */,
+				E54DDBC565BD4846A1724EB4 /* unpack_dsd.c */,
+				EBB9338A7A2A426BBA2ABF2D /* unpack_floats.c */,
+				EF74472BD8214BF4B48162C4 /* unpack_seek.c */,
+				06AA3FF215554E1B860526C2 /* unpack_utils.c */,
+				93FB49B51F874158A7E352C3 /* write_words.c */,
+				AC2F67AEFBB9411D93468715 /* wavpack.h */,
+			);
+			path = Sources/CAPlayWavPack;
+			sourceTree = "<group>";
+		};
+		86AEF6B2CD0A44388475C367 /* CAPlayVorbis */ = {
+			isa = PBXGroup;
+			children = (
+				14A9EAD2D3B347868BEBD574 /* analysis.c */,
+				6ECFFC20ABF44BBCAB141D01 /* bitrate.c */,
+				D59575C532834B2287B1C2B6 /* block.c */,
+				B0629F880D5844EE8D6B9A3C /* codebook.c */,
+				A742225574704165A22BADEA /* envelope.c */,
+				85309599284A4E318A4D0E0E /* floor0.c */,
+				D8D52DCED9054653B57540AB /* floor1.c */,
+				2E8C53EDAE0C48BCBB810F66 /* info.c */,
+				C4A9C69C76A34F389348001D /* lookup.c */,
+				5BA38BE86F3144E1B365721F /* lpc.c */,
+				2884DE0CB6F54AA28D68457A /* lsp.c */,
+				7DC46D8627BD40E5A290B24F /* mapping0.c */,
+				A070B66E04A9450CAADDE9BD /* mdct.c */,
+				1B9B65D326EE4586934D7D35 /* misc.c */,
+				16CF3405523541CE9014056F /* psy.c */,
+				91BE3E6A56EE4F94A3F9C9F6 /* registry.c */,
+				514D0AC7F75D4EB2AB159325 /* res0.c */,
+				9630357B1ED04501A4985ED2 /* sharedbook.c */,
+				1755558A314E4F0DA2F789D6 /* smallft.c */,
+				6F1645853D6A4EC1B4B90C17 /* synthesis.c */,
+				7DCAD92E07C44AB983DF40F7 /* vorbisfile.c */,
+				EB19DA821DD7472191CC40CC /* window.c */,
+				C26320143F574ACFA12309C2 /* codec.h */,
+				3EB98840DF1C4AE89BE50345 /* vorbisenc.h */,
+				611A32E504E84FB9A6783701 /* vorbisfile.h */,
+			);
+			path = Sources/CAPlayVorbis;
+			sourceTree = "<group>";
+		};
+		F4BFF19414BD4AE18D569380 /* CAPlaySpeex */ = {
+			isa = PBXGroup;
+			children = (
+				032E321CA91B4A2EB4ACA4A2 /* bits.c */,
+				81BC0B1E777E471281FC7986 /* cb_search.c */,
+				D8AE82DAE07B4CD78DDC83C9 /* exc_10_16_table.c */,
+				CBFEB64B5E3C48D797A713E2 /* exc_10_32_table.c */,
+				0AAA1CD70D8B4A6DBC27F4AD /* exc_20_32_table.c */,
+				92947300C3C040E7BF499A81 /* exc_5_256_table.c */,
+				BBE17BAD8B6848F1AA36F3ED /* exc_5_64_table.c */,
+				19E9A14030934FD092648A3F /* exc_8_128_table.c */,
+				DB5791061E024CF3B2169CFF /* fftwrap.c */,
+				9725CD5810494BF5BA8F6C1C /* filters.c */,
+				57CCAF4CA830441DA7BB9093 /* gain_table.c */,
+				C557E35A31C341C2ADB2A14E /* gain_table_lbr.c */,
+				4620AC2DB12E4A859B012224 /* hexc_10_32_table.c */,
+				FAC1A534AA6F40FEB3814D83 /* hexc_table.c */,
+				7961EBE99D7A45279E3EFA66 /* high_lsp_tables.c */,
+				E9DB4569F4FF4E399B57F77A /* kiss_fft.c */,
+				48EB7FE2E32D403AAD75D4AA /* kiss_fftr.c */,
+				5BB8B4B9EC9F45B0A03985D5 /* lpc.c */,
+				CC7E0B6CC59E4E0CA6B66839 /* lsp.c */,
+				F9474BACE37F4EEB8D371B58 /* lsp_tables_nb.c */,
+				319F3284734E4A959B8B95DD /* ltp.c */,
+				2D31DC1B64BB466189BBC2DF /* modes.c */,
+				909722DD6F5349088E788078 /* modes_wb.c */,
+				45EE2F8AC49B4A36ADC244F6 /* nb_celp.c */,
+				71FEFF4DEB08471295D29361 /* quant_lsp.c */,
+				FD32B5463F7C4A3E8B5A2C5A /* sb_celp.c */,
+				5884F6A505BD434DBEF32486 /* smallft.c */,
+				6447211889924DD888CF3C85 /* speex.c */,
+				DB94A0C5CCBE4259B61ABB20 /* speex_callbacks.c */,
+				43BFB0428D634DFAA3092604 /* speex_header.c */,
+				6CF94693BBBF4E0E83DAF3DD /* stereo.c */,
+				5B3650DEBE6A4D638150F724 /* vbr.c */,
+				B54137F51AEF41659D720285 /* vq.c */,
+				41B724DDB8924322A89734AB /* window.c */,
+				94323524F8E44AD782B6C76A /* speex.h */,
+				B7DD62D29CD643C79BE0A637 /* speex_bits.h */,
+				9712E79742C24141BB76F802 /* speex_callbacks.h */,
+				E570E30DA47A496C8508C508 /* speex_header.h */,
+				6884356235E746AAB81E645E /* speex_stereo.h */,
+				C964DA405F2A4DFCB4400E92 /* speex_types.h */,
+			);
+			path = Sources/CAPlaySpeex;
+			sourceTree = "<group>";
+		};
+		3F38F3D55E7145B3804E1458 /* APlayWavPack */ = {
+			isa = PBXGroup;
+			children = (
+				27468099E97742C8AF5E2978 /* APEv2TagParser.swift */,
+				E2C8B4AA78414E5E9D91FCAC /* WavPackDecoder.swift */,
+			);
+			path = Sources/APlayWavPack;
+			sourceTree = "<group>";
+		};
+		066560A04F7843FA8B6A5FC8 /* APlayVorbis */ = {
+			isa = PBXGroup;
+			children = (
+				253F230468CA45C687AF167D /* VorbisDecoder.swift */,
+			);
+			path = Sources/APlayVorbis;
+			sourceTree = "<group>";
+		};
+		DA5217FE7ABD4541A691A5AF /* APlaySpeex */ = {
+			isa = PBXGroup;
+			children = (
+				B388C2F6DB86417384A31F70 /* SpeexDecoder.swift */,
+			);
+			path = Sources/APlaySpeex;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -560,6 +1151,46 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 			buildActionMask = 2147483647;
 			files = (
 				10F83A8620F3427E00AF8222 /* APlay.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EBF171C14DC14457BF41E5F0 = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0BEFE3B8236B467681F3FEFB /* ogg.h in Headers */,
+				9FE67E0F838C459BBFD4BEB6 /* os_types.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4C67F6CF9902463CB200931F = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F59CE9F51DF04EBE9BFD4D49 /* wavpack.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8C07A851440143FDA730FA41 = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0FFE0A8DAA084004829E1617 /* codec.h in Headers */,
+				7D600BF10DD744FDA81247EA /* vorbisenc.h in Headers */,
+				A76C694CE2224FFD8018610B /* vorbisfile.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B6B0EC93475748CB9B28A469 = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B98137A48EFC4F3CA33DEB1A /* speex.h in Headers */,
+				7E0C11D6176A46DB95243BC1 /* speex_bits.h in Headers */,
+				98B231D75F084040816D9882 /* speex_callbacks.h in Headers */,
+				D477F4C76CFC420F8E1ED357 /* speex_header.h in Headers */,
+				71E5A5DC9C064376A7C4C993 /* speex_stereo.h in Headers */,
+				81828A91920342718AA9A3F0 /* speex_types.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -582,7 +1213,13 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5E0A5000000000000000802 /* PBXTargetDependency */,
 				A5E0A5000000000000002802 /* PBXTargetDependency */,
 				A5E0A5000000000000004803 /* PBXTargetDependency */,
-			);
+				758424DAC1BE4BA9BA35B694 /* PBXTargetDependency */,
+				1194986BF0F5457D927013A7 /* PBXTargetDependency */,
+				9614B8AAE14849789BB2D484 /* PBXTargetDependency */,
+				9B1D6765C2964754AE5BD751 /* PBXTargetDependency */,
+				33F0600268304CB5AF534B73 /* PBXTargetDependency */,
+				DBB2B02FEAAA4CB8AB264D8E /* PBXTargetDependency */,
+				5DA6E8FD8D8E4EF9A73EF696 /* PBXTargetDependency */,			);
 			name = APlayDemo;
 			productName = APlayDemo;
 			productReference = 106D4F0121F5D9B700EA58C4 /* APlayDemo.app */;
@@ -660,6 +1297,139 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 					productReference = A5E0A5000000000000004001 /* APlayOpus.framework */;
 					productType = "com.apple.product-type.framework";
 		};
+		E5DAFC4ACD7E445289ECC600 /* CAPlayOgg */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 96DA39AA8A6C44908450969C /* Build configuration list for PBXNativeTarget "CAPlayOgg" */;
+			buildPhases = (
+				B2E3563A920243559AB4DC63 /* Sources */,
+				EBF171C14DC14457BF41E5F0 /* Headers */,
+				69C913D9D5314CD485BAB2CE /* Frameworks */,
+				C8E792EA14EC4A03A1D91AD7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CAPlayOgg;
+			productName = CAPlayOgg;
+			productReference = 2E0B8A5B87984853A3D02705 /* CAPlayOgg.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		BC7DBC1DDE2D424E82A10AE1 /* CAPlayWavPack */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 77C4593F64D7444584379476 /* Build configuration list for PBXNativeTarget "CAPlayWavPack" */;
+			buildPhases = (
+				832AF3FE26EF4852BA3A3FBA /* Sources */,
+				4C67F6CF9902463CB200931F /* Headers */,
+				3A6FD59D96D548F4A3A7F638 /* Frameworks */,
+				A730262FBCC14E62AE724707 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CAPlayWavPack;
+			productName = CAPlayWavPack;
+			productReference = FECA328E81A34A72ADBD8F53 /* CAPlayWavPack.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		EA09DD66E27F46D5AC5D357D /* CAPlayVorbis */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9BD3335F24DD40A78A068440 /* Build configuration list for PBXNativeTarget "CAPlayVorbis" */;
+			buildPhases = (
+				995DDEAC475D4F0F93282DDB /* Sources */,
+				8C07A851440143FDA730FA41 /* Headers */,
+				01F62698F1A74694B1364762 /* Frameworks */,
+				93DEBD4DCBCC4AA48C7190A7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5A915FB58675438EBB71F0A4 /* PBXTargetDependency */,
+			);
+			name = CAPlayVorbis;
+			productName = CAPlayVorbis;
+			productReference = 4807BAF0714E47DA9E9AF204 /* CAPlayVorbis.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		91FF50AECEE64C37925700ED /* CAPlaySpeex */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7E82308FA11C49FAB09AEC96 /* Build configuration list for PBXNativeTarget "CAPlaySpeex" */;
+			buildPhases = (
+				7F2E8BE5A880409C9B724AA6 /* Sources */,
+				B6B0EC93475748CB9B28A469 /* Headers */,
+				2004D8EB63994364A786C5A5 /* Frameworks */,
+				E5379E5E553C4BFBA20E6425 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2C8991B7BB294888B8ECC60C /* PBXTargetDependency */,
+			);
+			name = CAPlaySpeex;
+			productName = CAPlaySpeex;
+			productReference = E0725CB7967D4DCC9DFD3A34 /* CAPlaySpeex.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		2FFF6453D2A643A4829E571A /* APlayWavPack */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 133C556734C94E4380A0C41E /* Build configuration list for PBXNativeTarget "APlayWavPack" */;
+			buildPhases = (
+				383B967BDF774BECA05D7428 /* Sources */,
+				DEF8F827043D44B78DF1C5C3 /* Frameworks */,
+				C47D1BF77BCB43FB93B3B5AB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9A12B424C9254A55BFBF0CE5 /* PBXTargetDependency */,
+				0AF431929525432FA7164EA1 /* PBXTargetDependency */,
+			);
+			name = APlayWavPack;
+			productName = APlayWavPack;
+			productReference = 667044F91781492BA2A65E9A /* APlayWavPack.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		7F4182CE29E347559563F965 /* APlayVorbis */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D9CF7C19AF9D4216B026AF09 /* Build configuration list for PBXNativeTarget "APlayVorbis" */;
+			buildPhases = (
+				44B0137D29994F669C8520F6 /* Sources */,
+				34CBAEEDAFE844A387ECF194 /* Frameworks */,
+				86AE0EAC1BAE47BB89E12CB7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B96BF6D925974D749FD0623F /* PBXTargetDependency */,
+				5C85FF72CA8842CF87643DAC /* PBXTargetDependency */,
+				6F7C0923FA864DA0A63DF267 /* PBXTargetDependency */,
+			);
+			name = APlayVorbis;
+			productName = APlayVorbis;
+			productReference = 83D30B7FD2B547A7BB28B2B5 /* APlayVorbis.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		06633798F40747619100ABA7 /* APlaySpeex */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9F704A83EDB34B4D80D016B1 /* Build configuration list for PBXNativeTarget "APlaySpeex" */;
+			buildPhases = (
+				63B6ACB46D6B4D29A1018093 /* Sources */,
+				2CDFD9657BFC4BC09E6C848E /* Frameworks */,
+				9F1089F53D3B4645B6260482 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B7A0D4ADFB2D45D78DF6C5A0 /* PBXTargetDependency */,
+				A2C08ABC0DD5464B9686D2C3 /* PBXTargetDependency */,
+				975D58E332C74B36BE82AAAA /* PBXTargetDependency */,
+			);
+			name = APlaySpeex;
+			productName = APlaySpeex;
+			productReference = 9FD3837A61B748B19DAC6797 /* APlaySpeex.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -703,7 +1473,13 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5E0A5000000000000000501 /* APlayExtras */,
 				A5E0A5000000000000002501 /* APlayMidi */,
 				A5E0A5000000000000004501 /* APlayOpus */,
-			);
+				E5DAFC4ACD7E445289ECC600 /* CAPlayOgg */,
+				BC7DBC1DDE2D424E82A10AE1 /* CAPlayWavPack */,
+				EA09DD66E27F46D5AC5D357D /* CAPlayVorbis */,
+				91FF50AECEE64C37925700ED /* CAPlaySpeex */,
+				2FFF6453D2A643A4829E571A /* APlayWavPack */,
+				7F4182CE29E347559563F965 /* APlayVorbis */,
+				06633798F40747619100ABA7 /* APlaySpeex */,			);
 		};
 /* End PBXProject section */
 
@@ -730,6 +1506,9 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 				A5E0A5000000000000003202 /* APlayTestSine.sf2 in Resources */,
 				A5A5A5C10000000000000003 /* tone.webm in Resources */,
 				A5A5A5C10000000000000004 /* tone.mka in Resources */,
+				55D3842F3C884C2D8EAC53D4 /* tone.ogg in Resources */,
+				5464FFDD72804DAA95B9EC66 /* tone.wv in Resources */,
+				8F3FFBA3F4E34B6F9C1602DD /* tone.spx in Resources */,
 				4CA1982280814E49912516D8 /* tone-mp4.mp4 in Resources */,
 				322B1BF9C8474BF4A989B6C1 /* tone.m4b in Resources */,
 				485571F09E1C47348B233EF1 /* tone-mp2.mp2 in Resources */,
@@ -770,6 +1549,55 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 					files = (
 					);
 					runOnlyForDeploymentPostprocessing = 0;
+		};
+		C8E792EA14EC4A03A1D91AD7 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A730262FBCC14E62AE724707 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		93DEBD4DCBCC4AA48C7190A7 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E5379E5E553C4BFBA20E6425 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C47D1BF77BCB43FB93B3B5AB = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		86AE0EAC1BAE47BB89E12CB7 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9F1089F53D3B4645B6260482 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
@@ -858,6 +1686,143 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 					);
 					runOnlyForDeploymentPostprocessing = 0;
 		};
+		B2E3563A920243559AB4DC63 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				724B9F0097C74172B70067A8 /* bitwise.c in Sources */,
+				50DD9B1657E24265823C7306 /* framing.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		832AF3FE26EF4852BA3A3FBA = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				74DC62F644424CF59863C9D3 /* common_utils.c in Sources */,
+				14F8342BB64E4B51AC891855 /* decorr_utils.c in Sources */,
+				6D9610DEF3C34392B5F01C0F /* entropy_utils.c in Sources */,
+				E4F249D1B722495F9F4D466D /* extra1.c in Sources */,
+				CCD01D2FDD674FD7B04C0CDF /* extra2.c in Sources */,
+				10EE38722E7F457D856EC7F2 /* open_filename.c in Sources */,
+				423B7A7CCF47443E9EF5AE1C /* open_legacy.c in Sources */,
+				323E201B618A4294B62933ED /* open_raw.c in Sources */,
+				592E3F99A94E4EFB9DFD8865 /* open_utils.c in Sources */,
+				F02C51A948634676B588D09E /* pack.c in Sources */,
+				5905F6C321A147618C56466F /* pack_dns.c in Sources */,
+				BB28EF16B06A41F7A36EBF88 /* pack_dsd.c in Sources */,
+				837CB85B636F4856BA949F0A /* pack_floats.c in Sources */,
+				16FC1B1E0BA741ADB9FA9213 /* pack_utils.c in Sources */,
+				2CA379E3276E4E2BBB5328B1 /* read_words.c in Sources */,
+				0E73C367DFEC465B9E7D8533 /* tag_utils.c in Sources */,
+				8F1005EB23594370892070EF /* tags.c in Sources */,
+				4960BC30C8DE410DB00E5B12 /* unpack.c in Sources */,
+				DB3CCFCFDCD248F0BF970A9D /* unpack3.c in Sources */,
+				A38366E3F5CA4B82A1B5F6C7 /* unpack3_open.c in Sources */,
+				AE9D76DA7C04427F89F9117F /* unpack3_seek.c in Sources */,
+				127DEC0D801448099EDAB2B3 /* unpack_dsd.c in Sources */,
+				AEB5FD449C2A4751A0C164DF /* unpack_floats.c in Sources */,
+				73976B33D92F4A2BB0D92B24 /* unpack_seek.c in Sources */,
+				8ECB7774805D47B299F4705A /* unpack_utils.c in Sources */,
+				611DC381BFFE493C8ADFEA04 /* write_words.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		995DDEAC475D4F0F93282DDB = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BE84C97D38F047DD9471EDCB /* analysis.c in Sources */,
+				7037F3B3F897489D842E197B /* bitrate.c in Sources */,
+				748A09F2B67B4BA0BD114AA3 /* block.c in Sources */,
+				178E5C0D2A564B1E80181042 /* codebook.c in Sources */,
+				4C8C1628B362463CA8C872D2 /* envelope.c in Sources */,
+				9BA050C6734E416FBAB4CCCC /* floor0.c in Sources */,
+				FF1D6BB689614556A7600A2D /* floor1.c in Sources */,
+				1F99BB5F09274611B14B037B /* info.c in Sources */,
+				02BAC5B0AE9D45D793BEDD25 /* lookup.c in Sources */,
+				EEAFDC9849A8424DAAD5FCDC /* lpc.c in Sources */,
+				B4339C02ACF14FEBA1022975 /* lsp.c in Sources */,
+				8A4DAD85BD8A40B78603521F /* mapping0.c in Sources */,
+				0F3D4D7C3A064A7F8D1C9C8B /* mdct.c in Sources */,
+				7D48B35C457B4C668DC41D9F /* misc.c in Sources */,
+				92FC1097769B451D90352CA8 /* psy.c in Sources */,
+				BC5F98DC37CF47AAA8B127FF /* registry.c in Sources */,
+				6D7FD17B15924A70BD016011 /* res0.c in Sources */,
+				850D836712884D0AAEDA793B /* sharedbook.c in Sources */,
+				F639A626F47A4BF28C3D3980 /* smallft.c in Sources */,
+				B2678EB4B34D40D7BF79073E /* synthesis.c in Sources */,
+				EB8F951FA6A84EE38C2F81AB /* vorbisfile.c in Sources */,
+				5C5483A0FEBF464B93E7730E /* window.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7F2E8BE5A880409C9B724AA6 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E1B757E0600A44838588C229 /* bits.c in Sources */,
+				F21B61684B844DD0A3003C2F /* cb_search.c in Sources */,
+				08EFED075472477F9081F056 /* exc_10_16_table.c in Sources */,
+				C1CCD1CCA16649B1872589F7 /* exc_10_32_table.c in Sources */,
+				B078C4EB8F8446059B62C6EF /* exc_20_32_table.c in Sources */,
+				E5C9F80C956849A1BDD6F561 /* exc_5_256_table.c in Sources */,
+				29AC973729DE4B9EA15AD9FA /* exc_5_64_table.c in Sources */,
+				F4F11A042CA44A4F913A27B1 /* exc_8_128_table.c in Sources */,
+				4100A904F27E45B6970A1F55 /* fftwrap.c in Sources */,
+				E351731B2FBC4B42A8787248 /* filters.c in Sources */,
+				D7B8E9F219C541C7900796CD /* gain_table.c in Sources */,
+				7D56570CEF834C1B86992AF8 /* gain_table_lbr.c in Sources */,
+				73E98BB99C974FE6A508A2DB /* hexc_10_32_table.c in Sources */,
+				67BC6A7B42054BAA83730DF5 /* hexc_table.c in Sources */,
+				52ACEF985E37426AB2A447CF /* high_lsp_tables.c in Sources */,
+				A36F2E495D614365BE6867D3 /* kiss_fft.c in Sources */,
+				91D6CE6E7B3A42459A1A817C /* kiss_fftr.c in Sources */,
+				E569984D6BC64513ABD5E472 /* lpc.c in Sources */,
+				C17C40B62BFB448F94BD9BA2 /* lsp.c in Sources */,
+				C87A2E8C874D45B19C7D2DE4 /* lsp_tables_nb.c in Sources */,
+				2027CA8486474B03987D6D5C /* ltp.c in Sources */,
+				B991626751CA464FBE4430A3 /* modes.c in Sources */,
+				FBB7087B1D744273A7897D77 /* modes_wb.c in Sources */,
+				03D750CDB6FC42DD8ADBB6F2 /* nb_celp.c in Sources */,
+				77A0931FDA9240709DA64663 /* quant_lsp.c in Sources */,
+				005CA7203AD94360A7325EA5 /* sb_celp.c in Sources */,
+				8B8F014E275F407BA7545482 /* smallft.c in Sources */,
+				2511E8937BF04446A5FBD25C /* speex.c in Sources */,
+				9F5328EBD8CB4D34B5176CB1 /* speex_callbacks.c in Sources */,
+				DE2CB6C64A8B456AB766B921 /* speex_header.c in Sources */,
+				48386959F6AC4DAD936299BF /* stereo.c in Sources */,
+				AB820258E08F4679906AEC16 /* vbr.c in Sources */,
+				EF853A0BCA96432B99AB560B /* vq.c in Sources */,
+				C839BF5D2403418F91005AF6 /* window.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		383B967BDF774BECA05D7428 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E3492587042A47FBBB53A610 /* APEv2TagParser.swift in Sources */,
+				245E5C02CCE74178BC9C963F /* WavPackDecoder.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		44B0137D29994F669C8520F6 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C585FC26961248BCAC8DDFBD /* VorbisDecoder.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		63B6ACB46D6B4D29A1018093 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCF4253539AC4101B58BBFEC /* SpeexDecoder.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -896,6 +1861,91 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 					target = A5E0A5000000000000004501 /* APlayOpus */;
 					targetProxy = A5E0A5000000000000004802 /* PBXContainerItemProxy */;
 		};
+		758424DAC1BE4BA9BA35B694 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5DAFC4ACD7E445289ECC600 /* CAPlayOgg */;
+			targetProxy = 5E73598B15BF4832BD9D45B1 /* PBXContainerItemProxy */;
+		};
+		1194986BF0F5457D927013A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BC7DBC1DDE2D424E82A10AE1 /* CAPlayWavPack */;
+			targetProxy = 3B457C078EDE4145875A9D01 /* PBXContainerItemProxy */;
+		};
+		5A915FB58675438EBB71F0A4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5DAFC4ACD7E445289ECC600 /* CAPlayOgg */;
+			targetProxy = A26C838619274757B92D0CD6 /* PBXContainerItemProxy */;
+		};
+		9614B8AAE14849789BB2D484 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA09DD66E27F46D5AC5D357D /* CAPlayVorbis */;
+			targetProxy = 8FA70265D65E49DA922011D3 /* PBXContainerItemProxy */;
+		};
+		2C8991B7BB294888B8ECC60C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5DAFC4ACD7E445289ECC600 /* CAPlayOgg */;
+			targetProxy = 3226DB2D840F460BACD4D89E /* PBXContainerItemProxy */;
+		};
+		9B1D6765C2964754AE5BD751 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 91FF50AECEE64C37925700ED /* CAPlaySpeex */;
+			targetProxy = 3AA80C7F386C457D906DE8E1 /* PBXContainerItemProxy */;
+		};
+		9A12B424C9254A55BFBF0CE5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 10F83A8020F3427E00AF8222 /* APlay */;
+			targetProxy = A27D49096ED5472C80BAD135 /* PBXContainerItemProxy */;
+		};
+		0AF431929525432FA7164EA1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BC7DBC1DDE2D424E82A10AE1 /* CAPlayWavPack */;
+			targetProxy = 8F48B051D45A4FF7AA675140 /* PBXContainerItemProxy */;
+		};
+		33F0600268304CB5AF534B73 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2FFF6453D2A643A4829E571A /* APlayWavPack */;
+			targetProxy = 19C0FF77485A48C8BC038AD7 /* PBXContainerItemProxy */;
+		};
+		B96BF6D925974D749FD0623F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 10F83A8020F3427E00AF8222 /* APlay */;
+			targetProxy = 60F88A52EFD040E9A00297AA /* PBXContainerItemProxy */;
+		};
+		5C85FF72CA8842CF87643DAC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5DAFC4ACD7E445289ECC600 /* CAPlayOgg */;
+			targetProxy = 4CFA9055758447078BBB68C0 /* PBXContainerItemProxy */;
+		};
+		6F7C0923FA864DA0A63DF267 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA09DD66E27F46D5AC5D357D /* CAPlayVorbis */;
+			targetProxy = C6E217B6D23D4B8C959A572D /* PBXContainerItemProxy */;
+		};
+		DBB2B02FEAAA4CB8AB264D8E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7F4182CE29E347559563F965 /* APlayVorbis */;
+			targetProxy = C3A3BD20AB2D493BA5923454 /* PBXContainerItemProxy */;
+		};
+		B7A0D4ADFB2D45D78DF6C5A0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 10F83A8020F3427E00AF8222 /* APlay */;
+			targetProxy = DEC105F9B96B48EEAB591CFC /* PBXContainerItemProxy */;
+		};
+		A2C08ABC0DD5464B9686D2C3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5DAFC4ACD7E445289ECC600 /* CAPlayOgg */;
+			targetProxy = 23DCE96E28E143F19F69A121 /* PBXContainerItemProxy */;
+		};
+		975D58E332C74B36BE82AAAA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 91FF50AECEE64C37925700ED /* CAPlaySpeex */;
+			targetProxy = 922E588037DF484C93F40304 /* PBXContainerItemProxy */;
+		};
+		5DA6E8FD8D8E4EF9A73EF696 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 06633798F40747619100ABA7 /* APlaySpeex */;
+			targetProxy = E79958F06EB8469B80E88459 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
@@ -913,6 +1963,12 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 		106D4F1021F5D9B900EA58C4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = L5W9FHSX92;
@@ -932,6 +1988,12 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 		106D4F1121F5D9B900EA58C4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = L5W9FHSX92;
@@ -1294,6 +2356,502 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 			};
 			name = Release;
 		};
+		DF8FEB3A851640A2B02DCA2A /* CAPlayOgg */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlayOgg;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlayOgg/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlayOgg;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8EEC58E62F694A1FABFD61DF /* CAPlayOgg */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlayOgg;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlayOgg/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlayOgg;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		656DAE3C614F4C3EB9843159 /* CAPlayWavPack */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlayWavPack;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayWavPack",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include/wavpack",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlayWavPack/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlayWavPack;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		EF2E778EE93B4C6C8EFEC372 /* CAPlayWavPack */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlayWavPack;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayWavPack",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include/wavpack",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlayWavPack/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlayWavPack;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CB6779AFCE6F414BB9CD4979 /* CAPlayVorbis */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlayVorbis;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayVorbis",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlayVorbis/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlayVorbis;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CDEFD80F36F74009B0C2486D /* CAPlayVorbis */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlayVorbis;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayVorbis",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlayVorbis/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlayVorbis;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E3DE9903C2304FCD8D8AB625 /* CAPlaySpeex */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlaySpeex;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlaySpeex",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlaySpeex/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"FLOATING_POINT=1",
+					"HAVE_CONFIG_H=1",
+					"USE_KISS_FFT=1",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlaySpeex;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C6A2BFC8E3E6481BAE84A067 /* CAPlaySpeex */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CAPlaySpeex;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Sources/CAPlaySpeex",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				MODULEMAP_FILE = "$(SRCROOT)/Sources/CAPlaySpeex/framework.modulemap";
+				OTHER_CFLAGS = (
+					"-I",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+					"-I",
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"FLOATING_POINT=1",
+					"HAVE_CONFIG_H=1",
+					"USE_KISS_FFT=1",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.CAPlaySpeex;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		03644C52731144D1B59127B9 /* APlayWavPack */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = APlayWavPack;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.APlayWavPack;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6D1ADF28654A4CA79510B1B7 /* APlayWavPack */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = APlayWavPack;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayWavPack/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.APlayWavPack;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BEE5E3334D904C84BA5F0D90 /* APlayVorbis */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = APlayVorbis;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.APlayVorbis;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		947F505210D7463E95E4A955 /* APlayVorbis */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = APlayVorbis;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+					"$(SRCROOT)/Sources/CAPlayVorbis/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.APlayVorbis;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		69186B0662CC4CD7AAE0B87C /* APlaySpeex */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = APlaySpeex;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.APlaySpeex;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F9756E071C0F4FB4BF5FF34B /* APlaySpeex */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1.0.0;
+				DYLIB_CURRENT_VERSION = 1.0.0;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = APlaySpeex;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/Sources/CAPlayOgg/include",
+					"$(SRCROOT)/Sources/CAPlaySpeex/include",
+				);
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = (
+								"$(inherited)",
+								"@executable_path/Frameworks",
+								"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.Selfstudio.APlaySpeex;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1350,6 +2908,69 @@ A5E0A500000000000000110E /* IcyTestServer.swift */ = {isa = PBXFileReference; la
 					);
 					defaultConfigurationIsVisible = 0;
 					defaultConfigurationName = Release;
+		};
+		96DA39AA8A6C44908450969C /* Build configuration list for PBXNativeTarget "CAPlayOgg" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DF8FEB3A851640A2B02DCA2A /* Debug */,
+				8EEC58E62F694A1FABFD61DF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77C4593F64D7444584379476 /* Build configuration list for PBXNativeTarget "CAPlayWavPack" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				656DAE3C614F4C3EB9843159 /* Debug */,
+				EF2E778EE93B4C6C8EFEC372 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9BD3335F24DD40A78A068440 /* Build configuration list for PBXNativeTarget "CAPlayVorbis" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CB6779AFCE6F414BB9CD4979 /* Debug */,
+				CDEFD80F36F74009B0C2486D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7E82308FA11C49FAB09AEC96 /* Build configuration list for PBXNativeTarget "CAPlaySpeex" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E3DE9903C2304FCD8D8AB625 /* Debug */,
+				C6A2BFC8E3E6481BAE84A067 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		133C556734C94E4380A0C41E /* Build configuration list for PBXNativeTarget "APlayWavPack" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				03644C52731144D1B59127B9 /* Debug */,
+				6D1ADF28654A4CA79510B1B7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D9CF7C19AF9D4216B026AF09 /* Build configuration list for PBXNativeTarget "APlayVorbis" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BEE5E3334D904C84BA5F0D90 /* Debug */,
+				947F505210D7463E95E4A955 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9F704A83EDB34B4D80D016B1 /* Build configuration list for PBXNativeTarget "APlaySpeex" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				69186B0662CC4CD7AAE0B87C /* Debug */,
+				F9756E071C0F4FB4BF5FF34B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

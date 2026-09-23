@@ -68,6 +68,23 @@ public final class VorbisDecoder: @unchecked Sendable, AudioDecoderCompatible {
         close_func: nil,
         tell_func: vorbisTellFunc)
 
+    /// Declares the source as the codec's own FourCC rather than
+    /// `kAudioFormatLinearPCM`: the library delivers canonical PCM through
+    /// `dstFormat`, and the pipeline hands a PCM `srcFormat` straight to the
+    /// audio unit — a half-filled one (0 bits, 0 bytes/frame) would leave the
+    /// unit on a degenerate ASBD and emit silence. `mChannelsPerFrame` stays
+    /// filled because the converter reads it back for the down/up-mix.
+    private static func sourceFormat(rate: Double, channels: UInt32) -> AudioStreamBasicDescription {
+        var fourcc: UInt32 = 0                       // "vorb", the Ogg mapping magic
+        for byte in "vorb".utf8 { fourcc = fourcc << 8 | UInt32(byte) }
+        return AudioStreamBasicDescription(
+            mSampleRate: rate,
+            mFormatID: fourcc,
+            mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0,
+            mBytesPerFrame: 0, mChannelsPerFrame: channels,
+            mBitsPerChannel: 0, mReserved: 0)
+    }
+
     /// Decoded PCM is delivered in the pipeline's canonical format.
     private static let canonical: AudioStreamBasicDescription = {
         let bytesPerSample = UInt32(MemoryLayout<Int16>.size)
@@ -236,17 +253,25 @@ public final class VorbisDecoder: @unchecked Sendable, AudioDecoderCompatible {
         let channels = max(Int(info.channels), 1)
         _floatBuffer = Array(repeating: 0, count: _decodeChunk * channels)
 
-        _info.srcFormat = AudioStreamBasicDescription(
-            mSampleRate: sampleRate,
-            mFormatID: CoreAudio.kAudioFormatLinearPCM,
-            mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0,
-            mBytesPerFrame: 0, mChannelsPerFrame: UInt32(channels),
-            mBitsPerChannel: 0, mReserved: 0)
+        _info.srcFormat = Self.sourceFormat(rate: sampleRate, channels: UInt32(channels))
         _info.dstFormat = Self.canonical
         _info.sampleRate = sampleRate
         _info.audioDataByteCount = UInt(data.count)
         _info.dataOffset = 0
         _info.fileHint = .ogg
+        // libvorbis has already walked the whole stream to build its page
+        // index, so the total is exact: samples per channel at the source
+        // rate, one frame per packet. Without it the duration is 0 and the
+        // end-of-track check replays the file in a loop instead of playing it.
+        let totalSamples = ov_pcm_total(&_vorbisFile, -1)
+        if totalSamples > 0 {
+            _info.audioDataPacketCount = UInt(totalSamples)
+            _info.srcFormat.mFramesPerPacket = 1
+        }
+        // The pipeline reads `isUpdated` before configuring the audio unit, and
+        // treats a PCM `srcFormat` as render-ready — a half-filled one would
+        // leave the unit on a degenerate ASBD and emit silence.
+        _info.markAsUpdated()
     }
 
     // MARK: - Decoding

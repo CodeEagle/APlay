@@ -78,6 +78,27 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
     /// The header and the Ogg comment packet precede the first audio packet.
     fileprivate static let firstAudioPacket = 2
     private var _packetsSeen = 0
+    /// Decoded frames accumulated across decode ticks. Speex has no
+    /// library-callable length, so the duration is taken from what was
+    /// actually decoded; a whole file empties in one tick, so the count is
+    /// complete before the first duration announcement.
+    private var _decodedFrames: UInt = 0
+
+    /// Declares the source as the codec's own FourCC rather than
+    /// `kAudioFormatLinearPCM`: the library delivers canonical PCM through
+    /// `dstFormat`, and the pipeline hands a PCM `srcFormat` straight to the
+    /// audio unit — a half-filled one (0 bits, 0 bytes/frame) would leave the
+    /// unit on a degenerate ASBD and emit silence.
+    private static func sourceFormat(rate: Double, channels: UInt32) -> AudioStreamBasicDescription {
+        var fourcc: UInt32 = 0                       // "Spee", the header packet magic
+        for byte in "Spee".utf8 { fourcc = fourcc << 8 | UInt32(byte) }
+        return AudioStreamBasicDescription(
+            mSampleRate: rate,
+            mFormatID: fourcc,
+            mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0,
+            mBytesPerFrame: 0, mChannelsPerFrame: channels,
+            mBitsPerChannel: 0, mReserved: 0)
+    }
 
     /// Decoded PCM is delivered in the pipeline's canonical format.
     private static let canonical: AudioStreamBasicDescription = {
@@ -137,6 +158,15 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
 
     // MARK: - File lifecycle
 
+    /// Destroys the libspeex bit allocator. `speex_bits_destroy` frees
+    /// `chars` but leaves the dangling pointer and `owner` set, so it must not
+    /// run twice — `closeFile` is called from `prepare`, `destroy` and
+    /// `deinit`, and zeroing the struct makes repeats a no-op.
+    private func destroyBits() {
+        speex_bits_destroy(&_bits)
+        _bits = SpeexBits()
+    }
+
     private func closeFile() {
         _stateQueue.sync {
             if let state = _state {
@@ -147,7 +177,7 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
                 speex_stereo_state_destroy(stereo)
                 _stereoState = nil
             }
-            speex_bits_destroy(&_bits)
+            destroyBits()
             ogg_stream_clear(&_oggStream)
             ogg_sync_clear(&_oggSync)
             _fileData.removeAll(keepingCapacity: false)
@@ -232,17 +262,16 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
         _frameSize = Int(max(frameSize, 1))
         _decodeBuffer = Array(repeating: 0, count: _frameSize * max(_srcChannels, 2))
 
-        _info.srcFormat = AudioStreamBasicDescription(
-            mSampleRate: _sampleRate,
-            mFormatID: CoreAudio.kAudioFormatLinearPCM,
-            mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0,
-            mBytesPerFrame: 0, mChannelsPerFrame: UInt32(_srcChannels),
-            mBitsPerChannel: 0, mReserved: 0)
+        _info.srcFormat = Self.sourceFormat(rate: _sampleRate, channels: UInt32(_srcChannels))
         _info.dstFormat = Self.canonical
         _info.sampleRate = _sampleRate
         _info.audioDataByteCount = UInt(data.count)
         _info.dataOffset = 0
         _info.fileHint = .speex
+        // The pipeline reads `isUpdated` before configuring the audio unit, and
+        // treats a PCM `srcFormat` as render-ready — a half-filled one would
+        // leave the unit on a degenerate ASBD and emit silence.
+        _info.markAsUpdated()
     }
 
     /// The parser error every open-time failure reports.
@@ -301,6 +330,7 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
                 speex_decode_int(state, &_bits, buffer.baseAddress)
             }
             guard status >= 0 else { continue }
+            _decodedFrames &+= UInt(_frameSize)
             if let stereo = _stereoState, _srcChannels == 2 {
                 _decodeBuffer.withUnsafeMutableBufferPointer { buffer in
                     speex_decode_stereo_int(buffer.baseAddress, Int32(_frameSize), stereo)
@@ -313,6 +343,14 @@ public final class SpeexDecoder: @unchecked Sendable, AudioDecoderCompatible {
             stop()
             outputStream.call(.empty)
             return
+        }
+        // `audioDataPacketCount` is only meaningful once decoding is done; a
+        // partial count would underestimate a mid-stream announcement. The
+        // loop above has either consumed the whole file or hit an error, so
+        // this is the final tally.
+        if _decodedFrames > 0 {
+            _info.audioDataPacketCount = _decodedFrames
+            _info.srcFormat.mFramesPerPacket = 1
         }
         _outputBuffer.withUnsafeBytes { rawBuffer in
             outputStream.call(.output((rawBuffer.baseAddress!, UInt32(rawBuffer.count))))

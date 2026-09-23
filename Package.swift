@@ -124,7 +124,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "APlayMacPlayback",
-            dependencies: ["APlay", "APlayMidi", "APlayOpus"],
+            dependencies: ["APlay", "APlayMidi", "APlayOpus", "APlayWavPack", "APlayVorbis", "APlaySpeex"],
             path: "MacPlayback"
         ),
         .testTarget(

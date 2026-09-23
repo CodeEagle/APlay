@@ -1,0 +1,4 @@
+module CAPlayWavPack {
+    header "wavpack/wavpack.h"
+    export *
+}

@@ -1,0 +1,9 @@
+framework module CAPlaySpeex {
+    header "speex.h"
+    header "speex_bits.h"
+    header "speex_callbacks.h"
+    header "speex_header.h"
+    header "speex_stereo.h"
+    header "speex_types.h"
+    export *
+}

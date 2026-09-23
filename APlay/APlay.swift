@@ -415,7 +415,13 @@ private extension APlay {
                 }
             }
         }
-        guard let dur = _currentComposer?.duration, dur.isFinite else { return }
+        // A duration of 0 means the format never reported one (WavPack,
+        // Vorbis, Speex and other whole-file decoders outside Core Audio).
+        // The delta check below is meaningless against it — `currentTime` is
+        // still 0 while the track buffers, so `delta` is 0 and the track would
+        // be pronounced over before it ever started, replaying it forever.
+        // End detection for these tracks is the frozen-time path above.
+        guard let dur = _currentComposer?.duration, dur.isFinite, dur > 0 else { return }
         let delta = abs(currentTime - dur)
         let deltaThreshold: Float = 0.02
         let lastDeltaHitThreshold = 2

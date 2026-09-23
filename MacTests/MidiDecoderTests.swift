@@ -296,4 +296,54 @@ final class MidiDecoderTests: XCTestCase {
                        "the fallback decoder must prepare for a local mp3")
         XCTAssertEqual(fake.prepareFileHints, [.mp3])
     }
+
+    /// Routing `prepare` is not enough: the pipeline pushes bytes at this
+    /// decoder's `inputStream`, reads its `info` for duration and sample rate,
+    /// and subscribes to its `outputStream` for decoded PCM. A format this
+    /// library does not own must carry all three through to the fallback — the
+    /// seam a wrapper silently drops when it forgets it, which left every
+    /// non-file, non-MIDI track in the demo matrix playing nothing while the
+    /// bytes were discarded and the format stayed empty.
+    func testFallbackReceivesBytesAndSurfacesItsOutput() throws {
+        let fake = FakeDecoder()
+        fake.recordInput()
+        let url = try fixture("tone-cbr", "mp3")
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .mp3)
+        fake.setAttached(streamer)
+
+        let decoder = APlayMidi.decoder(fallback: { _ in fake })(config)
+        try decoder.prepare(for: streamer, at: 0)
+
+        // Bytes pushed at the wrapper must land in the fallback decoder.
+        let bytes: [UInt8] = [0x01, 0x02, 0x03, 0x04]
+        bytes.withUnsafeBufferPointer { buffer in
+            decoder.inputStream.call((buffer.baseAddress!, UInt32(buffer.count), true))
+        }
+        XCTAssertEqual(fake.inputPackets.count, 1,
+                       "the fallback must receive every pushed packet")
+        XCTAssertEqual(fake.inputPackets.first?.bytes, bytes)
+        XCTAssertEqual(fake.inputPackets.first?.isFirst, true)
+
+        // Events the fallback emits must surface on the wrapper's stream.
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+        let pcm: [UInt8] = [0x10, 0x20, 0x30, 0x40]
+        pcm.withUnsafeBufferPointer { buffer in
+            fake.outputStream.call(.output((UnsafeRawPointer(buffer.baseAddress!),
+                                            UInt32(buffer.count))))
+        }
+        XCTAssertEqual(collector.totalBytes, pcm.count,
+                       "the fallback's decoded output must reach the pipeline")
+
+        // The wrapper must expose the fallback's parsed format, not its own
+        // empty one — the pipeline reads duration and sample rate through it.
+        fake.info.sampleRate = 44_100
+        fake.info.markAsUpdated()
+        XCTAssertEqual(decoder.info.sampleRate, 44_100)
+        XCTAssertTrue(decoder.info.isUpdated)
+        XCTAssertTrue(decoder.seekable())
+    }
 }

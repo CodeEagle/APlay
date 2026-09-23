@@ -109,6 +109,9 @@ public final class MidiDecoder: @unchecked Sendable, AudioDecoderCompatible {
     private var _timer: DispatchSourceTimer?
     private var _isStopped = true
     private var _isDestroyed = false
+    /// True while a `prepare` was routed to the fallback, so `info`, seekability
+    /// and the byte stream follow it instead of this decoder's empty state.
+    private var _handedOff = false
     /// Set when `resume` arrives before the file is open; the timer starts
     /// once `prepare` has built the engine.
     private var _pendingResume = false
@@ -127,6 +130,17 @@ public final class MidiDecoder: @unchecked Sendable, AudioDecoderCompatible {
         _config = config
         _fallback = fallback
         _soundfont = soundfont
+        // The pipeline subscribes to *this* decoder when it is built, so a URL
+        // the fallback takes must still surface its events and its bytes —
+        // otherwise installing this product would silence every format it does
+        // not own.
+        _fallback.outputStream.delegate(to: self) { decoder, event in
+            decoder._outputStream.call(event)
+        }
+        _inputStream.delegate(to: self) { decoder, input in
+            guard decoder._handedOff else { return }
+            decoder._fallback.inputStream.call(input)
+        }
         let timer = DispatchSource.makeTimerSource(flags: [], queue: _decodeQueue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(20))
         timer.setEventHandler { [weak self] in self?.decodeTick() }
@@ -305,13 +319,15 @@ public final class MidiDecoder: @unchecked Sendable, AudioDecoderCompatible {
 
     // MARK: - AudioDecoderCompatible
 
-    public var info: AudioDecoder.Info { _info }
+    public var info: AudioDecoder.Info { _handedOff ? _fallback.info : _info }
     public var outputStream: Delegated<AudioDecoder.Event, Void> { _outputStream }
     public var inputStream: Delegated<AudioDecoder.AudioInput, Void> { _inputStream }
 
     /// The whole file is buffered and the sequencer is positionable, so a seek
     /// to any time is possible once the file is open.
-    public func seekable() -> Bool {        _stateQueue.sync { _engine != nil }
+    public func seekable() -> Bool {
+        if _handedOff { return _fallback.seekable() }
+        return _stateQueue.sync { _engine != nil }
     }
 
     public func prepare(for provider: StreamProviderCompatible,
@@ -319,7 +335,12 @@ public final class MidiDecoder: @unchecked Sendable, AudioDecoderCompatible {
         // Only own MIDI hints; anything else belongs to the fallback decoder.
         guard case let .local(url, hint) = provider.info,
               APlayMidi.handledHints.contains(hint) else {
+            _handedOff = true
             return try _fallback.prepare(for: provider, at: position)
+        }
+        if _handedOff {
+            _handedOff = false
+            _fallback.pause()
         }
         try openFile(at: url, position: position, contentLength: provider.contentLength)
     }

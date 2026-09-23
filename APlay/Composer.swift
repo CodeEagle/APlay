@@ -32,6 +32,9 @@ final class Composer: @unchecked Sendable {
     private lazy var _queue = DispatchQueue(concurrentName: "Composer")
     private lazy var _isRuning = false
     private lazy var __isDoubleChecked = false
+    private let _resumeLock = NSLock()
+    /// A token makes automatic startup one-shot and invalidates queued work on teardown.
+    private var _pendingResume: UUID?
 
     private var _isDoubleChecked: Bool {
         get { return _queue.sync { __isDoubleChecked } }
@@ -72,14 +75,6 @@ final class Composer: @unchecked Sendable {
             case let .hasBytesAvailable(data, count, isFirstPacket):
                 let bufProgress = sself._streamer.bufferingProgress
                 sself.eventPipeline.call(.buffering(bufProgress))
-                if sself._streamer.info.isRemoteWave {
-                    let targetPercentage = sself._config.preBufferWaveFormatPercentageBeforePlay
-                    if bufProgress > targetPercentage {
-                        DispatchQueue.main.async {
-                            sself._player?.resume()
-                        }
-                    }
-                }
                 sself._decoder.info.fileHint = sself._streamer.info.fileHint
                 sself._decoder.inputStream.call((data, count, isFirstPacket))
             case .endEncountered:
@@ -124,6 +119,7 @@ final class Composer: @unchecked Sendable {
                     }
                 }
                 sself._ringBuffer.write(data: item.0, amount: item.1)
+                if item.1 > 0 { sself.resumeWhenBuffered() }
                 // Bitrate events are the usual trigger, but they never arrive
                 // for three classes of track that can still compute a duration:
                 // Opus/MIDI report it through the container instead of the
@@ -153,6 +149,26 @@ final class Composer: @unchecked Sendable {
         DispatchQueue.main.async {
             let d = Int(ceil(self.duration))
             self.eventPipeline.call(.duration(d))
+        }
+    }
+
+    /// Decoded bytes, rather than the absolute download position, establish
+    /// readiness after every open/seek (including local files and unknown lengths).
+    /// Enqueued after format setup and the ring-buffer write, so rendering can
+    /// consume audio immediately. Prepared tracks never arm this token.
+    private func resumeWhenBuffered() {
+        _resumeLock.lock()
+        let token = _pendingResume
+        _resumeLock.unlock()
+        guard let token else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self._resumeLock.lock()
+            let shouldResume = self._pendingResume == token
+            if shouldResume { self._pendingResume = nil }
+            self._resumeLock.unlock()
+            guard shouldResume else { return }
+            self._player?.resume()
         }
     }
 
@@ -228,17 +244,15 @@ extension Composer {
 
     func play(_ url: URL, position: StreamProvider.Position = 0, info: AudioDecoder.Info? = nil, autoplay: Bool = true) {
         isPreloading = autoplay == false
+        _resumeLock.lock()
+        _pendingResume = autoplay ? UUID() : nil
+        _resumeLock.unlock()
         eventPipeline.toggle(enable: true)
         if let value = info { _decoder.info.update(from: value) }
-        _decoder.resume()
-        _streamer.open(url: url, at: position)
         _player?.setup(Player.canonical)
         installReadSource()
-        if autoplay, _streamer.info.isRemoteWave == false {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: { [weak self] in
-                self?._player?.resume()
-            })
-        }
+        _decoder.resume()
+        _streamer.open(url: url, at: position)
         isRunning = true
         _config.startBackgroundTask(isToDownloadImage: false)
     }
@@ -390,6 +404,9 @@ extension Composer {
     }
 
     func destroy() {
+        _resumeLock.lock()
+        _pendingResume = nil
+        _resumeLock.unlock()
         _ringBuffer.clear()
         eventPipeline.toggle(enable: false)
         _decoder.destroy()

@@ -32,7 +32,8 @@ final class FakeStreamProvider: StreamProviderCompatible {
         // Reflect the requested url so callers that key on `composer.url`
         // (preload reuse) see a match, while keeping whatever file hint the
         // test configured (issue #17 asserts an injected decoder sees .opus).
-        info = .remote(url, info.fileHint)
+        info = url.isFileURL ? .local(url, info.fileHint) : .remote(url, info.fileHint)
+        self.position = position
     }
 
     func destroy() { destroyCount += 1 }
@@ -156,7 +157,7 @@ final class ComposerCoordinationTests: XCTestCase {
         let player = FakePlayer()
         let collector = Collector()
 
-        streamer.info = .remote(url, fileHint)
+        streamer.info = url.isFileURL ? .local(url, fileHint) : .remote(url, fileHint)
 
         // Point the decoder's prepare assertion at the streamer the Composer
         // actually builds with.
@@ -280,7 +281,111 @@ final class ComposerCoordinationTests: XCTestCase {
         harness.composer.startPlayback()
 
         XCTAssertEqual(harness.composer.isPreloading, false)
-        // The 0.5s auto-resume has not fired yet, and startPlayback must not add one.
+        // No decoded audio has arrived, and startPlayback must not add a resume.
+        XCTAssertEqual(harness.player.resumeCount, 0)
+    }
+
+    // MARK: - Buffered autoplay resume
+
+    private func drainMainQueue() {
+        let drained = expectation(description: "queued main-thread work completed")
+        DispatchQueue.main.async { drained.fulfill() }
+        wait(for: [drained], timeout: 1)
+    }
+
+    private func emitDecodedOutput(_ decoder: FakeDecoder, byteCount: UInt32 = 4) {
+        let payload: [UInt8] = [0x01, 0x02, 0x03, 0x04]
+        payload.withUnsafeBytes { buffer in
+            decoder.outputStream.call(.output((buffer.baseAddress!, byteCount)))
+        }
+    }
+
+    func testAutoplayResumesOnceAfterDecodedOutputWhenSeekingBeforeBufferThreshold() {
+        let url = URL(string: "https://example.com/a.wav")!
+        let harness = makeHarness(url: url, fileHint: .wave)
+        harness.streamer.contentLength = 1000
+        harness.streamer.bufferingProgress = 0.02 // position 20 is below the old 10% threshold.
+        harness.composer.play(url, position: 20)
+        harness.streamer.emit(.readyForRead)
+        drainMainQueue()
+
+        XCTAssertEqual(harness.decoder.prepareCalls, [20])
+        XCTAssertEqual(harness.player.resumeCount, 0)
+
+        emitDecodedOutput(harness.decoder)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 1)
+
+        emitDecodedOutput(harness.decoder)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 1, "autoplay must resume only once")
+    }
+
+    func testAutoplayDoesNotResumeForEmptyDecodedOutput() {
+        let harness = makeHarness()
+        harness.composer.play(harness.streamer.info.url)
+        harness.streamer.emit(.readyForRead)
+
+        emitDecodedOutput(harness.decoder, byteCount: 0)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 0)
+
+        emitDecodedOutput(harness.decoder)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 1, "empty output must leave autoplay armed")
+    }
+
+    func testAutoplayResumesAfterDecodedOutputWhenSeekingPastBufferThreshold() {
+        let url = URL(string: "https://example.com/a.wav")!
+        let harness = makeHarness(url: url, fileHint: .wave)
+        harness.streamer.contentLength = 1000
+        harness.streamer.bufferingProgress = 0.8
+        harness.composer.play(url, position: 800)
+        harness.streamer.emit(.readyForRead)
+        drainMainQueue()
+
+        XCTAssertEqual(harness.decoder.prepareCalls, [800])
+        XCTAssertEqual(harness.player.resumeCount, 0)
+
+        emitDecodedOutput(harness.decoder)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 1)
+    }
+
+    func testLocalFileAutoplayResumesAfterDecodedOutput() {
+        let url = URL(fileURLWithPath: "/tmp/aplay-autoplay.wav")
+        let harness = makeHarness(url: url, fileHint: .wave)
+        harness.composer.play(url)
+        harness.streamer.emit(.readyForRead)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 0)
+
+        emitDecodedOutput(harness.decoder)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 1)
+    }
+
+    func testPreloadingDoesNotResumeAfterDecodedOutput() {
+        let harness = makeHarness()
+        harness.composer.play(harness.streamer.info.url, autoplay: false)
+        harness.streamer.emit(.readyForRead)
+
+        emitDecodedOutput(harness.decoder)
+        drainMainQueue()
+        XCTAssertEqual(harness.player.resumeCount, 0)
+    }
+
+    func testDestroyCancelsQueuedAutoplayResume() {
+        // Keep emission and teardown in one main-thread turn so resume stays queued.
+        XCTAssertTrue(Thread.isMainThread)
+        let harness = makeHarness()
+        harness.composer.play(harness.streamer.info.url)
+        harness.streamer.emit(.readyForRead)
+
+        emitDecodedOutput(harness.decoder)
+        XCTAssertEqual(harness.player.resumeCount, 0)
+        harness.composer.destroy()
+        drainMainQueue()
         XCTAssertEqual(harness.player.resumeCount, 0)
     }
 

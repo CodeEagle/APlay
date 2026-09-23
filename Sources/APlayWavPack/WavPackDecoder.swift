@@ -65,6 +65,22 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
         set_pos_abs: nil, set_pos_rel: nil, push_back_byte: nil,
         get_length: nil, can_seek: nil, truncate_here: nil, close: nil)
 
+    /// Declares the source as the codec's own FourCC rather than
+    /// `kAudioFormatLinearPCM`: the library delivers canonical PCM through
+    /// `dstFormat`, and the pipeline hands a PCM `srcFormat` straight to the
+    /// audio unit — a half-filled one (0 bits, 0 bytes/frame) would leave the
+    /// unit on a degenerate ASBD and emit silence.
+    private static func sourceFormat(rate: Double, channels: UInt32) -> AudioStreamBasicDescription {
+        var fourcc: UInt32 = 0                       // "wvpk", the block header magic
+        for byte in "wvpk".utf8 { fourcc = fourcc << 8 | UInt32(byte) }
+        return AudioStreamBasicDescription(
+            mSampleRate: rate,
+            mFormatID: fourcc,
+            mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0,
+            mBytesPerFrame: 0, mChannelsPerFrame: channels,
+            mBitsPerChannel: 0, mReserved: 0)
+    }
+
     /// Decoded PCM is delivered in the pipeline's canonical format.
     private static let canonical: AudioStreamBasicDescription = {
         let bytesPerSample = UInt32(MemoryLayout<Int16>.size)
@@ -86,6 +102,8 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
     private var _outputBuffer = [UInt8]()
     private let _unpackChunk = 4096            // interleaved samples per unpack call
     private var _srcChannels = 1
+    private var _srcBitsPerSample = 16
+    private var _srcIsFloat = false
 
     public init(config: ConfigurationCompatible, fallback: AudioDecoderCompatible) {
         _config = config
@@ -194,20 +212,33 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
         let sampleRate = WavpackGetSampleRate(context)
         let channels = max(Int(WavpackGetNumChannels(context)), 1)
         _srcChannels = channels
+        // `WavpackUnpackSamples` delivers samples right-justified in the int32
+        // (see unpack_utils.c), so converting to 16-bit canonical PCM scales by
+        // the source's real bit depth rather than assuming a left-aligned payload.
+        _srcBitsPerSample = max(Int(WavpackGetBitsPerSample(context)), 1)
+        _srcIsFloat = WavpackGetFloatNormExp(context) != 0
         // The library writes `frames * channels` int32s for a `frames` request.
         _unpackBuffer = Array(repeating: 0, count: _unpackChunk * channels)
 
-        _info.srcFormat = AudioStreamBasicDescription(
-            mSampleRate: Double(sampleRate),
-            mFormatID: CoreAudio.kAudioFormatLinearPCM,
-            mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0,
-            mBytesPerFrame: 0, mChannelsPerFrame: UInt32(channels),
-            mBitsPerChannel: 0, mReserved: 0)
+        _info.srcFormat = Self.sourceFormat(rate: Double(sampleRate),
+                                               channels: UInt32(channels))
         _info.dstFormat = Self.canonical
         _info.sampleRate = Double(sampleRate)
         _info.audioDataByteCount = UInt(data.count)
         _info.dataOffset = 0
         _info.fileHint = .wavpack
+        // The library knows the exact length, so the duration is exact too —
+        // the packet count is total samples per channel, one frame per
+        // packet (mirrors how APlayOpus reports an Ogg/EBML duration).
+        let totalSamples = WavpackGetNumSamples64(context)
+        if totalSamples > 0 {
+            _info.audioDataPacketCount = UInt(totalSamples)
+            _info.srcFormat.mFramesPerPacket = 1
+        }
+        // The pipeline reads `isUpdated` before it configures the audio unit,
+        // and reconfigures on a PCM `srcFormat` — a half-filled one would
+        // leave the unit on a degenerate ASBD and emit silence.
+        _info.markAsUpdated()
 
         // The APEv2 trailer is read straight off the buffered file; the library
         // exposes it through WavpackGetTagItem, but that touches a NULL
@@ -256,20 +287,29 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
     /// Converts interleaved int32 samples to canonical 16-bit stereo PCM,
     /// down/up-mixing channels and resampling to 44.1 kHz when the source
     /// differs, so the pipeline always gets the format it was configured for.
-    /// 16-bit sources arrive left-aligned in the int32 range, so the high half
-    /// carries the payload.
+    ///
+    /// `WavpackUnpackSamples` delivers samples **right-justified** in the int32
+    /// (see `unpack_utils.c`): a 16-bit source already fills the low half and the
+    /// high half is empty, so shifting right by 16 crushed every sample to 0/-1
+    /// and the track came out silent. Samples are scaled to 16 bits from their
+    /// real bit depth instead. `count` is complete frames, so the buffer spans
+    /// `count * channels` samples; an output frame steps `ratio` source frames,
+    /// so emitting one output frame per source frame read only ever covered the
+    /// first `ratio` of the file (one second of a two-second 22.05 kHz tone).
     private func convertToCanonical(_ samples: UnsafePointer<Int32>, count: Int) {
         let channels = _srcChannels
-        let frames = count / channels
+        let frames = count
         let ratio = _info.sampleRate / Double(Self.canonical.mSampleRate)
+        guard ratio > 0 else { return }
+        let outFrames = Int((Double(frames) / ratio).rounded())
 
         var srcFrame = 0.0
-        for _ in 0..<frames {
+        for _ in 0..<outFrames {
             let index = Int(srcFrame) * channels
-            if index + channels <= count {
+            if index + channels <= frames * channels {
                 var left = 0, right = 0
                 for channel in 0..<channels {
-                    let value = samples[index + channel]
+                    let value = scaledSample(samples[index + channel])
                     switch channel {
                     case 0: left = Int(value)
                     case 1: right = Int(value)
@@ -278,11 +318,27 @@ public final class WavPackDecoder: @unchecked Sendable, AudioDecoderCompatible {
                 }
                 if channels > 2 { left /= channels; right /= (channels - 1) }
                 if channels == 1 { right = left }
-                appendSample(Int16(truncatingIfNeeded: left >> 16))
-                appendSample(Int16(truncatingIfNeeded: right >> 16))
+                appendSample(Int16(clamping: left))
+                appendSample(Int16(clamping: right))
             }
             srcFrame += ratio
         }
+    }
+
+    /// Maps one right-justified library sample onto the 16-bit output range.
+    private func scaledSample(_ raw: Int32) -> Int16 {
+        if _srcIsFloat {
+            // The file was opened without `OPEN_NORMALIZE`, so the int32 holds
+            // the raw float bit pattern; values beyond ±1 (an unnormalised file)
+            // clamp rather than scale. No float fixture ships — integer bit
+            // depth is the supported path.
+            let value = Float(bitPattern: UInt32(bitPattern: raw))
+            return Int16(clamping: Int(value * 32767))
+        }
+        if _srcBitsPerSample <= 16 {
+            return Int16(truncatingIfNeeded: raw)
+        }
+        return Int16(truncatingIfNeeded: raw >> (_srcBitsPerSample - 16))
     }
 
     private func appendSample(_ value: Int16) {

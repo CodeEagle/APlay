@@ -57,6 +57,49 @@ final class WavPackDecoderTests: XCTestCase {
                        "the wrapper delivers canonical PCM")
         XCTAssertEqual(decoder.info.dstFormat.mChannelsPerFrame, 2)
         XCTAssertTrue(decoder.seekable(), "a buffered local file must report seekable")
+        decoder.destroy()
+    }
+
+    /// The library returns samples right-justified in the int32, so a 16-bit
+    /// source already fills the low half — the conversion must scale by bit
+    /// depth, not shift the payload away. The fixture is a 2 s, 22.05 kHz mono
+    /// tone at about an eighth of full scale, so an audible, whole decode peaks
+    /// in the thousands and runs the full two seconds.
+    func testDecodedAudioIsAudibleAndFullLength() throws {
+        let url = try fixture("tone", "wv")
+        let config = APlay.Configuration(logPolicy: .disable)
+        let decoder = APlayWavPack.decoder(fallback: { DefaultAudioDecoder(config: $0) })(config)
+        let collector = OutputCollector()
+        decoder.outputStream.delegate(to: collector) { collector, event in
+            collector.record(event: event)
+        }
+        let streamer = FakeStreamProvider()
+        streamer.info = .local(url, .wavpack)
+        streamer.contentLength = fileSize(of: url)
+
+        decoder.resume()
+        try decoder.prepare(for: streamer, at: 0)
+
+        // Wait for the whole file: the byte floor alone would sample the decode
+        // mid-flight, and a crushed or half-length decode slips past it.
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline, collector.emptyCount == 0 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        XCTAssertEqual(collector.emptyCount, 1, "the decoder must report the end of the file")
+        XCTAssertTrue(collector.errors.isEmpty, "WavPack emitted \(collector.errors.count) errors")
+
+        var peak: Int32 = 0
+        collector.bytes.withUnsafeBytes { raw in
+            let samples = raw.bindMemory(to: Int16.self)
+            for sample in samples { peak = max(peak, abs(Int32(sample))) }
+        }
+        XCTAssertGreaterThan(peak, 2000,
+                             "the samples were crushed to 0/-1 — a right-justified 16-bit value must not be shifted")
+        let seconds = Double(collector.totalBytes / 4) / 44100
+        XCTAssertEqual(seconds, 2.0, accuracy: 0.15,
+                       "the whole file must be decoded, not just the first half")
+        decoder.destroy()
     }
 
     // MARK: - Lifecycle
@@ -86,6 +129,7 @@ final class WavPackDecoderTests: XCTestCase {
         XCTAssertEqual(collector.emptyCount, 1,
                        "the decoder must report the end of the file exactly once")
         XCTAssertTrue(collector.errors.isEmpty)
+        decoder.destroy()
     }
 
     /// Pausing suspends the render timer and resuming picks it back up.
@@ -106,13 +150,27 @@ final class WavPackDecoderTests: XCTestCase {
         XCTAssertTrue(wait(for: collector, minBytes: 20_000))
 
         decoder.pause()
-        let paused = collector.totalBytes
-        Thread.sleep(forTimeInterval: 0.2)
+        // A tick already in flight on the decode queue can land after the
+        // suspend; the pump has stopped once the byte count stops growing.
+        var settled = collector.totalBytes
+        var quiet = 0
+        let settleDeadline = Date().addingTimeInterval(2)
+        while quiet < 4, Date() < settleDeadline {
+            Thread.sleep(forTimeInterval: 0.05)
+            if collector.totalBytes == settled {
+                quiet += 1
+            } else {
+                quiet = 0
+                settled = collector.totalBytes
+            }
+        }
+        let paused = settled
         XCTAssertEqual(collector.totalBytes, paused, "a paused decoder must keep decoding")
 
         decoder.resume()
         XCTAssertTrue(wait(for: collector, minBytes: paused + 20_000),
                       "a resumed decoder must keep decoding")
+        decoder.destroy()
     }
 
     // MARK: - Routing

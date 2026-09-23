@@ -15,6 +15,11 @@ import APlay
 import APlayExtras
 import APlayMidi
 import APlayOpus
+import APlaySpeex
+import APlayVorbis
+import APlayWavPack
+import APlayMidi
+import APlayOpus
 import Combine
 import UIKit
 
@@ -272,6 +277,8 @@ final class DemoPlayer: ObservableObject {
     /// `APlayMidi` sits one step further in: a `.mid` is a note sequence, not
     /// an audio stream, so it is rendered through the bundled SoundFont.
     /// `APlayOpus` takes the WebM/Matroska rows Core Audio has no parser for.
+    /// The three vendored-codec products take the formats Core Audio has no
+    /// decoder for at all: WavPack, Vorbis in Ogg and Speex.
     private static func makeConfig(gapless: Bool, logSink: ((String) -> Void)?) -> APlay.Configuration {
         let soundfont = Bundle.main.url(forResource: "APlayTestSine", withExtension: "sf2")
         return APlay.Configuration(
@@ -283,15 +290,19 @@ final class DemoPlayer: ObservableObject {
             loggerBuilder: { policy in
                 DemoLogger(policy: policy, sink: logSink ?? { _ in })
             },
-            audioDecoderBuilder: APlayExtras.fileDecoder(fallback: APlayMidi.decoder(
-                fallback: APlayOpus.decoder(
-                    fallback: { config in
-                        // A fresh default configuration is the only public way to reach
-                        // the built-in decoder builder; building one here also keeps the
-                        // chain from recursing into this router.
-                        APlay.Configuration().audioDecoderBuilder(config)
-                    }),
-                soundfont: .init(url: soundfont)))
+            audioDecoderBuilder: APlayExtras.fileDecoder(
+                fallback: APlayMidi.decoder(
+                    fallback: APlayOpus.decoder(
+                        fallback: APlayWavPack.decoder(
+                            fallback: APlayVorbis.decoder(
+                                fallback: APlaySpeex.decoder(
+                                    fallback: { config in
+                                        // A fresh default configuration is the only public way to reach
+                                        // the built-in decoder builder; building one here also keeps the
+                                        // chain from recursing into this router.
+                                        APlay.Configuration().audioDecoderBuilder(config)
+                                    })))),
+                    soundfont: .init(url: soundfont)))
         )
     }
 
@@ -462,7 +473,11 @@ final class DemoPlayer: ObservableObject {
         nowPlayingAlbum = track.route == .native
             ? "APlay · native decoder"
             : track.route == .midi ? "APlayMidi · SoundFont sampler"
-            : track.route == .opus ? "APlayOpus · EBML demuxer" : "APlayExtras · ExtAudioFile"
+            : track.route == .opus ? "APlayOpus · EBML demuxer"
+            : track.route == .wavPack ? "APlayWavPack · vendored C"
+            : track.route == .vorbis ? "APlayVorbis · libvorbis"
+            : track.route == .speex ? "APlaySpeex · libspeex"
+            : "APlayExtras · ExtAudioFile"
         let seed = track.resourceName + "." + track.resourceType
         cover = CoverArt.image(forSeed: seed)
         coverPalette = CoverArt.palette(forSeed: seed)

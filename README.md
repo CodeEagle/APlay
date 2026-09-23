@@ -118,13 +118,14 @@ metadata *and* decodes to canonical PCM.
 | AAC (LC / HE-AAC v1 / v2 / ELD) | `.m4a` `.mp4` `.mp4f` `.mpg4` | MP4 and raw ADTS verified |
 | AAC raw ADTS | `.aac` `.adts` `.aacp` | |
 | Audiobook MP4 | `.m4b` | hinted so Core Audio takes the MP4 branch |
-| MP3 / MP2 | `.mp3` `.mp2` | CBR and VBR MP3; seek supported |
+| MP3 | `.mp3` | decodes on macOS and iOS; CBR and VBR; seek supported |
+| MP2 | `.mp2` | decodes on macOS; iOS does not expose the MPEG Layer II decoder to third-party apps — verified on an iOS 27 device, where `AudioConverterNew` returns `'fmt?'` |
 | FLAC | `.flac` | seek supported (with a seek table) |
 | Opus in OGG | `.opus` | Core Audio parses the container |
 | WAVE PCM | `.wav` `.wave` | tolerates extra chunks before `data`; seek supported |
 | IMA ADPCM in WAVE | `.wav` | Core Audio reports it as linear PCM |
 | ALAC in MP4 | `.m4a` | the magic cookie reaches the converter (2.1.0) |
-| Dolby Digital / Plus | `.ac3` `.eac3` | decodes on macOS; iOS does not expose the Dolby decoders to third-party apps — AVPlayer can still play them from an MP4/MOV track |
+| Dolby Digital / Plus | `.ac3` `.eac3` | decodes on macOS and iOS — verified in audio on an iPhone 15 Pro Max / iOS 27.0; the rows only looked iOS-broken while a decoder-chain bug silenced every non-file format |
 
 **Optional libraries** — the products above plug into one seam and claim only their own
 extensions; everything else falls through to the built-in decoder:

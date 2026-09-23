@@ -22,6 +22,14 @@ enum DecodeRoute: String, Hashable, Sendable {
     /// Demuxed by `APlayOpus` — Core Audio has the Opus codec but no parser
     /// for the EBML container, so the track is pulled apart in Swift.
     case opus = "APlayOpus · EBML demuxer"
+    /// Decoded by `APlayWavPack` — Core Audio ships no WavPack decoder, so the
+    /// reference C library is vendored.
+    case wavPack = "APlayWavPack · vendored C"
+    /// Decoded by `APlayVorbis` — Core Audio knows the Ogg container but ships
+    /// no Vorbis decoder.
+    case vorbis = "APlayVorbis · libvorbis"
+    /// Decoded by `APlaySpeex` — Core Audio has no Speex decoder at all.
+    case speex = "APlaySpeex · libspeex"
 
     var badge: String {
         switch self {
@@ -29,6 +37,9 @@ enum DecodeRoute: String, Hashable, Sendable {
         case .fileFallback: return "APlayExtras"
         case .midi: return "APlayMidi"
         case .opus: return "APlayOpus"
+        case .wavPack: return "APlayWavPack"
+        case .vorbis: return "APlayVorbis"
+        case .speex: return "APlaySpeex"
         }
     }
 }
@@ -95,7 +106,7 @@ enum TrackLibrary {
               route: .native, isShowcase: false),
         Track(resourceName: "tone-mp2", resourceType: "mp2",
               format: "MP2",
-              detail: "MPEG Layer II — the format used in broadcast and Video CD.",
+              detail: "Decodes on macOS; iOS does not expose the MPEG Layer II decoder to third-party apps.",
               route: .native, isShowcase: false),
         Track(resourceName: "tone", resourceType: "aac",
               format: "AAC · ADTS",
@@ -123,11 +134,11 @@ enum TrackLibrary {
               route: .native, isShowcase: false),
         Track(resourceName: "tone", resourceType: "ac3",
               format: "AC-3",
-              detail: "Decodes on macOS; iOS keeps the Dolby decoder away from third-party apps.",
+              detail: "Dolby Digital — Core Audio decodes it on macOS and iOS alike.",
               route: .native, isShowcase: false),
         Track(resourceName: "tone", resourceType: "eac3",
               format: "E-AC-3",
-              detail: "Dolby Digital Plus — the same licensing wall as AC-3 on iOS.",
+              detail: "Dolby Digital Plus — decodes on both platforms too.",
               route: .native, isShowcase: false),
 
         Track(resourceName: "tone", resourceType: "aiff",
@@ -168,17 +179,34 @@ enum TrackLibrary {
               detail: "The same container carrying scripted tags, demuxed and decoded in Swift.",
               route: .opus, isShowcase: false),
 
+        Track(resourceName: "tone", resourceType: "wv",
+              format: "WavPack",
+              detail: "No Core Audio decoder — the reference C library is vendored as APlayWavPack.",
+              route: .wavPack, isShowcase: false),
+        Track(resourceName: "tone", resourceType: "ogg",
+              format: "Vorbis · Ogg",
+              detail: "Core Audio knows the container but ships no Vorbis decoder — libvorbis is vendored.",
+              route: .vorbis, isShowcase: false),
+        Track(resourceName: "tone", resourceType: "spx",
+              format: "Speex",
+              detail: "No Core Audio decoder — libspeex is vendored, sharing the Ogg framing layer.",
+              route: .speex, isShowcase: false),
+
         Track(resourceName: "melody", resourceType: "mid",
               format: "MIDI",
               detail: "A note sequence rather than an audio stream, rendered through the bundled SoundFont.",
               route: .midi, isShowcase: false),
     ]
 
-    /// Formats Core Audio will not decode on iOS — the Dolby decoders are
-    /// licensed and not exposed to third-party apps, so the matrix reports
-    /// them as unsupported rather than failed. Verified on an iPhone 15 Pro
-    /// Max / iOS 27.0; the same rows decode on macOS.
-    static let iosUnsupportedFormats: Set<String> = ["AC-3", "E-AC-3"]
+    /// Formats Core Audio will not decode on iOS. Only MP2 belongs here: iOS
+    /// does not expose an MPEG Layer II decoder, so the matrix reports it as
+    /// unsupported rather than failed (verified on an iPhone 15 Pro Max /
+    /// iOS 27.0, where `AudioConverterNew` returns 'fmt?'; the same row
+    /// decodes on macOS).
+    /// AC-3 and E-AC-3 were once listed here, but the rows only looked broken
+    /// because a decoder-chain bug silenced every non-file track; with that
+    /// fixed they decode and play on the same device.
+    static let iosUnsupportedFormats: Set<String> = ["MP2"]
 
     /// Remote source shipped by the old demo, kept to show HTTP streaming.
     static let remoteURL = URL(string: "https://raw.githubusercontent.com/CodeEagle/APlay/master/APlayDemo/a.m4a")!

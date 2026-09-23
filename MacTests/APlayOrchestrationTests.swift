@@ -82,6 +82,19 @@ final class APlayOrchestrationTests: XCTestCase {
                 streamers[streamerIndex].emit(.hasBytesAvailable(ptr.baseAddress!, UInt32(Self.payload.count), true))
             }
         }
+
+        /// Ends the current track the way a whole-file decoder does once its
+        /// ring buffer drains: the stream is already fully received, the
+        /// reported clock stops advancing, and the end-of-track detection keys
+        /// on the stall. A decoder `.empty` with a clock that never moved is a
+        /// buffered track, not a finished one — treating it as over replays the
+        /// file in a loop instead of playing it.
+        func stallCurrentTrack() {
+            player.currentTimeValue = 2
+            player.eventPipeline.call(.playback(2))
+            player.eventPipeline.call(.playback(2))
+            player.eventPipeline.call(.playback(2))
+        }
     }
 
     /// Mutable box the builder closures capture, since they run before the
@@ -163,9 +176,10 @@ final class APlayOrchestrationTests: XCTestCase {
         harness = h
         h.aplay.play([url1, url2], at: 0)
 
-        // The stream reports end, then the decoded ring buffer drains.
+        // The stream reports end, then the decoded ring buffer drains and the
+        // reported clock stalls — that stall is the end-of-track signal.
         h.streamers.first?.emit(.endEncountered)
-        h.decoders.first?.outputStream.call(.empty)
+        h.stallCurrentTrack()
 
         let advanced = waitUntil { h.streamers.count == 2 }
         XCTAssertTrue(advanced, "the next track must be built")
@@ -268,7 +282,7 @@ final class APlayOrchestrationTests: XCTestCase {
                        "the preloaded track must not report buffering while another track plays")
 
         // The current track runs dry and hands over.
-        h.decoders.first?.outputStream.call(.empty)
+        h.stallCurrentTrack()
         let replayed = waitUntil {
             h.collector.events.contains(where: { if case .buffering = $0 { return true }; return false })
         }
@@ -285,7 +299,7 @@ final class APlayOrchestrationTests: XCTestCase {
         h.streamers.first?.emit(.endEncountered)
         h.feed(1)
 
-        h.decoders.first?.outputStream.call(.empty)
+        h.stallCurrentTrack()
 
         let advanced = waitUntil {
             h.streamers.first?.destroyCount == 1
@@ -328,7 +342,7 @@ final class APlayOrchestrationTests: XCTestCase {
         h.streamers.first?.emit(.endEncountered)
         // No decoded data is fed to the preload.
 
-        h.decoders.first?.outputStream.call(.empty)
+        h.stallCurrentTrack()
 
         let rebuilt = waitUntil { h.streamers.count == 3 }
         XCTAssertTrue(rebuilt, "the normal path rebuilds the composer")

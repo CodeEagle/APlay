@@ -21,6 +21,7 @@ public final class APlay: @unchecked Sendable {
     public var loopPattern: PlayList.LoopPattern {
         get { return playlist.loopPattern }
         set {
+            discardPreload()
             playlist.loopPattern = newValue
             eventPipeline.call(.playModeChanged(newValue))
         }
@@ -259,8 +260,8 @@ public extension APlay {
         current.destroy()
         let com = createComposer()
         _player.startTime = Float(maybeTime)
-        com.play(current.url, position: p, info: current.streamInfo)
         _currentComposer = com
+        com.play(current.url, position: p, info: current.streamInfo)
         _nowPlayingInfo.play(elapsedPlayback: Float(maybeTime))
         eventPipeline.call(.duration(_nowPlayingInfo.duration))
     }
@@ -372,8 +373,8 @@ private extension APlay {
         discardPreload()
         _currentComposer?.destroy()
         let com = createComposer()
-        com.play(url, autoplay: autoplay)
         _currentComposer = com
+        com.play(url, autoplay: autoplay)
         _nowPlayingInfo.play(elapsedPlayback: 0)
     }
 
@@ -484,14 +485,14 @@ private extension APlay {
             pauseAll(after: 0)
             return
         }
-        activatePreloadedTrack(next)
+        activatePreloadedTrack(next, preservePlaybackIntent: true)
     }
 
-    /// Shared tail of both entry points into a buffered track (end of track and
-    /// a manual skip onto it): rebind the render source first so the audio unit
-    /// never idles on a drained buffer, then post the events on the main thread
-    /// exactly like the old `pauseAll` path did.
-    private func activatePreloadedTrack(_ next: Composer) {
+    /// Control-side tail. Built-in rendering only publishes atomic handoff/empty
+    /// mailboxes; the player control queue consumes them before arriving here.
+    /// A same-format handoff has already switched sources at the render boundary.
+    /// Manual skips also enter here from their non-realtime caller.
+    private func activatePreloadedTrack(_ next: Composer, preservePlaybackIntent: Bool = false) {
         let old = _currentComposer
         _nextComposer = nil
         if __pendingNextEvents.streamerEnded {
@@ -504,7 +505,7 @@ private extension APlay {
             // its first `.empty` event on.
             _isSteamerEndEncounted = true
         }
-        next.activate()
+        next.activate(preservePlaybackIntent: preservePlaybackIntent)
         _currentComposer = next
         old?.destroy()
         DispatchQueue.main.async { [weak self] in
@@ -548,6 +549,14 @@ private extension APlay {
         // opens the stream off the main thread (see the comment there), so the
         // track is visible as the buffered one — and its events are withheld —
         // from the moment it is registered.
+        com.bufferedAhead = { [weak self, weak com] in
+            guard let self, let com else { return }
+            com.armHandoff(valid: { [weak self, weak com] in
+                guard let self, let com else { return false }
+                return self._nextComposer === com &&
+                    self.playlist.peekNextURL() == com.url
+            }, completion: { [weak self] in self?.performGaplessHandoff() })
+        }
         com.preload(url)
     }
 
@@ -602,6 +611,7 @@ private extension APlay {
                 obj.queuePreloadEvent(event)
                 return
             }
+            guard let composer = com, obj._currentComposer === composer else { return }
             obj.handleComposerEvent(event)
         }
         return com

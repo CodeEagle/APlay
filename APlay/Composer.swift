@@ -11,15 +11,75 @@ import Foundation
     import UIKit
 #endif
 
+/// One decoder writer and one render reader. Only the writer may wait; the
+/// audio side uses bounded atomic operations and memcpy. Closing never resets
+/// cursors underneath an in-flight read; source retirement owns the storage.
+private final class ComposerPCMBuffer {
+    private let capacity: Int64
+    private let storage: UnsafeMutableRawPointer
+    private let written = RenderAtomic()
+    private let consumed = RenderAtomic()
+    private let closed = RenderAtomic()
+    private let writerLock = NSLock()
+    private let writerWake = DispatchSemaphore(value: 0)
+    init(capacity: Int) {
+        self.capacity = Int64(capacity)
+        storage = .allocate(byteCount: capacity, alignment: 16)
+    }
+    deinit { storage.deallocate() }
+    var availableData: UInt32 { UInt32(max(0, written.load() - consumed.load())) }
+    func clear() { _ = closed.exchange(1); writerWake.signal() }
+    func write(data: UnsafeRawPointer, amount: UInt32) {
+        writerLock.lock(); defer { writerLock.unlock() }
+        var offset = 0
+        while offset < Int(amount), closed.load() == 0 {
+            let tail = written.load()
+            let free = Int(capacity - (tail - consumed.load()))
+            guard free > 0 else {
+                // Backpressure belongs to the decoder, never the audio callback.
+                _ = writerWake.wait(timeout: .now() + .milliseconds(5))
+                continue
+            }
+            let count = min(free, Int(amount) - offset)
+            let index = Int(tail % capacity)
+            let first = min(count, Int(capacity) - index)
+            memcpy(storage.advanced(by: index), data.advanced(by: offset), first)
+            if first < count { memcpy(storage, data.advanced(by: offset + first), count - first) }
+            _ = written.add(Int64(count))
+            offset += count
+        }
+    }
+    func read(amount: UInt32, into pointer: UnsafeMutableRawPointer) -> (UInt32, Bool) {
+        guard closed.load() == 0 else { return (0, false) }
+        let head = consumed.load()
+        let count = min(Int(amount), Int(written.load() - head))
+        guard count > 0 else { return (0, false) }
+        let index = Int(head % capacity)
+        let first = min(count, Int(capacity) - index)
+        memcpy(pointer, storage.advanced(by: index), first)
+        if first < count { memcpy(pointer.advanced(by: first), storage, count - first) }
+        _ = consumed.add(Int64(count))
+        return (UInt32(count), head == 0)
+    }
+}
+
 final class Composer: @unchecked Sendable {
     lazy var eventPipeline: Delegated<Event, Void> = Delegated<Event, Void>()
     /// True while the composer is buffering a prepared track without playing it
     /// (see `prepare`). `startPlayback` flips it back to false.
-    private(set) var isPreloading = false
+    private let preloading = RenderAtomic()
+    private(set) var isPreloading: Bool {
+        get { preloading.load() != 0 }
+        set { _ = preloading.exchange(newValue ? 1 : 0) }
+    }
     /// True while this composer buffers a track *ahead* of the current one (see
     /// `preload(_:)`). `APlay` withholds its events and the output unit is left
     /// alone until `activate()` installs this composer as the read source.
-    private(set) var isPreloadAhead = false
+    private let preloadAhead = RenderAtomic()
+    private(set) var isPreloadAhead: Bool {
+        get { preloadAhead.load() != 0 }
+        set { _ = preloadAhead.exchange(newValue ? 1 : 0) }
+    }
     private(set) var isRunning: Bool {
         get { return _queue.sync { _isRuning } }
         set { _queue.async(flags: .barrier) { self._isRuning = newValue } }
@@ -28,13 +88,52 @@ final class Composer: @unchecked Sendable {
     private weak var _player: PlayerCompatible?
     private let _streamer: StreamProviderCompatible
     private let _decoder: AudioDecoderCompatible
-    private let _ringBuffer = Uroboros(capacity: 2 << 21) // 2MB
+    private let _ringBuffer = ComposerPCMBuffer(capacity: 2 << 21) // 4 MiB
     private lazy var _queue = DispatchQueue(concurrentName: "Composer")
     private lazy var _isRuning = false
     private lazy var __isDoubleChecked = false
     private let _resumeLock = NSLock()
     /// A token makes automatic startup one-shot and invalidates queued work on teardown.
     private var _pendingResume: UUID?
+    private let generation = UUID()
+    private let alive = RenderAtomic(1)
+    private let emptyMailbox = RenderAtomic()
+    private let streamEnded = RenderAtomic()
+    private let exhausted = RenderAtomic()
+    private let didArm = RenderAtomic()
+    private let renderSourceActivated = RenderAtomic()
+    private let bufferedCallbackLock = NSLock()
+    private var onBufferedAhead: (() -> Void)?
+    var bufferedAhead: (() -> Void)? {
+        get { bufferedCallbackLock.lock(); defer { bufferedCallbackLock.unlock() }; return onBufferedAhead }
+        set { bufferedCallbackLock.lock(); onBufferedAhead = newValue; bufferedCallbackLock.unlock() }
+    }
+
+    private func configureOutput(_ format: AudioStreamBasicDescription, ready: Bool) {
+        guard let player = _player else { return }
+        if let output = player as? APlayer {
+            output.configure(format, token: generation, exhausted: exhausted, valid: { [weak self] in
+                self?.alive.load() == 1 && self?.isPreloadAhead == false
+            }, source: makeReadSource(), ready: { [weak self] in
+                ready && self?.alive.load() == 1 && self?.isBufferedAhead == true
+            })
+        } else {
+            guard alive.load() == 1 else { return }
+            if player.asbd != format { player.setup(format) }
+        }
+    }
+
+    func armHandoff(valid: @escaping () -> Bool, completion: @escaping () -> Void) {
+        guard let output = _player as? APlayer, isBufferedAhead,
+              didArm.compare(0, 1) else { return }
+        output.armNext(outputFormat, token: generation, enabled: alive, exhausted: exhausted,
+                       valid: { [weak self] in self?.alive.load() == 1 && valid() },
+                       source: makeReadSource()) { [weak self] in
+            guard let self else { return }
+            _ = self.renderSourceActivated.compare(0, 1)
+            completion()
+        }
+    }
 
     private var _isDoubleChecked: Bool {
         get { return _queue.sync { __isDoubleChecked } }
@@ -63,6 +162,14 @@ final class Composer: @unchecked Sendable {
         _streamer = config.streamerBuilder(config)
         _decoder = config.audioDecoderBuilder(config)
         _player = player
+        if let output = player as? APlayer {
+            output.observe(generation) { [weak self] in
+                guard let self, self.alive.load() == 1 else { return }
+                if self.emptyMailbox.exchange(0) != 0 {
+                    self.eventPipeline.call(.decoderEmptyEncountered)
+                }
+            }
+        }
         _streamer.outputPipeline.delegate(to: self) { sself, value in
             switch value {
             case let .flac(value):
@@ -78,6 +185,8 @@ final class Composer: @unchecked Sendable {
                 sself._decoder.info.fileHint = sself._streamer.info.fileHint
                 sself._decoder.inputStream.call((data, count, isFirstPacket))
             case .endEncountered:
+                _ = sself.streamEnded.compare(0, 1)
+                if sself._decoder.info.srcFormat.isLinearPCM { _ = sself.exhausted.compare(0, 1) }
                 sself.eventPipeline.call(.streamerEndEncountered)
             case let .metadataSize(size):
                 sself._decoder.info.metadataSize = UInt(size)
@@ -95,31 +204,23 @@ final class Composer: @unchecked Sendable {
             case let .metadata(items):
                 sself.modifyMetadata(of: items)
             case .empty:
-                sself.eventPipeline.call(.decoderEmptyEncountered)
+                if sself.streamEnded.load() == 1 { _ = sself.exhausted.compare(0, 1) }
+                if sself._player is APlayer { _ = sself.emptyMailbox.compare(0, 1) }
+                else { sself.eventPipeline.call(.decoderEmptyEncountered) }
             case let .output(item):
-                // A track buffering ahead of the current one must not
-                // reconfigure the audio unit — that would stop the track
-                // that is actually playing. The decision is captured here rather
-                // than read inside the block: a block queued while preloading
-                // can run after `activate()`, and `activate()` configures the
-                // unit itself if the formats differ.
-                let configuringAllowed = sself.isPreloadAhead == false
-                DispatchQueue.main.async {
-                    guard configuringAllowed else { return }
-                    if let player = sself._player {
-                        let dstFormat = sself._decoder.info.dstFormat
-                        let srcFormat = sself._decoder.info.srcFormat
-                        if srcFormat.isLinearPCM, player.asbd != srcFormat {
-                            player.setup(srcFormat)
-                            debug_log("⛑ 0 set asbd")
-                        } else if dstFormat != player.asbd {
-                            player.setup(dstFormat)
-                            debug_log("⛑ 1 set asbd")
-                        }
-                    }
-                }
+                let format = sself.outputFormat
                 sself._ringBuffer.write(data: item.0, amount: item.1)
-                if item.1 > 0 { sself.resumeWhenBuffered() }
+                if sself.isPreloadAhead {
+                    if item.1 > 0 { sself.bufferedAhead?() }
+                } else if sself._player is APlayer {
+                    sself.configureOutput(format, ready: item.1 > 0)
+                } else {
+                    DispatchQueue.main.async { [weak sself] in
+                        guard let sself, sself.alive.load() == 1, !sself.isPreloadAhead else { return }
+                        sself.configureOutput(format, ready: item.1 > 0)
+                    }
+                    if item.1 > 0 { sself.resumeWhenBuffered() }
+                }
                 // Bitrate events are the usual trigger, but they never arrive
                 // for three classes of track that can still compute a duration:
                 // Opus/MIDI report it through the container instead of the
@@ -167,7 +268,7 @@ final class Composer: @unchecked Sendable {
             let shouldResume = self._pendingResume == token
             if shouldResume { self._pendingResume = nil }
             self._resumeLock.unlock()
-            guard shouldResume else { return }
+            guard shouldResume, self.alive.load() == 1, !self.isPreloadAhead else { return }
             self._player?.resume()
         }
     }
@@ -249,8 +350,13 @@ extension Composer {
         _resumeLock.unlock()
         eventPipeline.toggle(enable: true)
         if let value = info { _decoder.info.update(from: value) }
-        _player?.setup(Player.canonical)
-        installReadSource()
+        if let output = _player as? APlayer {
+            output.select(generation, autoplay: autoplay)
+            // Wait for the actual decoded format before publishing its source.
+        } else {
+            _player?.setup(Player.canonical)
+            installReadSource()
+        }
         _decoder.resume()
         _streamer.open(url: url, at: position)
         isRunning = true
@@ -290,39 +396,19 @@ extension Composer {
     /// slice on. Two tracks sharing a sample format hand over seamlessly; a
     /// change of format re-initialises the unit first (see
     /// `needsAudioUnitReconfiguration`).
-    func activate() {
+    func activate(preservePlaybackIntent: Bool = false) {
         guard isPreloadAhead else { return }
         isPreloadAhead = false
         isPreloading = false
-        guard needsAudioUnitReconfiguration, let player = _player else {
-            installReadSource()
-            // The unit is already rendering for an end-of-track handoff; only a
-            // handoff the user triggered while paused needs the output started. The
-            // guard keeps `resume()` — which touches main-actor APIs on iOS — off
-            // the realtime render thread.
-            if _player?.state != .running {
-                _player?.resume()
-            }
+        if let output = _player as? APlayer {
+            if renderSourceActivated.load() != 0 { return }
+            output.select(generation, autoplay: preservePlaybackIntent ? nil : true)
+            configureOutput(outputFormat, ready: isBufferedAhead)
             return
         }
-        // A change of sample format has to re-initialise the audio unit, which
-        // stops and restarts the AVAudioEngine render graph. That must never run
-        // on the render thread: `activate()` is reached from the render
-        // callback's end-of-track chain, and `setup` waits for the render in
-        // flight to finish — deadlocking against the very callback that called
-        // it, so the handoff tail never runs and the end-of-track flag stays
-        // set forever. Finish the swap on the main queue instead; the current
-        // track has already run dry, so the unit emits silence for the few
-        // milliseconds until the swap lands rather than stalling, and a
-        // cross-format transition was never seamless anyway.
-        DispatchQueue.main.async { [weak self] in
-            guard let sself = self else { return }
-            player.setup(sself.outputFormat)
-            sself.installReadSource()
-            if player.state != .running {
-                player.resume()
-            }
-        }
+        if needsAudioUnitReconfiguration { _player?.setup(outputFormat) }
+        installReadSource()
+        if _player?.state != .running { _player?.resume() }
     }
 
     /// The format the audio unit must be configured with to render this track.
@@ -348,13 +434,20 @@ extension Composer {
     /// Installs the ring buffer (and the linear-PCM end-of-track detection) as
     /// the player's active render source.
     private func installReadSource() {
-        _player?.readClosure = { [weak self] size, pointer in
-            guard let sself = self else { return (0, false) }
-            let (readSize, isFirstData) = sself._ringBuffer.read(amount: size, into: pointer)
-            if sself._decoder.info.srcFormat.isLinearPCM, readSize == 0 {
-                sself._decoder.outputStream.call(.empty)
+        _player?.readClosure = makeReadSource()
+    }
+
+    private func makeReadSource() -> (UInt32, UnsafeMutablePointer<UInt8>) -> (UInt32, Bool) {
+        let linearPCM = _decoder.info.srcFormat.isLinearPCM
+        let realtime = _player is APlayer
+        return { [self] size, pointer in
+            guard alive.load() == 1 else { return (0, false) }
+            let result = _ringBuffer.read(amount: size, into: pointer)
+            if linearPCM, result.0 == 0 {
+                if realtime { _ = emptyMailbox.compare(0, 1) }
+                else { _decoder.outputStream.call(.empty) }
             }
-            return (readSize, isFirstData)
+            return result
         }
     }
 
@@ -399,11 +492,16 @@ extension Composer {
     }
 
     func pause() {
+        _resumeLock.lock(); _pendingResume = nil; _resumeLock.unlock()
         _decoder.pause()
         _streamer.pause()
     }
 
     func destroy() {
+        _ = exhausted.exchange(0)
+        _ = alive.exchange(0)
+        (_player as? APlayer)?.unobserve(generation)
+        bufferedAhead = nil
         _resumeLock.lock()
         _pendingResume = nil
         _resumeLock.unlock()

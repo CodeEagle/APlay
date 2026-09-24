@@ -19,6 +19,8 @@ import APlaySpeex
 import APlayVorbis
 import APlayWavPack
 import Foundation
+import AVFoundation
+import Darwin
 
 /// Resolves the sample asset: first CLI argument, else `<package-root>/APlayDemo/a.m4a`.
 private func assetURL() -> URL? {
@@ -265,8 +267,230 @@ private func poll(_ verdictProvider: @autoclosure @escaping () -> Verdict, deadl
     }
 }
 
-if CommandLine.arguments.dropFirst().first == "gapless" {
-    runGapless()
+/// Storage is allocated before playback. The tap only uses bounded sample reads
+/// and lock-free OSAtomic operations (available on the package's macOS 12 floor).
+private final class StressEvidence {
+    let frames = UnsafeMutablePointer<Int64>.allocate(capacity: 1)
+    let nonzero = UnsafeMutablePointer<Int64>.allocate(capacity: 1)
+    private let lock = NSLock()
+    private var states: [String] = []
+    private var index = 0
+    private var failure: String?
+
+    init() {
+        frames.initialize(to: 0)
+        nonzero.initialize(to: 0)
+    }
+
+    deinit {
+        frames.deinitialize(count: 1); frames.deallocate()
+        nonzero.deinitialize(count: 1); nonzero.deallocate()
+    }
+
+    func attach(to player: APlay) {
+        player.pcmTap = { [self] buffers, count, format in
+            guard count > 0 else { return }
+            OSAtomicAdd64Barrier(Int64(count), frames)
+            if OSAtomicAdd64Barrier(0, nonzero) != 0 { return }
+            // Inspect at most 64 valid samples per buffer; never scan padded
+            // silence beyond the decoded frame count. Numeric comparisons also
+            // distinguish floating-point negative zero from nonzero PCM.
+            for buffer in UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: buffers)) {
+                guard let data = buffer.mData else { continue }
+                let sampleCount = min(64, Int(count) * Int(buffer.mNumberChannels))
+                var heard = false
+                switch format.commonFormat {
+                case .pcmFormatInt16:
+                    for i in 0..<min(sampleCount, Int(buffer.mDataByteSize) / 2) {
+                        if data.load(fromByteOffset: i * 2, as: Int16.self) != 0 { heard = true; break }
+                    }
+                case .pcmFormatInt32:
+                    for i in 0..<min(sampleCount, Int(buffer.mDataByteSize) / 4) {
+                        if data.load(fromByteOffset: i * 4, as: Int32.self) != 0 { heard = true; break }
+                    }
+                case .pcmFormatFloat32:
+                    for i in 0..<min(sampleCount, Int(buffer.mDataByteSize) / 4) {
+                        let value = data.load(fromByteOffset: i * 4, as: Float.self)
+                        if value.isFinite && value != 0 { heard = true; break }
+                    }
+                case .pcmFormatFloat64:
+                    for i in 0..<min(sampleCount, Int(buffer.mDataByteSize) / 8) {
+                        let value = data.load(fromByteOffset: i * 8, as: Double.self)
+                        if value.isFinite && value != 0 { heard = true; break }
+                    }
+                default: break
+                }
+                if heard { OSAtomicAdd64Barrier(1, nonzero); break }
+            }
+        }
+        player.eventPipeline.delegate(to: self) { recorder, event in
+            recorder.lock.lock(); defer { recorder.lock.unlock() }
+            switch event {
+            case let .state(state):
+                switch state {
+                case .idle: recorder.states.append("idle")
+                case .paused: recorder.states.append("paused")
+                case .playing: recorder.states.append("running")
+                case let .error(error): recorder.failure = "state error: \(error)"
+                case let .unknown(error): recorder.failure = "state unknown: \(error)"
+                }
+            case let .playingIndexChanged(index): recorder.index = index
+            case let .error(error): recorder.failure = "error event: \(error)"
+            default: break
+            }
+        }
+    }
+
+    var snapshot: (index: Int, failure: String?) {
+        lock.lock(); defer { lock.unlock() }
+        return (index, failure)
+    }
+
+    func report() {
+        lock.lock()
+        let sequence = states
+        lock.unlock()
+        print("[stress] renderedFrames=\(OSAtomicAdd64Barrier(0, frames)) nonzeroPCM=\(OSAtomicAdd64Barrier(0, nonzero) > 0)")
+        print("[stress] state events (playing mapped to running; not AU stop counts): idle=\(sequence.filter { $0 == "idle" }.count) paused=\(sequence.filter { $0 == "paused" }.count) running=\(sequence.filter { $0 == "running" }.count)")
+        print("[stress] state sequence: \(sequence.joined(separator: " -> "))")
+    }
+}
+
+// AAC tone.m4a and PCM tone.wav decode to different formats, forcing output reconfiguration.
+// Avoid aiff/aifc: localFileHit misidentifies them as mp3, so playback fails.
+// Use tone.m4a/tone-alac.m4a as the same-format control without reconfiguration.
+private func stressAssets(_ fileNames: [String]?) -> [URL] {
+    let fixtures = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("MacTests/Fixtures")
+    let pair = fileNames ?? ["tone.m4a", "tone.wav"]
+    let urls = pair.map { fixtures.appendingPathComponent($0) }
+    guard !urls.isEmpty, urls.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) else {
+        print("FAIL: stress fixtures not found: \(pair) under MacTests/Fixtures")
+        exit(2)
+    }
+    return urls
+}
+
+private func runStress(switches: Int, interval: TimeInterval, fileNames: [String]? = nil) {
+    runStressPlayback(switches: switches, interval: interval, fileNames: fileNames, gapless: false)
+}
+
+private func runStressGapless(switches: Int, interval: TimeInterval, fileNames: [String]? = nil) {
+    runStressPlayback(switches: switches, interval: interval, fileNames: fileNames, gapless: true)
+}
+
+private func runStressPlayback(switches: Int, interval: TimeInterval, fileNames: [String]?, gapless: Bool) {
+    // Flush evidence even if the process crashes or the external watchdog kills it.
+    setbuf(stdout, nil)
+    guard switches >= (gapless ? 1 : 0), switches < 100_000,
+          interval.isFinite, interval > 0 else {
+        print("FAIL: invalid stress switches/interval")
+        exit(2)
+    }
+    let urls = stressAssets(fileNames)
+    print("[stress] mode=\(gapless ? "stress-gapless" : "stress") targetSwitches=\(switches) interval=\(interval) fixtures=\(urls.map { $0.lastPathComponent })")
+    let evidence = StressEvidence()
+    print("[stress] before player initialization (initial evidence, not a verdict)")
+    evidence.report()
+    let player = APlay(configuration: APlay.Configuration(logPolicy: .disable,
+        autoHandlingInterruptEvent: false, gaplessPlaybackEnabled: gapless))
+    evidence.attach(to: player)
+    let start = Date()
+    let lock = NSLock()
+    var done = 0
+    var finishedSwitching = false
+    var timer: DispatchSourceTimer?
+    if gapless {
+        // interval controls observation cadence only; never force next()/seek().
+        player.loopPattern = .stopWhenAllPlayed(.order)
+        player.play((0...switches).map { urls[$0 % urls.count] }, at: 0)
+    } else {
+        player.play(urls[0])
+        let source = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
+        source.schedule(deadline: .now() + 0.5, repeating: interval)
+        source.setEventHandler {
+            lock.lock()
+            if done >= switches {
+                finishedSwitching = true
+                lock.unlock()
+                source.cancel()
+                return
+            }
+            done += 1
+            let index = done
+            lock.unlock()
+            player.play(urls[index % urls.count])
+        }
+        timer = source
+        source.resume()
+    }
+    let deadline = start.addingTimeInterval(115)
+    var previousTime: TimeInterval?
+    var finalAdvanced = false
+    var finalPeak: TimeInterval = 0
+    var failure: String?
+    var completed = false
+    var lastReport = start
+    while Date() < deadline {
+        let snapshot = evidence.snapshot
+        lock.lock()
+        let ready = gapless ? snapshot.index == switches : finishedSwitching
+        let count = gapless ? snapshot.index : done
+        lock.unlock()
+        if let error = snapshot.failure { failure = error; break }
+        if ready {
+            let time = player.currentTime()
+            if let previous = previousTime, time > previous, previous >= 0 { finalAdvanced = true }
+            previousTime = time
+            finalPeak = max(finalPeak, time)
+            if finalAdvanced, OSAtomicAdd64Barrier(0, evidence.frames) > 0,
+               OSAtomicAdd64Barrier(0, evidence.nonzero) > 0 {
+                completed = true
+                break
+            }
+        }
+        if Date().timeIntervalSince(lastReport) >= 5 {
+            print("[stress] completedSwitches=\(count) finalTrackTime=\(finalPeak)")
+            evidence.report()
+            lastReport = Date()
+        }
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: gapless ? min(interval, 0.1) : 0.02))
+    }
+    timer?.cancel()
+    evidence.report()
+    print("[stress] finalTrackTimePeak=\(finalPeak) advanced=\(finalAdvanced)")
+    if OSAtomicAdd64Barrier(0, evidence.frames) == 0 {
+        print("FAIL: no audio rendered")
+    } else if OSAtomicAdd64Barrier(0, evidence.nonzero) == 0 {
+        print("FAIL: no nonzero PCM sampled")
+    } else if let failure = failure {
+        print("FAIL: \(failure)")
+    } else if !completed {
+        print("FAIL: timed out waiting for \(switches) switches and final-track currentTime advancement")
+    } else {
+        print("PASS: survived \(switches) \(gapless ? "natural handoffs" : "switches") in \(String(format: "%.1f", Date().timeIntervalSince(start)))s; rendered nonzero PCM and final-track currentTime advanced")
+        exit(0)
+    }
+    exit(1)
+}
+
+if let mode = CommandLine.arguments.dropFirst().first {
+    if mode == "gapless" {
+        runGapless()
+    } else if mode == "stress" || mode == "stress-gapless" {
+        let rest = CommandLine.arguments.dropFirst().dropFirst()
+        let switches = rest.first.flatMap(Int.init) ?? (mode == "stress" ? 400 : 2)
+        let interval = rest.dropFirst().first.flatMap(Double.init) ?? 0.02
+        let names = Array(rest.dropFirst().dropFirst().prefix(2))
+        if mode == "stress-gapless" {
+            runStressGapless(switches: switches, interval: interval, fileNames: names.isEmpty ? nil : names)
+        } else {
+            runStress(switches: switches, interval: interval, fileNames: names.isEmpty ? nil : names)
+        }
+    } else {
+        runSingleTrack()
+    }
 } else {
     runSingleTrack()
 }

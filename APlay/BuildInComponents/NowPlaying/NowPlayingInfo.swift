@@ -106,6 +106,12 @@ extension APlay {
         }
 
         func remove() {
+            // A barrier *sync* so the clear has already happened when this
+            // returns. The caller (`_play`) writes the next track's metadata
+            // straight after; with an async barrier that clear could still be
+            // queued and would wipe the write. `remove` is only ever called
+            // from `resetFlag` on the caller's thread, never from inside
+            // `_queue`, so this cannot deadlock.
             _queue.sync(flags: .barrier) {
                 self.name = ""
                 self.artist = ""
@@ -126,6 +132,20 @@ extension APlay {
                     center.playbackState = .stopped
                 }
             #endif
+        }
+
+        /// Writes a track's metadata in one go, in place of the scattered
+        /// `metadataUpdate` setters. Call this after `remove()` has cleared the
+        /// previous track and before `play()`/`update()` publishes, so a track
+        /// change never leaves the Now Playing card describing the old track or
+        /// an empty one. The artwork URL (if any) is fetched asynchronously
+        /// through `image(with:)`, which publishes on its own when it lands.
+        func apply(_ metadata: APlay.NowPlayingMetadata) {
+            if let title = metadata.title { name = title }
+            if let artist = metadata.artist { self.artist = artist }
+            if let album = metadata.album { self.album = album }
+            if let image = metadata.artwork { artwork = image }
+            if let artworkURL = metadata.artworkURL { image(with: artworkURL) }
         }
 
         private func doRequest(_ request: URLRequest) {

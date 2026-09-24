@@ -87,5 +87,33 @@ import XCTest
                 wait(for: [exp], timeout: 2)
             }
         }
+
+        /// `remove` clears on a *sync* barrier: a track change can write the
+        /// next track's metadata the instant it returns, without sleeping to
+        /// let a queued clear land first.
+        func testRemoveClearsSynchronously() {
+            let (config, info) = makeInfo()
+            withExtendedLifetime(config) {
+                info.apply(.init(title: "Lattice", artist: "Nexus", album: "Bloom"))
+                info.remove()
+                // No wait: the sync barrier means the clear is already done.
+                XCTAssertEqual(info.name, "")
+                XCTAssertEqual(info.artist, "")
+                XCTAssertEqual(info.album, "")
+            }
+        }
+
+        /// `apply` replaces only the fields it is given, which is what lets a
+        /// track change keep nothing of the previous track without the host
+        /// spelling out every nil.
+        func testApplyWritesGivenFields() {
+            let (config, info) = makeInfo()
+            withExtendedLifetime(config) {
+                info.apply(.init(title: "Aurora", artist: "Bloom"))
+                XCTAssertEqual(info.name, "Aurora")
+                XCTAssertEqual(info.artist, "Bloom")
+                XCTAssertEqual(info.album, "")
+            }
+        }
     }
 #endif

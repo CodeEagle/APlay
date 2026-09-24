@@ -1,5 +1,5 @@
 State format: capsule-v2
-State revision: 4
+State revision: 5
 
 ## Context
 - Root: /Users/lincoln/Develop/GitHub/APlay（CodeEagle/APlay 镜像，master）
@@ -21,10 +21,9 @@ State revision: 4
   两处冲突；336 tests 全绿。
 - Done: 推送 master（a31cbe9..2f9add8），PR #20 自动 MERGED，打 tag v2.1.8 并推送。
 - Open: none。
-
-## Checks
-- swift test 全量：336 tests，0 failures，0 crashes（合并后单跑）。
-- 远程核验：master=2f9add8；v2.1.8=c7b5ce9；open PR 为空。
+- Checks: swift test 全量 336 tests / 0 failures / 0 crashes（合并后单跑）；
+  远程核验 master=2f9add8、v2.1.8=c7b5ce9、open PR 为空。
+- Pending: none。
 
 ## Rules
 - Constraints: swift test 需 CLANG_MODULE_CACHE_PATH=/private/tmp/aplay-midi-clang-cache

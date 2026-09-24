@@ -68,6 +68,16 @@ public final class APlay: @unchecked Sendable {
     private let _maxOpenRestry = 5
     private var _currentOpenRestry = 0
 
+    /// Guards the two composer slots. Every create, switch, preload and teardown
+    /// takes this lock, so the check-then-act race that used to orphan
+    /// composers (`guard _nextComposer == nil` reading on one queue while the
+    /// write landed on another) cannot happen: the check and the write are one
+    /// critical section.
+    /// Recursive: `destroy()` can fire callbacks that reach back into the
+    /// slot helpers (an event delegate reading `_currentComposer`), and those
+    /// must not deadlock against the teardown that triggered them.
+    private let _composerLock = NSRecursiveLock()
+
     private var _obs: [NSObjectProtocol] = []
 
     deinit {
@@ -257,10 +267,9 @@ public extension APlay {
         guard let current = _currentComposer else { return }
         var maybeTime = time
         let p = current.position(for: &maybeTime)
-        current.destroy()
         let com = createComposer()
         _player.startTime = Float(maybeTime)
-        _currentComposer = com
+        _swapCurrentComposer(com)
         com.play(current.url, position: p, info: current.streamInfo)
         _nowPlayingInfo.play(elapsedPlayback: Float(maybeTime))
         eventPipeline.call(.duration(_nowPlayingInfo.duration))
@@ -271,14 +280,31 @@ public extension APlay {
         guard let url = playlist.nextURL() else { return }
         // A skip onto the track that is already buffered ahead of the current
         // one takes the buffer instead of reopening the stream.
-        if let pre = _nextComposer, pre.url == url, canTakeOverPreload(pre) {
-            _isCalledDelayPaused = true
-            activatePreloadedTrack(pre)
-        } else {
-            discardPreload()
-            _play(url)
-        }
-        indexChanged()
+        //
+        // The branch and the slot mutations it triggers run as one block on
+        // the composer queue. Reading the preload, deciding to take it over,
+        // and emptying the slot are a check-then-act triple; doing them across
+        // queue hops let a concurrent `preloadNextTrack` see the vacant slot
+        // between the decision and the move and install a second preload,
+        // which then looked like a rebuilt track (and orphaned the loser).
+        var tookOver = false
+        _withComposerLock {
+    guard let pre = __nextComposer, pre.url == url, canTakeOverPreload(pre) else {
+        return
+    }
+    __nextComposer = nil
+    tookOver = true
+    _isCalledDelayPaused = true
+    _activatePreloadedTrackLocked(pre)
+}
+guard tookOver else {
+    discardPreload()
+    _play(url)
+    indexChanged()
+    return
+}
+indexChanged()
+
     }
 
     /// play previous song in list
@@ -292,7 +318,13 @@ public extension APlay {
     /// destroy player
     func destroy() {
         discardPreload()
-        _currentComposer?.destroy()
+        // Synchronous and in-place: teardown must not hop through the composer
+        // queue, because that queue can be draining a block that captured this
+        // APlay (a composer's event delegate holds it) — a `sync` from here
+        // would re-enter half-torn-down state. The slot is cleared under the
+        // same barrier the swap helpers use, and the composer it held is torn
+        // down before the slot publishes the change.
+        _swapCurrentComposer(nil)
         _player.destroy()
     }
 
@@ -370,11 +402,26 @@ private extension APlay {
 
     func _play(_ url: URL, autoplay: Bool = true) {
         resetFlag()
-        discardPreload()
-        _currentComposer?.destroy()
+        // The preload must be dropped and the new composer installed in one
+        // critical section. Doing them in two steps left a window in which a
+        // concurrent preload saw both slots vacant and installed a composer
+        // that `_swapCurrentComposer` then overwrote without ever destroying.
+        // `com.play()` starts the streamer and decoder, so it must run inside
+        // the same critical section that installs the composer. Two callers
+        // that each build and start a composer then race for the slot; the
+        // loser is destroyed before its stream ever opens, instead of opening
+        // a stream nothing will ever read.
         let com = createComposer()
-        _currentComposer = com
-        com.play(url, autoplay: autoplay)
+        _withComposerLock {
+            let retiredNext = __nextComposer
+            __nextComposer = nil
+            retiredNext?.destroy()
+            let retired = __currentComposer
+            __currentComposer = nil
+            retired?.destroy()
+            __currentComposer = com
+            com.play(url, autoplay: autoplay)
+        }
         _nowPlayingInfo.play(elapsedPlayback: 0)
     }
 
@@ -493,8 +540,29 @@ private extension APlay {
     /// A same-format handoff has already switched sources at the render boundary.
     /// Manual skips also enter here from their non-realtime caller.
     private func activatePreloadedTrack(_ next: Composer, preservePlaybackIntent: Bool = false) {
-        let old = _currentComposer
-        _nextComposer = nil
+        // Detach the preload from its slot without destroying it: this composer
+        // is about to own the output, so only ownership moves. The slot is
+        // vacant before the composer is installed as the current one.
+        _detachNextComposer()
+        _activatePreloadedTrackBody(next, preservePlaybackIntent: preservePlaybackIntent)
+    }
+
+    /// The same takeover, called with the composer queue already held (see
+    /// `next()`). The slot was vacated by the caller, so this only installs the
+    /// new owner.
+    private func _activatePreloadedTrackLocked(_ next: Composer, preservePlaybackIntent: Bool = false) {
+        _activatePreloadedTrackBody(next, preservePlaybackIntent: preservePlaybackIntent)
+    }
+
+    /// Shared tail. Touches the composer queue directly (never through the
+    /// re-entrant swap helpers): `destroy()` can fire callbacks that read the
+    /// slots, which would re-enter the queue a caller already holds.
+    private func _activatePreloadedTrackBody(_ next: Composer, preservePlaybackIntent: Bool) {
+        // Detach the preload from its slot without destroying it: this composer
+        // is about to own the output, so only ownership moves. The slot is
+        // vacant before the composer is installed as the current one, and both
+        // steps run on the composer queue.
+        _detachNextComposer()
         if __pendingNextEvents.streamerEnded {
             _isSteamerEndEncounted = true
         }
@@ -506,8 +574,16 @@ private extension APlay {
             _isSteamerEndEncounted = true
         }
         next.activate(preservePlaybackIntent: preservePlaybackIntent)
-        _currentComposer = next
-        old?.destroy()
+        // The retired composer is torn down while the slot is empty, so it is
+        // never observable as live; the new owner is published right after.
+        // The caller of `_activatePreloadedTrackLocked` already holds the
+        // composer queue, so this stores directly instead of re-entering it.
+        _withComposerLock {
+            let retired = __currentComposer
+            __currentComposer = nil
+            retired?.destroy()
+            __currentComposer = next
+        }
         DispatchQueue.main.async { [weak self] in
             guard let sself = self else { return }
             sself.eventPipeline.call(.playEnded)
@@ -537,14 +613,15 @@ private extension APlay {
     /// current track's stream has been fully received.
     private func preloadNextTrack() {
         guard config.isGaplessPlaybackEnabled else { return }
-        guard _nextComposer == nil else { return }
         guard let current = _currentComposer else { return }
         guard let url = playlist.peekNextURL() else { return }
         // Single-track loop would just rebuffer the track that is already
         // decoded, and `.stopWhenAllPlayed` has nothing after the last track.
         guard url != current.url else { return }
-        let com = createComposer()
-        _nextComposer = com
+        // The install is one block on the composer queue: the vacancy check and
+        // the write cannot be interleaved by a second preload, which is what
+        // used to leave the losing composer running with no owner.
+        guard let com = _installNextComposerIfVacant({ createComposer() }) else { return }
         // `preload` marks the composer as buffering ahead synchronously and
         // opens the stream off the main thread (see the comment there), so the
         // track is visible as the buffered one — and its events are withheld —
@@ -563,8 +640,7 @@ private extension APlay {
     /// Drops the track buffering ahead of the current one. Called whenever the
     /// user moves somewhere else in the list, or the buffered track takes over.
     private func discardPreload() {
-        _nextComposer?.destroy()
-        _nextComposer = nil
+        _setNextComposer(nil)
         __pendingNextEvents.clear()
     }
 
@@ -769,13 +845,88 @@ extension APlay {
     }
 
     private var _currentComposer: Composer? {
-        get { return _propertiesQueue.sync { __currentComposer } }
-        set { _propertiesQueue.async(flags: .barrier) { self.__currentComposer = newValue } }
+        get { _composerLock.lock(); defer { _composerLock.unlock() }; return __currentComposer }
+        // Mutations must go through `_swapCurrentComposer` so the teardown of
+        // the composer being replaced happens before the slot is read again,
+        // and on the queue that owns the slot.
+        set { fatalError("use _swapCurrentComposer") }
     }
 
     private var _nextComposer: Composer? {
-        get { return _propertiesQueue.sync { __nextComposer } }
-        set { _propertiesQueue.async(flags: .barrier) { self.__nextComposer = newValue } }
+        get { _composerLock.lock(); defer { _composerLock.unlock() }; return __nextComposer }
+        set { fatalError("use _setNextComposer") }
+    }
+
+    /// Installs `com` as the current composer and returns the one it replaced.
+    ///
+    /// The slot is emptied first, the retired composer is torn down, and only
+    /// then is the new one published — all three steps in queue order. A
+    /// concurrent reader therefore never sees a live composer that has already
+    /// lost its slot, and a second writer cannot install into a slot whose
+    /// previous owner is only half torn down. `destroy()` runs outside the
+    /// queue block (it can fire callbacks that read the slots) but strictly
+    /// before this method returns.
+    /// Runs `body` while holding the composer lock (recursive, so callbacks that
+    /// re-enter the slot helpers during a teardown do not deadlock).
+    private func _withComposerLock<T>(_ body: () -> T) -> T {
+        _composerLock.lock()
+        defer { _composerLock.unlock() }
+        return body()
+    }
+
+    @discardableResult
+    private func _swapCurrentComposer(_ com: Composer?) -> Composer? {
+        _withComposerLock {
+            let old = __currentComposer
+            __currentComposer = nil
+            old?.destroy()
+            __currentComposer = com
+            return old
+        }
+    }
+
+    /// Sets the preloaded composer, tearing the previous preload down first
+    /// (see `_swapCurrentComposer`).
+    @discardableResult
+    private func _setNextComposer(_ com: Composer?) -> Composer? {
+        _withComposerLock {
+            let old = __nextComposer
+            __nextComposer = nil
+            old?.destroy()
+            __nextComposer = com
+            return old
+        }
+    }
+
+    /// Removes the preloaded composer from its slot **without** tearing it
+    /// down. Used when that composer is about to become the current one: its
+    /// streamer and decoder must keep running, so only the ownership moves.
+    @discardableResult
+    private func _detachNextComposer() -> Composer? {
+        _withComposerLock {
+            let old = __nextComposer
+            __nextComposer = nil
+            return old
+        }
+    }
+
+    /// The only safe way to answer "is there a preload?": the check and the
+    /// install run as one block on the composer queue, so a second caller
+    /// cannot slip a composer in between the guard and the write.
+    private func _installNextComposerIfVacant(_ make: () -> Composer) -> Composer? {
+        _withComposerLock {
+            guard __nextComposer == nil else { return nil }
+            let com = make()
+            __nextComposer = com
+            return com
+        }
+    }
+
+    /// Reads both slots under one lock, for the identity checks that must see a
+    /// consistent pair (`_currentComposer === composer` at handoff time).
+    private func _composerPair() -> (current: Composer?, next: Composer?) {
+        _composerLock.lock(); defer { _composerLock.unlock() }
+        return (__currentComposer, __nextComposer)
     }
 
     private var _isPlayingBeforeInterrupt: Bool {

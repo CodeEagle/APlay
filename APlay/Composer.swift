@@ -37,7 +37,12 @@ private final class ComposerPCMBuffer {
             let free = Int(capacity - (tail - consumed.load()))
             guard free > 0 else {
                 // Backpressure belongs to the decoder, never the audio callback.
-                _ = writerWake.wait(timeout: .now() + .milliseconds(5))
+                // Wait without a timeout: `read` and `clear` both wake this
+                // semaphore, so the decoder thread is parked rather than waking
+                // every 5 ms to re-test a buffer that a torn-down composer will
+                // never drain — the polling loop is what kept orphaned composers
+                // pinned on a live thread, unreachable by ARC.
+                writerWake.wait()
                 continue
             }
             let count = min(free, Int(amount) - offset)
@@ -59,6 +64,9 @@ private final class ComposerPCMBuffer {
         memcpy(pointer, storage.advanced(by: index), first)
         if first < count { memcpy(pointer.advanced(by: first), storage, count - first) }
         _ = consumed.add(Int64(count))
+        // Wake the decoder thread parked in `write` on a full buffer: the bytes
+        // it is waiting for room for have just been consumed.
+        writerWake.signal()
         return (UInt32(count), head == 0)
     }
 }
@@ -104,6 +112,13 @@ final class Composer: @unchecked Sendable {
     private let renderSourceActivated = RenderAtomic()
     private let bufferedCallbackLock = NSLock()
     private var onBufferedAhead: (() -> Void)?
+    /// The URL this composer was opened for. `play` and `preload` record it
+    /// before they touch the streamer, so callers that key on the URL
+    /// (`APlay.next` reusing a preload, `prepare`-then-`play`) do not race with
+    /// the stream open — `preload` opens off-thread, and the streamer's `info`
+    /// only carries the URL once that open lands.
+    private let urlLock = NSLock()
+    private var recordedURL: URL?
     var bufferedAhead: (() -> Void)? {
         get { bufferedCallbackLock.lock(); defer { bufferedCallbackLock.unlock() }; return onBufferedAhead }
         set { bufferedCallbackLock.lock(); onBufferedAhead = newValue; bufferedCallbackLock.unlock() }
@@ -146,7 +161,15 @@ final class Composer: @unchecked Sendable {
     /// duration forever, even though the value is already computable.
     private var hasAnnouncedDuration = false
     #if DEBUG
-        private nonisolated(unsafe) static var count = 0
+        /// Live (not yet `destroy()`ed) instance count. One current composer plus
+        /// at most one buffering ahead is the whole budget; anything more is an
+        /// orphaned composer whose streamer/decoder are still running.
+        private nonisolated(unsafe) static var _liveCount = 0
+        static var liveCount: Int {
+            _liveCountLock.lock(); defer { _liveCountLock.unlock() }
+            return _liveCount
+        }
+        private static let _liveCountLock = NSLock()
         private let _id: Int
         deinit {
             debug_log("\(self) \(#function)")
@@ -155,8 +178,10 @@ final class Composer: @unchecked Sendable {
 
     init(player: PlayerCompatible, config: ConfigurationCompatible) {
         #if DEBUG
-            _id = Composer.count
-            Composer.count = Composer.count &+ 1
+            Composer._liveCountLock.lock()
+            _id = Composer._liveCount
+            Composer._liveCount += 1
+            Composer._liveCountLock.unlock()
         #endif
         _config = config
         _streamer = config.streamerBuilder(config)
@@ -341,9 +366,13 @@ extension Composer {
 
     var streamInfo: AudioDecoder.Info { return _decoder.info }
 
-    var url: URL { return _streamer.info.url }
+    var url: URL {
+        urlLock.lock(); defer { urlLock.unlock() }
+        return recordedURL ?? _streamer.info.url
+    }
 
     func play(_ url: URL, position: StreamProvider.Position = 0, info: AudioDecoder.Info? = nil, autoplay: Bool = true) {
+        urlLock.lock(); recordedURL = url; urlLock.unlock()
         isPreloading = autoplay == false
         _resumeLock.lock()
         _pendingResume = autoplay ? UUID() : nil
@@ -371,6 +400,7 @@ extension Composer {
     /// This is the `prepare(_:)` semantics turned into a background preload for
     /// gapless playback.
     func preload(_ url: URL) {
+        urlLock.lock(); recordedURL = url; urlLock.unlock()
         isPreloading = true
         isPreloadAhead = true
         eventPipeline.toggle(enable: true)
@@ -498,14 +528,27 @@ extension Composer {
     }
 
     func destroy() {
-        _ = exhausted.exchange(0)
-        _ = alive.exchange(0)
+        // Idempotent: the composer slots are overwritten on every track
+        // change, and a slot that lost a race can be destroyed twice. Only the
+        // first teardown owns the live-count bookkeeping and the real work.
+        guard alive.exchange(0) == 1 else { return }
+        #if DEBUG
+            Composer._liveCountLock.lock()
+            Composer._liveCount -= 1
+            Composer._liveCountLock.unlock()
+        #endif
+        // Synchronous order matters: the ring buffer is closed first so a
+        // decoder thread parked in `write` on a full buffer is released before
+        // anything below touches the components that thread may be calling.
+        // The streamer task is cancelled and its callbacks dropped after the
+        // decoder, so no in-flight network byte reaches a decommissioned
+        // decoder.
+        _ringBuffer.clear()
         (_player as? APlayer)?.unobserve(generation)
         bufferedAhead = nil
         _resumeLock.lock()
         _pendingResume = nil
         _resumeLock.unlock()
-        _ringBuffer.clear()
         eventPipeline.toggle(enable: false)
         _decoder.destroy()
         _streamer.destroy()

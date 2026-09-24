@@ -45,12 +45,19 @@ final class APlayOrchestrationTests: XCTestCase {
                 autoFillID3InfoToNowPlayingCenter: false,
                 autoHandlingInterruptEvent: false,
                 gaplessPlaybackEnabled: gapless,
-                streamerBuilder: { [unowned box] _ in
+                // `box` is captured weakly: the recorder is a stored property of
+                // the harness, but the closures are stored on the configuration
+                // the harness also keeps — a strong cycle would never let either
+                // go. A weak box means the builders are only callable while the
+                // harness is alive, which is exactly the test's lifetime.
+                streamerBuilder: { [weak box] _ in
+                    guard let box else { fatalError("harness released before a streamer was built") }
                     let streamer = FakeStreamProvider()
                     box.streamers.append(streamer)
                     return streamer
                 },
-                audioDecoderBuilder: { [unowned box] _ in
+                audioDecoderBuilder: { [weak box] _ in
+                    guard let box else { fatalError("harness released before a decoder was built") }
                     let decoder = FakeDecoder()
                     decoder.setAttached(box.streamers.last!)
                     box.decoders.append(decoder)

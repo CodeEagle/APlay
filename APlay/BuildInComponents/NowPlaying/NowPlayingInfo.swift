@@ -24,7 +24,11 @@ extension APlay {
         var playbackTime: Float = 0
         private var _queue: DispatchQueue = DispatchQueue(concurrentName: "NowPlayingInfo")
         private var _coverTask: URLSessionDataTask?
-        private unowned var _config: ConfigurationCompatible
+        // Owned strongly: APlay holds this object for its whole lifetime, and
+        // several of the methods below reach `_config` from async blocks whose
+        // execution can outlive the APlay that owns the config — an `unowned`
+        // reference there reads freed memory once teardown reordered.
+        private var _config: ConfigurationCompatible
 
         #if DEBUG
             deinit {
@@ -102,7 +106,7 @@ extension APlay {
         }
 
         func remove() {
-            _queue.async(flags: .barrier) {
+            _queue.sync(flags: .barrier) {
                 self.name = ""
                 self.artist = ""
                 self.album = ""

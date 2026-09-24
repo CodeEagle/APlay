@@ -19,7 +19,18 @@ final class FakeStreamProvider: StreamProviderCompatible {
 
     var position: StreamProvider.Position = 0
     var contentLength: UInt = 100
-    var info: StreamProvider.URLInfo = .remote(URL(string: "https://example.com/a.mp3")!, .mp3)
+    /// `Composer.preload` opens the stream off-thread, and the composer's
+    /// streamer-event delegate reads `info` (`.fileHint`) from the thread that
+    /// drives the events. A real streamer writes `info` on the open thread
+    /// before it ever emits, so the two never overlap; the fake has to promise
+    /// the same with a lock instead of a plain `var`, or the torn read of the
+    /// URL-bearing enum shows up as a dangling `_SwiftURL` under load.
+    private let infoLock = NSLock()
+    private var _info: StreamProvider.URLInfo = .remote(URL(string: "https://example.com/a.mp3")!, .mp3)
+    var info: StreamProvider.URLInfo {
+        get { infoLock.lock(); defer { infoLock.unlock() }; return _info }
+        set { infoLock.lock(); _info = newValue; infoLock.unlock() }
+    }
     var bufferingProgress: Float = 0.5
 
     private(set) var openCalls: [(url: URL, position: StreamProvider.Position)] = []

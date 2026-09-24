@@ -117,3 +117,29 @@
 - swift test 全量：334 tests，0 failures，0 crashes，连续 6 轮（3 轮正常
   + 3 轮正常；另加压 6 轮全量中 5 轮全绿，1 轮为上述无关既有 SIGTRAP）。
 - 泄漏断言（基线增量）隔离与整套均通过。
+
+## SF-0103
+- Revision: 4（交付完成：提交、推送、合并 PR、打 tag）
+
+### 交付动作
+- 提交 e92a44e：泄漏修复本体（槽位锁化 + destroy 幂等 + ring buffer 去轮询
+  + Composer.url 同步可见 + fake streamer info 加锁 + 泄漏测试基线增量断言）。
+- 本地合并 PR #20（feat(nowplaying): accept track metadata on play/prepare）
+  为 merge commit 2f9add8。冲突两处，解决方式：
+  - APlay.swift `_play`：保留 HEAD 的锁临界区（泄漏修复），把 PR 的
+    `if let metadata { _nowPlayingInfo.apply(metadata) }` 挪到锁块之后、
+    `_nowPlayingInfo.play` 之前——保住 PR 想要的 clear→apply→publish 顺序。
+  - NowPlayingInfo.swift `remove()`：两侧都改成了 sync barrier，取 PR 侧
+    的注释（解释为何不能 async）。
+- 推送 master：a31cbe9..2f9add8。GitHub 自动将 PR #20 识别为 MERGED
+  （b15da8b 已在 master 历史中），open PR 清空。
+- 打 annotated tag v2.1.8 并推送，指向 2f9add8。
+  注：v2.1.7 原本就指向 PR #20 的 commit b15da8b（此前一直未合并），
+  故本次 merge 同时把 v2.1.7 的内容纳入 master；v2.1.8 = metadata 特性 +
+  泄漏修复。GitHub Releases 的 "Latest" 仍停在 v2.1.2（v2.1.3 起均为纯
+  tag 未建 Release）——未创建 Release，因用户只要求打 tag。
+
+### 验收（合并后）
+- swift test 全量：336 tests，0 failures，0 crashes（23s）。比合并前 334
+  多 2 个，正是 PR #20 新增的 NowPlayingInfo 测试。
+- 远程 master=2f9add8；refs/tags/v2.1.8=c7b5ce9；无 open PR。

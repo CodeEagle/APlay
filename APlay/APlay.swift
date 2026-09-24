@@ -169,20 +169,57 @@ public extension APlay {
         set { _player.pcmTap = newValue }
     }
 
+    /// Track metadata for the system's Now Playing card.
+    ///
+    /// Pass this to `play(_:metadata:)` / `prepare(_:metadata:)` so the engine
+    /// can publish the new track the moment it clears the previous one —
+    /// `_play` clears the card and, without this, only the URL is known, which
+    /// leaves the card blank until the host notices and pushes metadata of
+    /// its own. Everything is optional and `nil` fields are left untouched.
+    public struct NowPlayingMetadata: Sendable {
+        public var title: String?
+        public var artist: String?
+        public var album: String?
+        /// Fetched asynchronously (URLCache-backed) and published on arrival.
+        public var artworkURL: String?
+        /// Set directly, for hosts that already have the image in memory.
+        public var artwork: APlayImage?
+
+        public init(
+            title: String? = nil,
+            artist: String? = nil,
+            album: String? = nil,
+            artworkURL: String? = nil,
+            artwork: APlayImage? = nil
+        ) {
+            self.title = title
+            self.artist = artist
+            self.album = album
+            self.artworkURL = artworkURL
+            self.artwork = artwork
+        }
+    }
+
     /// play with a autoclosure
     ///
-    /// - Parameter url: a autoclosure to produce URL
-    func play(_ url: @autoclosure () -> URL) {
+    /// - Parameters:
+    ///   - url: a autoclosure to produce URL
+    ///   - metadata: the new track's Now Playing metadata, published as soon as
+    ///     the previous track's card is cleared
+    func play(_ url: @autoclosure () -> URL, metadata: NowPlayingMetadata? = nil) {
         let u = url()
         // If the same track is already preloaded (buffered but not playing),
         // start playback from the filled ring buffer instead of reopening it.
+        // The metadata still has to be applied here — this branch never runs
+        // `_play`, so the `apply` there would be skipped.
         if let com = _currentComposer, com.url == u, com.isPreloading {
+            if let metadata { _nowPlayingInfo.apply(metadata) }
             com.startPlayback()
             return
         }
         let urls = [u]
         playlist.changeList(to: urls, at: 0)
-        _play(u)
+        _play(u, metadata: metadata)
     }
 
     /// Preload a track without starting playback.
@@ -191,12 +228,16 @@ public extension APlay {
     /// audio unit is not started. A subsequent `play` of the same URL picks up
     /// the buffered data and starts immediately. See issue #14.
     ///
-    /// - Parameter url: a autoclosure to produce URL
-    func prepare(_ url: @autoclosure () -> URL) {
+    /// - Parameters:
+    ///   - url: a autoclosure to produce URL
+    ///   - metadata: the new track's Now Playing metadata, applied now so it is
+    ///     already in place when a later `play` of the same URL takes the
+    ///     preload fast path
+    func prepare(_ url: @autoclosure () -> URL, metadata: NowPlayingMetadata? = nil) {
         let u = url()
         let urls = [u]
         playlist.changeList(to: urls, at: 0)
-        _play(u, autoplay: false)
+        _play(u, autoplay: false, metadata: metadata)
     }
 
     /// play whit variable parametric
@@ -368,13 +409,17 @@ private extension APlay {
 
     // MARK: Playback
 
-    func _play(_ url: URL, autoplay: Bool = true) {
+    func _play(_ url: URL, autoplay: Bool = true, metadata: NowPlayingMetadata? = nil) {
         resetFlag()
         discardPreload()
         _currentComposer?.destroy()
         let com = createComposer()
         _currentComposer = com
         com.play(url, autoplay: autoplay)
+        // `resetFlag` has just cleared the card; the new track's metadata goes
+        // in before the publish below, so the card never describes the old
+        // track and never sits blank waiting for the host to notice.
+        if let metadata { _nowPlayingInfo.apply(metadata) }
         _nowPlayingInfo.play(elapsedPlayback: 0)
     }
 

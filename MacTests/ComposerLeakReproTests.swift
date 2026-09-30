@@ -175,3 +175,46 @@ final class NSLockableBox<Value> {
     func update(_ body: (inout Value) -> Void) { lock.lock(); body(&value); lock.unlock() }
     func swap(_ newValue: Value) { lock.lock(); value = newValue; lock.unlock() }
 }
+
+extension ComposerLeakReproTests {
+
+    /// The sequential skip pattern the macOS app drives: one queue, no
+    /// concurrency, but a rapid string of `play(url)` calls where each track
+    /// is replaced before its composer has settled. The concurrent race above
+    /// is fixed; this covers the *serial* path — the previous composer must
+    /// be torn down on each replacement rather than piling up with its
+    /// 4 MiB ring buffer and writer thread still live.
+    func testSerialRapidTrackSwitchDoesNotPileUpComposers() {
+        let urls = (0 ..< 40).map { URL(string: "https://example.com/t\($0).mp3")! }
+
+        let h = Harness(gapless: false)
+        defer { h.aplay.destroy() }
+
+        // Sequential, like the app: load url 1, immediately skip to url 2…
+        for url in urls { h.aplay.play(url) }
+
+        let baseline = Composer.liveCount
+        let settled = waitUntil(timeout: 8) { Composer.liveCount - baseline <= 2 }
+        XCTAssertTrue(settled, "serial skips never drained to the budget")
+        XCTAssertLessThanOrEqual(Composer.liveCount - baseline, 2,
+                                 "a single play keeps one current (and at most one preloaded) composer; got \(Composer.liveCount - baseline)")
+    }
+
+    /// Same serial hammer, but through `prepare` — the app uses this path
+    /// while the transport is paused, and the composer slots have to drain
+    /// there too.
+    func testSerialRapidPrepareDoesNotPileUpComposers() {
+        let urls = (0 ..< 40).map { URL(string: "https://example.com/t\($0).mp3")! }
+
+        let h = Harness(gapless: false)
+        defer { h.aplay.destroy() }
+
+        for url in urls { h.aplay.prepare(url) }
+
+        let baseline = Composer.liveCount
+        let settled = waitUntil(timeout: 8) { Composer.liveCount - baseline <= 2 }
+        XCTAssertTrue(settled, "serial prepares never drained to the budget")
+        XCTAssertLessThanOrEqual(Composer.liveCount - baseline, 2,
+                                 "a single prepare keeps one current (and at most one preloaded) composer; got \(Composer.liveCount - baseline)")
+    }
+}

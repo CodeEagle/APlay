@@ -37,12 +37,15 @@ private final class ComposerPCMBuffer {
             let free = Int(capacity - (tail - consumed.load()))
             guard free > 0 else {
                 // Backpressure belongs to the decoder, never the audio callback.
-                // Wait without a timeout: `read` and `clear` both wake this
-                // semaphore, so the decoder thread is parked rather than waking
-                // every 5 ms to re-test a buffer that a torn-down composer will
-                // never drain — the polling loop is what kept orphaned composers
-                // pinned on a live thread, unreachable by ARC.
-                writerWake.wait()
+                // The wait is bounded, not infinite: `clear()` signals exactly
+                // once, and a writer that was inside memcpy (or
+                // AudioConverterFillComplexBuffer) at that moment can reach the
+                // wait only after the signal has already been spent — an
+                // unbounded wait then parks the decode thread forever, and its
+                // live stack frame keeps the whole Composer (streamer, decoder,
+                // 4 MiB ring buffers) reachable and undestroyable. Re-checking
+                // `closed` every 50 ms closes that window unconditionally.
+                writerWake.wait(timeout: .now() + .milliseconds(50))
                 continue
             }
             let count = min(free, Int(amount) - offset)

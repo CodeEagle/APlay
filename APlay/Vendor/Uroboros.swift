@@ -59,6 +59,9 @@ public final class Uroboros {
     private let _propertiesQueue = DispatchQueue(label: "Uroboros.Properties")
     /// Semaphore for stop/continue write action
     private lazy var _semaphore = DispatchSemaphore(value: 0)
+    /// Set by `close()`: once closed, a writer parked in `checkSpace` must stop
+    /// waiting instead of parking forever on a buffer nothing will drain.
+    private let closed = RenderAtomic()
     /// Store content
     private var _body: UroborosBody
 
@@ -90,11 +93,26 @@ public final class Uroboros {
         guard amount > 0 else { return }
         _writeQueue.sync {
             func checkSpace() {
-                guard amount > availableSpace else { return }
-                requiredSpace = amount
-                _semaphore.wait()
+                // A loop, not a single guard: the semaphore wake (real or the
+                // 50 ms timeout below) must re-test the space, because a wake can
+                // arrive when the reader had already released enough room — or
+                // when it never will (a torn-down decoder stops draining).
+                //
+                // The wait is bounded: `commitRead`/`clear()` signal exactly once
+                // per satisfied `requiredSpace`, and a writer that was inside
+                // memcpy (or an AudioFileStream packet callback) at that moment
+                // can reach the wait after the signal has been spent. With an
+                // unbounded wait the network parse thread parks forever, and its
+                // live stack frame keeps the whole Composer (streamer, decoder,
+                // 4 MiB ring buffers and the pending network Data) reachable —
+                // the exact leak seen on rapid track switching.
+                while amount > availableSpace, closed.load() == 0 {
+                    requiredSpace = amount
+                    _semaphore.wait(timeout: .now() + .milliseconds(50))
+                }
             }
             checkSpace()
+            guard closed.load() == 0 else { return }
             let intCount = Int(amount)
             let targetLocation = end + amount
             if targetLocation > capacity {
@@ -182,6 +200,20 @@ public final class Uroboros {
         let data = availableData
         guard data > 0 else { return }
         commitRead(count: data)
+    }
+
+    /// Closes the buffer to further writes and releases any writer parked in
+    /// `checkSpace`.
+    ///
+    /// `clear()` alone is not enough for teardown: when the buffer happens to
+    /// be empty at that moment its `guard data > 0` early-returns without
+    /// signalling, so a writer that already set `requiredSpace` waits forever.
+    /// `close` signals unconditionally and marks the buffer closed so the
+    /// writer's bounded re-check loop stops spinning.
+    public func close() {
+        _ = closed.exchange(1)
+        requiredSpace = 0
+        _semaphore.signal()
     }
 }
 

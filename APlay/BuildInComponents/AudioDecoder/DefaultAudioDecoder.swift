@@ -73,6 +73,10 @@ extension DefaultAudioDecoder: AudioDecoderCompatible {
         debug_log("DefaultAudioDecoder request destroy")
         _isRequestClose = true
         _decodeTimer?.invalidate()
+        // Closing the packet ring lets a writer parked in `Uroboros.write`'s
+        // bounded wait loop notice the teardown instead of parking forever and
+        // pinning this decoder (and its Composer) on a live stack frame.
+        _packetsManager.close()
         _packetsManager.clear()
     }
 

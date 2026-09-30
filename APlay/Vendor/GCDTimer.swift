@@ -48,7 +48,20 @@ final class GCDTimer {
     func invalidate() {
         _action = nil
         _timer?.setEventHandler(handler: nil)
-        pause()
+        // Cancelling (not only suspending) removes the source from libdispatch's
+        // timer heap: a suspended DispatchSourceTimer keeps its heap slot until
+        // it is cancelled, and every unreleased GCDTimer therefore left a
+        // 2.5kB entry behind per track change, which read as the app's
+        // "_dispatch_timers_heap" growing past 14MB on rapid skipping.
+        // Resume before cancel: releasing a suspended source is a libdispatch
+        // client bug ("Release of a suspended object"), so the suspend that
+        // `pause()` applies has to be undone before the source is dropped.
+        _stateQueue.sync {
+            if _isStopped { _timer?.resume() }
+            _isStopped = true
+        }
+        _timer?.cancel()
+        _timer = nil
     }
 
     func pause() {

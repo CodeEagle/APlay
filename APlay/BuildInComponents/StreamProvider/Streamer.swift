@@ -479,6 +479,10 @@ private extension Streamer {
     /// whole. Always false for a plain local file, which has no holes.
     private func resumeReaderShouldWait(at offset: UInt64) -> Bool {
         guard let resume = resumeCache() else { return false }
+        // There is no bitmap block at/past EOF. For block-aligned lengths,
+        // querying it would wait forever instead of letting FileHandle return
+        // an empty read and emit endEncountered. Holes before EOF still wait.
+        guard offset < resume.contentLength else { return false }
         return resume.bitmapContains(offset: offset) == false
     }
 

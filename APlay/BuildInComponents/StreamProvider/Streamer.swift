@@ -20,6 +20,11 @@ final class Streamer: StreamProviderCompatible, @unchecked Sendable {
 
     var bufferingProgress: Float {
         guard contentLength > 0 else { return 0 }
+        // A resumed stream buffers ahead of the playhead: the table's byte count
+        // is how far playback can reach, not how far it has gone.
+        if let resume = resumeCache() {
+            return Float(resume.downloadedBytes) / Float(contentLength)
+        }
         let start = Float(position) + Float(_bytesRead)
         return start / Float(contentLength)
     }
@@ -53,6 +58,36 @@ final class Streamer: StreamProviderCompatible, @unchecked Sendable {
     private var _bytesRead: UInt = 0
     private var _tagParser: MetadataParserCompatible?
     private var _isFirstPacket = true
+
+    /// Resume-cache state for a remote stream whose bytes are laid out in a
+    /// preallocated `.part` container: either a partial container the URL
+    /// already has, or one the response's content length let us preallocate.
+    private let _resumeLock = NSLock()
+    private var _resume: ResumeCache?
+    /// The offset the active download asked the server to start at, so a 206's
+    /// `Content-Range` can be checked against it.
+    private var _resumeDownloadStart: UInt64 = 0
+
+    /// Reads the resume cache under its lock: the network callbacks and the
+    /// local read loop reach it from different queues.
+    @inline(__always)
+    private func resumeCache() -> ResumeCache? {
+        _resumeLock.lock()
+        defer { _resumeLock.unlock() }
+        return _resume
+    }
+
+    private func setResume(_ cache: ResumeCache?) {
+        _resumeLock.lock()
+        _resume = cache
+        _resumeLock.unlock()
+    }
+
+    /// A sweep of the cache directory, once per process, before the cache is
+    /// first written into. Running it here keeps the write path free of bookkeeping
+    /// and guarantees the evicted entries are not the ones being opened.
+    private static var _hasSweptDiskCache = false
+    private static let _sweepLock = NSLock()
 
     #if DEBUG
         deinit {
@@ -168,8 +203,26 @@ extension Streamer {
             _fileHandle = nil
             try? handle.close()
         }
+        if let resume = resumeCache() {
+            resume.close()
+            setResume(nil)
+            _resumeDownloadStart = 0
+        }
         guard info.isRemote else { return }
         if resetTimer { _watchDogInfo.reset() }
+    }
+
+    /// Cancels the in-flight download but leaves the container and the local
+    /// reader running, so a reconnect writes into the same `.part` and the read
+    /// loop bridges the gap by waiting on the next block. Must run on
+    /// `_stateQueue`.
+    private func cancelDownload() {
+        if let task = _task {
+            _task = nil
+            _isSuspended = false
+            task.cancel()
+        }
+        resumeCache()?.flushMeta()
     }
 
     private func reset(url: URL) {
@@ -180,10 +233,49 @@ extension Streamer {
         _bytesRead = 0
         info = StreamProvider.URLInfo(url: url)
         position = 0
-        if let cachedInfo = asCachedFileInfo() { info = cachedInfo }
+        if info.isRemote {
+            // The sweep belongs ahead of any cache write, and the name it must
+            // spare is this track's — the oldest entry on a full disk could
+            // otherwise be the one about to play.
+            sweepDiskCacheOnce(protecting: url)
+        }
+        if let cachedInfo = asCachedFileInfo() {
+            info = cachedInfo
+        } else if let resume = openResumeCache(for: url) {
+            // A partial container replays its cached blocks locally while the
+            // network tops it up, so the stream reads through the same file
+            // handle as a finished cache hit.
+            setResume(resume)
+            info = .local(resume.containerURL, info.fileHint)
+        }
         contentLength = info.localContentLength()
+        if let resume = resumeCache() { contentLength = UInt(resume.contentLength) }
         _tagParser = tagParser(for: info)
         _config.logger.log("\(info)", to: .streamProvider)
+    }
+
+    /// Scans the cache directory once per process, evicting the oldest entries
+    /// until the allocated bytes fit `maxDiskCacheSize`.
+    private func sweepDiskCacheOnce(protecting url: URL) {
+        guard _config.cachePolicy.isEnabled else { return }
+        Self._sweepLock.lock()
+        let alreadySwept = Self._hasSweptDiskCache
+        Self._hasSweptDiskCache = true
+        Self._sweepLock.unlock()
+        guard alreadySwept == false else { return }
+        DiskCacheCleaner().sweepIfNeeded(cacheDirectory: _config.cacheDirectory,
+                                          maxSize: UInt64(_config.maxDiskCacheSize),
+                                          excluding: [_config.cacheNaming.name(for: url)],
+                                          log: { [weak self] message in
+                                            self?._config.logger.log(message, to: .streamProvider)
+                                          })
+    }
+
+    /// Looks for a container a previous session left partly filled for this URL,
+    /// so its cached blocks can be replayed and only the remainder fetched.
+    private func openResumeCache(for url: URL) -> ResumeCache? {
+        guard _config.cachePolicy.isEnabled, let name = _cacheInfo.cacheName else { return nil }
+        return ResumeCache.open(name: name, cacheDirectory: _config.cacheDirectory, expectedOriginURL: url)
     }
 
     private func setLocalRunning(_ value: Bool) {
@@ -222,6 +314,11 @@ private extension Streamer {
                 let e = error as? APlay.Error ?? APlay.Error.open("open local failed: \(error)")
                 outputPipeline.call(.errorOccurred(e))
             }
+            // A reopened partial container is read locally and filled by a
+            // download that starts alongside it.
+            if resumeCache() != nil {
+                startResumeDownload(at: UInt64(position))
+            }
         case .remote:
             openRemote(at: position)
         case .unknown:
@@ -256,12 +353,21 @@ private extension Streamer {
             outputPipeline.call(.errorOccurred(.open("not a remote url")))
             return
         }
+        // A partial container already holds the track's opening, so ask only for
+        // what the table says is missing; the play position is the floor.
+        let start = resumeDownloadStart(for: UInt64(position))
+        _resumeDownloadStart = start
         var request = URLRequest(url: url)
         request.httpMethod = Keys.get.rawValue
         request.setValue(_config.userAgent, forHTTPHeaderField: Keys.userAgent.rawValue)
         request.setValue(Keys.icyMetaDataValue.rawValue, forHTTPHeaderField: Keys.icyMetadata.rawValue)
-        if position > 0 {
-            request.setValue("bytes=\(position)-", forHTTPHeaderField: Keys.range.rawValue)
+        if start > 0 {
+            request.setValue("bytes=\(start)-", forHTTPHeaderField: Keys.range.rawValue)
+        }
+        // Let the server judge whether the content moved: a 206 keeps the cached
+        // bytes, a 200 discards them.
+        if let ifRange = resumeCache()?.ifRangeValue {
+            request.setValue(ifRange, forHTTPHeaderField: Keys.ifRange.rawValue)
         }
         for (key, value) in _config.predefinedHttpHeaderValues {
             debug_log("Setting predefined HTTP header[\(key) : \(value)]")
@@ -276,7 +382,49 @@ private extension Streamer {
         _watchDogInfo.reopenTimes += 1
         _watchDogInfo.isReadedData = false
         _isFirstPacket = true
-        _config.logger.log("open at \(position)", to: .streamProvider)
+        _config.logger.log("open at \(position) (downloading from \(start))", to: .streamProvider)
+        task.resume()
+    }
+
+    /// Where a download should ask the server to start: the play position, or —
+    /// when a partial container already covers its opening — the first block the
+    /// table does not vouch for, so the cached bytes are not re-fetched.
+    private func resumeDownloadStart(for position: UInt64) -> UInt64 {
+        guard let resume = resumeCache() else { return position }
+        return max(position, resume.firstMissingOffset())
+    }
+
+    /// Starts the download that fills an already-open container. Mirrors
+    /// `openRemote(at:)` against the container's origin URL, which `info` no
+    /// longer carries once the stream reads locally. Must run on `_stateQueue`.
+    private func startResumeDownload(at position: UInt64) {
+        guard let resume = resumeCache() else { return }
+        let start = max(position, resume.firstMissingOffset())
+        _resumeDownloadStart = start
+        resume.setWriteOffset(start)
+
+        var request = URLRequest(url: resume.originURL)
+        request.httpMethod = Keys.get.rawValue
+        request.setValue(_config.userAgent, forHTTPHeaderField: Keys.userAgent.rawValue)
+        request.setValue(Keys.icyMetaDataValue.rawValue, forHTTPHeaderField: Keys.icyMetadata.rawValue)
+        if start > 0 {
+            request.setValue("bytes=\(start)-", forHTTPHeaderField: Keys.range.rawValue)
+        }
+        if let ifRange = resume.ifRangeValue {
+            request.setValue(ifRange, forHTTPHeaderField: Keys.ifRange.rawValue)
+        }
+        for (key, value) in _config.predefinedHttpHeaderValues {
+            debug_log("Setting predefined HTTP header[\(key) : \(value)]")
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let task = _urlSession.dataTask(with: request)
+        _task = task
+        if _isSuspended { task.suspend() }
+        _watchDogInfo.reopenTimes += 1
+        _watchDogInfo.isReadedData = false
+        _isFirstPacket = true
+        _config.logger.log("resume download from \(start) of \(resume.contentLength)", to: .streamProvider)
         task.resume()
     }
 }
@@ -295,6 +443,16 @@ private extension Streamer {
             let handle = _fileHandle
             _localLock.unlock()
             guard running, let handle else { return }
+
+            // A resumed stream may be read faster than it is filled: the block
+            // ahead can still be a sparse hole. Wait for the writer to close it
+            // rather than serve the hole's zeros — a pause or a teardown breaks
+            // this wait through `_isRunningLocal`.
+            if resumeReaderShouldWait(at: handle.offsetInFile) {
+                Thread.sleep(forTimeInterval: 0.01)
+                continue
+            }
+
             guard let chunk = try? handle.read(upToCount: 8192), chunk.isEmpty == false else { break }
             deliverLocalData(chunk)
         }
@@ -305,6 +463,13 @@ private extension Streamer {
         _localLock.unlock()
         guard reachedEOF else { return }
         outputPipeline.call(.endEncountered)
+    }
+
+    /// Whether the next pull would enter a block the resume table has not marked
+    /// whole. Always false for a plain local file, which has no holes.
+    private func resumeReaderShouldWait(at offset: UInt64) -> Bool {
+        guard let resume = resumeCache() else { return false }
+        return resume.bitmapContains(offset: offset) == false
     }
 
     private func deliverLocalData(_ data: Data) {
@@ -431,15 +596,26 @@ private extension Streamer {
 
         switch statusCode {
         case 200, 206:
-            if let len = http.value(forHTTPHeaderField: Keys.contentLength.rawValue).flatMap({ UInt($0) }) {
-                if statusCode == 206 {
-                    contentLength = len + position
-                } else {
-                    contentLength = len
+            if resumeCache() != nil {
+                // Already reading the container: the range we got must be the one
+                // we asked for, and the length the one we cached.
+                handleResumeResponse(http, statusCode: statusCode)
+            } else if let length = responseContentLength(http, statusCode: statusCode) {
+                // A known length means the body can be laid out in a container,
+                // which makes this stream resumable from here on. The read loop
+                // posts `.readyForRead` once the container is open.
+                beginResumeDownload(http: http, contentLength: length)
+            } else {
+                if let len = http.value(forHTTPHeaderField: Keys.contentLength.rawValue).flatMap({ UInt($0) }) {
+                    if statusCode == 206 {
+                        contentLength = len + position
+                    } else {
+                        contentLength = len
+                    }
+                    _config.logger.log("\(statusCode) Content Length:\(contentLength)", to: .streamProvider)
                 }
-                _config.logger.log("\(statusCode) Content Length:\(contentLength)", to: .streamProvider)
+                outputPipeline.call(.readyForRead)
             }
-            outputPipeline.call(.readyForRead)
         case 401, 407:
             // The challenge is answered in the session delegate; if the server
             // still answers with 401/407 the reconnect watchdog takes over.
@@ -457,7 +633,7 @@ private extension Streamer {
     }
 
     func handle(data: Data) {
-        if info.isRemote {
+        if info.isRemote || resumeCache() != nil {
             if Self.isRetryableStatus(currentResponseStatus) {
                 // An error page is not audio: keep the watchdog armed (see
                 // `handleEndEncountered`) and keep the bytes out of the
@@ -472,6 +648,14 @@ private extension Streamer {
             data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
                 guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
                 _icyCastInfo.parseICYStream(streamer: self, buffers: UnsafeMutablePointer(mutating: base), bufSize: Int(count))
+            }
+        } else if let resume = resumeCache() {
+            // The container is the buffer: the read loop hands these bytes to
+            // the decoder once the block closes, so nothing is posted here —
+            // posting would feed the parser twice.
+            data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+                _ = resume.write(bytes: UnsafeMutablePointer(mutating: base), count: Int(count))
             }
         } else {
             data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
@@ -497,9 +681,35 @@ private extension Streamer {
     }
 
     private func handleEndEncountered() {
-        guard info.isRemote == true else { return }
+        guard info.isRemote || resumeCache() != nil else { return }
         let statusCode = currentResponseStatus
         if Self.isRetryableStatus(statusCode) { return }
+
+        if let resume = resumeCache() {
+            // The read loop owns end-of-stream for the container; the network
+            // side only tops it up when the download stopped short of the end.
+            let frontier = resume.writeOffset
+            if frontier < UInt64(contentLength), contentLength > 0 {
+                _config.logger.log("Resume stream ended at \(frontier) of \(contentLength), restarting the download", to: .streamProvider)
+                cancelDownload()
+                startReconnectWatchDog(notStreamingEnd: true)
+            } else if resume.isComplete == false,
+                      resume.firstMissingOffset() < UInt64(contentLength) {
+                // A seek past the gap left a hole behind the play point: the
+                // tail is whole but the middle is not, so promote() would refuse
+                // it. Refill from the first missing block; the next
+                // end-of-download promotes the now-complete container.
+                let hole = resume.firstMissingOffset()
+                _config.logger.log("Resume download reached the end with a hole at \(hole) of \(contentLength); refilling", to: .streamProvider)
+                _watchDogInfo.reset()
+                startResumeDownload(at: hole)
+            } else {
+                _watchDogInfo.reset()
+                promoteResumeCache()
+            }
+            return
+        }
+
         let read = _bytesRead + position
         if read < contentLength, contentLength > 0 {
             _config.logger.log("HTTP stream end encountered whithout streamimg all content[\(contentLength)] , restart at postion \(read)", to: .streamProvider)
@@ -515,13 +725,27 @@ private extension Streamer {
 
     private func handleStreamError(_ error: Error) {
         let nsError = error as NSError
-        guard info.isRemote, nsError.domain == NSURLErrorDomain, nsError.code != NSURLErrorCancelled else { return }
+        guard (info.isRemote || resumeCache() != nil),
+              nsError.domain == NSURLErrorDomain,
+              nsError.code != NSURLErrorCancelled else { return }
         let read = _bytesRead + position
         if read < contentLength, contentLength > 0 {
             _watchDogInfo.startWatchDog(with: 2) { [weak self] reachMaxRetryTime in
                 guard let sself = self else { return }
                 if reachMaxRetryTime {
                     sself.reachMaxRetryAndStopWatchDog()
+                    return
+                }
+                // A resumed download picks up inside the container it already
+                // filled; the local reader stays open across the reconnect.
+                if sself.resumeCache() != nil {
+                    sself.cancelDownload()
+                    guard sself.reconnectResumeDownload() else {
+                        sself._watchDogInfo.invalidateTimer()
+                        let error = APlay.Error.streamParse("Resume position exceeded content length[\(sself.contentLength)]")
+                        sself.outputPipeline.call(.errorOccurred(error))
+                        return
+                    }
                     return
                 }
                 let p = StreamProvider.Position(sself.position + sself._bytesRead)
@@ -532,11 +756,196 @@ private extension Streamer {
                     sself.outputPipeline.call(.errorOccurred(error))
                     return
                 }
+                sself._bytesRead = 0
                 sself._open(at: p)
             }
         } else {
             _watchDogInfo.invalidateTimer()
             outputPipeline.call(.errorOccurred(.network(error.localizedDescription)))
+        }
+    }
+}
+
+// MARK: - Resume cache plumbing
+
+private extension Streamer {
+    /// Total body length a response carries: a 206 announces it in
+    /// `Content-Range`, any status in `Content-Length`.
+    func responseContentLength(_ http: HTTPURLResponse, statusCode: Int) -> UInt64? {
+        if statusCode == 206 {
+            // A conformant 206 names the whole resource in `Content-Range`.
+            // Without it `Content-Length` is only the slice that was requested,
+            // so the slice's start has to be added back to recover the total.
+            if let total = contentRange(http)?.split(separator: "/").last,
+               let value = UInt64(total) {
+                return value
+            }
+            if let len = http.value(forHTTPHeaderField: Keys.contentLength.rawValue).flatMap({ UInt64($0) }) {
+                return len + _resumeDownloadStart
+            }
+            return nil
+        }
+        if let len = http.value(forHTTPHeaderField: Keys.contentLength.rawValue).flatMap({ UInt64($0) }) { return len }
+        return nil
+    }
+
+    /// The `Content-Range` header's start, or `nil` when the server reports an
+    /// unsatisfiable range (`bytes */total`) — not a range to resume from.
+    func contentRangeStart(_ http: HTTPURLResponse) -> UInt64? {
+        guard let range = contentRange(http) else { return nil }
+        guard let span = range.split(separator: "/").first,
+              let start = span.split(separator: "-").first else { return nil }
+        return UInt64(start)
+    }
+
+    private func contentRange(_ http: HTTPURLResponse) -> String? {
+        guard var value = http.value(forHTTPHeaderField: Keys.contentRange.rawValue) else { return nil }
+        if value.hasPrefix("bytes ") { value = String(value.dropFirst(6)) }
+        guard value.contains("/") else { return nil }
+        return value
+    }
+
+    /// Lays out a freshly known body in a preallocated container and switches
+    /// the stream to reading it locally, which is what makes the download
+    /// resumable. Runs on `_stateQueue`.
+    func beginResumeDownload(http: HTTPURLResponse, contentLength length: UInt64) {
+        guard _icyCastInfo.isIcyStream == false else { return }
+        guard let name = _cacheInfo.cacheName else { return }
+        guard let resume = ResumeCache.create(name: name,
+                                              cacheDirectory: _config.cacheDirectory,
+                                              originURL: info.url,
+                                              contentLength: length,
+                                              etag: http.value(forHTTPHeaderField: Keys.etag.rawValue),
+                                              lastModified: http.value(forHTTPHeaderField: Keys.lastModified.rawValue)) else {
+            // No container, no resume: the sequential path takes the body.
+            outputPipeline.call(.readyForRead)
+            return
+        }
+        setResume(resume)
+        resume.setWriteOffset(_resumeDownloadStart)
+        contentLength = UInt(length)
+        info = .local(resume.containerURL, info.fileHint)
+        do {
+            try openResumeReader(at: UInt64(position))
+        } catch {
+            let e = error as? APlay.Error ?? APlay.Error.open("open resume container failed: \(error)")
+            outputPipeline.call(.errorOccurred(e))
+        }
+    }
+
+    /// Checks a response that arrived for an already-open container: the range
+    /// must be the one asked for and the length the cached one, else the
+    /// container restarts. Runs on `_stateQueue`.
+    func handleResumeResponse(_ http: HTTPURLResponse, statusCode: Int) {
+        guard _icyCastInfo.isIcyStream == false else {
+            fallBackToSequential()
+            return
+        }
+        guard let resume = resumeCache() else { return }
+        let etag = http.value(forHTTPHeaderField: Keys.etag.rawValue)
+        let lastModified = http.value(forHTTPHeaderField: Keys.lastModified.rawValue)
+
+        if statusCode == 206 {
+            // A conformant server repeats the slice in `Content-Range`; one that
+            // omits the header is still answering the range that was requested.
+            let start = contentRangeStart(http) ?? _resumeDownloadStart
+            guard start == _resumeDownloadStart else {
+                // The server answered with a slice other than the one requested,
+                // so the container's layout no longer matches the stream.
+                fallBackToSequential()
+                return
+            }
+            if let total = responseContentLength(http, statusCode: statusCode), total != resume.contentLength {
+                // The validators matched but the length moved: the cached bytes
+                // belong to another rendition, so the table starts over.
+                resume.restart(contentLength: total, etag: etag, lastModified: lastModified)
+                contentLength = UInt(total)
+                return
+            }
+            resume.setWriteOffset(start)
+            resume.setValidators(etag: etag, lastModified: lastModified)
+        } else {
+            // A 200 means the server ignored `If-Range` or replaced the content:
+            // the whole body comes back and the container starts over at zero.
+            guard let total = responseContentLength(http, statusCode: statusCode), total > 0 else {
+                fallBackToSequential()
+                return
+            }
+            resume.restart(contentLength: total, etag: etag, lastModified: lastModified)
+            contentLength = UInt(total)
+        }
+    }
+
+    /// Opens the container for reading and starts draining it. Mirrors
+    /// `openLocal(at:)` without the ID3 probe, which the opening path already ran
+    /// against the origin URL. Must run on `_stateQueue`.
+    func openResumeReader(at offset: UInt64) throws {
+        guard case let .local(url, _) = info else {
+            throw APlay.Error.open("not a local url")
+        }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw APlay.Error.open("file not exists: \(url)")
+        }
+        let handle = try FileHandle(forReadingFrom: url)
+        if offset > 0 { try handle.seek(toOffset: offset) }
+        _localLock.lock()
+        _fileHandle = handle
+        _isRunningLocal = true
+        _localLock.unlock()
+        _isFirstPacket = true
+        _readQueue.async { [weak self] in
+            self?.localReadLoop()
+        }
+    }
+
+    /// Restarts the download into the container from where it stopped, leaving
+    /// the local reader untouched — it bridges the gap by waiting on the next
+    /// block. Returns false when nothing is left to fetch. Must run on
+    /// `_stateQueue`.
+    @discardableResult
+    func reconnectResumeDownload() -> Bool {
+        guard let resume = resumeCache() else { return false }
+        _watchDogInfo.invalidateTimer()
+        let frontier = resume.writeOffset
+        guard frontier < UInt64(contentLength), contentLength > 0 else { return false }
+        _bytesRead = 0
+        startResumeDownload(at: frontier)
+        return true
+    }
+
+    /// Gives up on the container and writes to the sequential tmp file — what a
+    /// stream without a usable length, or a ShoutCast body, has always done. The
+    /// partial stays on disk for a later, better-behaved request.
+    func fallBackToSequential() {
+        guard let resume = resumeCache() else { return }
+        setLocalRunning(false)
+        if let handle = _fileHandle {
+            _fileHandle = nil
+            try? handle.close()
+        }
+        resume.flushMeta()
+        info = .remote(resume.originURL, info.fileHint)
+        setResume(nil)
+        _resumeDownloadStart = 0
+        _bytesRead = 0
+        outputPipeline.call(.readyForRead)
+        _config.logger.log("resume cache unusable for this response; falling back to sequential", to: .streamProvider)
+    }
+
+    /// Every block of the container holds real bytes, so it is indistinguishable
+    /// from a completed download: move it to the plain cache path and the next
+    /// open finds a full hit.
+    func promoteResumeCache() {
+        guard let resume = resumeCache(), _config.cachePolicy.isEnabled else { return }
+        // Match the sequential path and let the caller's validator clear the
+        // file before it becomes a cache hit.
+        let headerSnapshot = registerHeader.compactMapValues { $0 as? String }
+        let originURL = resume.originURL
+        DispatchQueue.global(qos: .utility).async {
+            if case let APlay.Configuration.HttpFileValidationPolicy.validateHeader(keys: _, closure) = self._config.httpFileCompletionValidator {
+                guard closure(originURL, resume.containerURL.path, headerSnapshot) else { return }
+            }
+            _ = resume.promote()
         }
     }
 }
@@ -567,6 +976,13 @@ private extension Streamer {
                    sself.contentLength > 0 {
                     p = StreamProvider.Position(totalReadLength)
                 } else { p = 0 }
+            }
+            if sself.resumeCache() != nil {
+                // The container is the reconnect target: the local reader stays
+                // open and the download picks up at its write cursor.
+                sself.cancelDownload()
+                _ = sself.reconnectResumeDownload()
+                return
             }
             sself._bytesRead = 0
             sself._open(at: p)
@@ -774,6 +1190,10 @@ private extension Streamer {
 
         init(config: ConfigurationCompatible) { _config = config }
 
+        /// Cache file name for the current URL, `nil` when caching is off or
+        /// no URL has been reset into yet.
+        var cacheName: String? { _cacheName }
+
         func cachedFilePath(for dir: String) -> String? {
             guard let name = _cacheName else { return nil }
             return "\(dir)/\(name)"
@@ -853,5 +1273,9 @@ private extension Streamer {
         case icecastStationName = "IcecastStationName"
         case contentType = "Content-Type"
         case contentLength = "Content-Length"
+        case ifRange = "If-Range"
+        case contentRange = "Content-Range"
+        case etag = "ETag"
+        case lastModified = "Last-Modified"
     }
 }

@@ -89,12 +89,13 @@ final class Streamer: StreamProviderCompatible, @unchecked Sendable {
     private static var _hasSweptDiskCache = false
     private static let _sweepLock = NSLock()
 
-    #if DEBUG
-        deinit {
-            _urlSession.finishTasksAndInvalidate()
-            debug_log("\(self) \(#function)")
-        }
-    #endif
+    deinit {
+        // URLSession retains its delegate until invalidated, even after all
+        // data tasks end. This must run in Release too: dropping the Streamer
+        // alone otherwise leaves a session + weak delegate bridge per track.
+        _urlSession.invalidateAndCancel()
+        debug_log("\(self) \(#function)")
+    }
 
     init(config: ConfigurationCompatible) {
         _config = config
@@ -453,8 +454,17 @@ private extension Streamer {
                 continue
             }
 
-            guard let chunk = try? handle.read(upToCount: 8192), chunk.isEmpty == false else { break }
-            deliverLocalData(chunk)
+            // FileHandle returns autoreleased NSData backing its Swift Data.
+            // This dispatch block may run for an entire track (and block on
+            // decoder backpressure), so its outer pool is not drained per read.
+            // Keep the pool around BOTH reading and synchronous delivery: the
+            // raw pointer must remain valid through parser/decoder callbacks.
+            let delivered = autoreleasepool { () -> Bool in
+                guard let chunk = try? handle.read(upToCount: 8192), !chunk.isEmpty else { return false }
+                deliverLocalData(chunk)
+                return true
+            }
+            guard delivered else { break }
         }
         // EOF (not pause/destroy) is the only path that posts `.endEncountered`.
         _localLock.lock()

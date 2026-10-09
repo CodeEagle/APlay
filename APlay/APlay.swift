@@ -382,11 +382,12 @@ indexChanged()
         return TimeInterval(_player.currentTime())
     }
 
-    func metadataUpdate(title: String? = nil, album: String? = nil, artist: String? = nil, cover: APlayImage? = nil) {
+    func metadataUpdate(title: String? = nil, album: String? = nil, artist: String? = nil, cover: APlayImage? = nil, clearArtwork: Bool = false) {
         if let value = title { _nowPlayingInfo.name = value }
         if let value = artist { _nowPlayingInfo.artist = value }
         if let value = album { _nowPlayingInfo.album = value }
-        if let value = cover { _nowPlayingInfo.artwork = value }
+        if clearArtwork { _nowPlayingInfo.artwork = nil }
+        else if let value = cover { _nowPlayingInfo.artwork = value }
         _nowPlayingInfo.update()
     }
 

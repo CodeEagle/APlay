@@ -17,6 +17,7 @@ import AVFoundation
 import XCTest
 @testable import APlay
 
+#if DEBUG // pullRenderQuantum is intentionally a DEBUG-only render seam.
 final class PcmTapTests: XCTestCase {
     func testPcmTapDeliversSamples() throws {
         let player = APlayer(config: APlay.Configuration())
@@ -156,3 +157,4 @@ extension PcmTapTests {
                          "resident footprint grew \(growth / 1024 / 1024) MiB over 10k render quanta")
     }
 }
+#endif

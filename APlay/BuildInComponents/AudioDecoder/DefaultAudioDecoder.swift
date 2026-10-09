@@ -47,11 +47,17 @@ final class DefaultAudioDecoder: @unchecked Sendable {
         set { _propertiesQueue.async(flags: .barrier) { self.__isRequestClose = newValue } }
     }
 
-    #if DEBUG
-        deinit {
-            debug_log("\(self) \(#function)")
-        }
-    #endif
+    deinit {
+        // Opaque Core Audio handles are not ARC-managed. destroy() first stops
+        // timers and releases blocked writers; an in-flight parse/decode call
+        // still strongly owns this decoder until it returns. Final release is
+        // therefore the safe point to close handles without racing callbacks.
+        // Read storage directly: syncing _propertiesQueue here can deadlock if
+        // its final queued setter is the one releasing this object.
+        if let stream = _audioFileStream { AudioFileStreamClose(stream) }
+        if let converter = __audioConverter { AudioConverterDispose(converter) }
+        debug_log("\(self) \(#function)")
+    }
 
     init(config: ConfigurationCompatible) {
         _config = config

@@ -12,6 +12,10 @@
 import XCTest
 @testable import APlay
 
+// This suite uses Composer's DEBUG-only live counter. Native handle/session
+// lifecycle tests run in both configurations and inspect actual allocations.
+#if DEBUG
+
 final class ComposerLeakReproTests: XCTestCase {
 
     // MARK: - Fakes
@@ -218,3 +222,4 @@ extension ComposerLeakReproTests {
                                  "a single prepare keeps one current (and at most one preloaded) composer; got \(Composer.liveCount - baseline)")
     }
 }
+#endif

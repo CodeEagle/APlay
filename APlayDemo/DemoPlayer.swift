@@ -282,7 +282,7 @@ final class DemoPlayer: ObservableObject {
     private static func makeConfig(gapless: Bool, logSink: ((String) -> Void)?) -> APlay.Configuration {
         let soundfont = Bundle.main.url(forResource: "APlayTestSine", withExtension: "sf2")
         return APlay.Configuration(
-            cachePolicy: .disable,
+            cachePolicy: .enable([]),
             autoHandlingInterruptEvent: true,
             gaplessPlaybackEnabled: gapless,
             enableVolumeMixer: true,
